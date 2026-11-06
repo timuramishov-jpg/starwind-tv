@@ -10,6 +10,8 @@ import android.media.tv.TvContract;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.Process;
+import android.util.LruCache;
 import android.os.SystemClock;
 import android.text.TextUtils;
 import android.util.Log;
@@ -46,6 +48,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -62,9 +65,19 @@ final class IosFeed {
     static final String YOUTUBE = "com.yandex.tv.ytplayer", RUTUBE = "ru.rutube.app.tv", VK = "com.vk.tv", KINOPOISK = "ru.kinopoisk.yandex.tv", ZONA = "ru.zonaplayer.app";
     private final Context context;
     private final SharedPreferences prefs;
-    private final ExecutorService pool = Executors.newFixedThreadPool(3);
-    private final ExecutorService pictures = Executors.newFixedThreadPool(3);
-    private final ExecutorService requests = Executors.newFixedThreadPool(4);
+    // Потоки фоновые и с низким приоритетом, чтобы не отнимать процессор у интерфейса на слабом телевизоре.
+    private static final ThreadFactory QUIET = r -> {
+        Thread t = new Thread(() -> { Process.setThreadPriority(Process.THREAD_PRIORITY_BACKGROUND); r.run(); });
+        t.setDaemon(true);
+        return t;
+    };
+    private final ExecutorService pool = Executors.newFixedThreadPool(2, QUIET);
+    private final ExecutorService pictures = Executors.newFixedThreadPool(2, QUIET);
+    private final ExecutorService requests = Executors.newFixedThreadPool(2, QUIET);
+    /** Обложки в памяти с потолком: восьмая часть памяти приложения, остальное читается с диска. */
+    private final LruCache<String, Bitmap> memory = new LruCache<String, Bitmap>((int) (Runtime.getRuntime().maxMemory() / 8)) {
+        @Override protected int sizeOf(String k, Bitmap b) { return b.getByteCount(); }
+    };
     private final File dir;
     private final Handler main = new Handler(Looper.getMainLooper());
     private String clientId, clientSecret, apiKey, kinoKey;
@@ -247,6 +260,14 @@ final class IosFeed {
     }
 
     private Bitmap image(String url) {
+        Bitmap hit = memory.get(url);
+        if (hit != null) return hit;
+        Bitmap b = imageFromDiskOrNet(url);
+        if (b != null) memory.put(url, b);
+        return b;
+    }
+
+    private Bitmap imageFromDiskOrNet(String url) {
         File cached = new File(dir, "i" + Integer.toHexString(url.hashCode()));
         try {
             if (cached.exists()) {
@@ -354,9 +375,18 @@ final class IosFeed {
 
     void resetProbe() { probeAt = 0; }
 
+    /** Держит обложки только у видимых лент: выбранной и соседних. Остальные вернутся из кэша при показе. */
+    void keepImages(Set<String> visible) {
+        for (Map.Entry<String, List<IosHome.FeedItem>> e : pools.entrySet()) {
+            if (visible.contains(e.getKey())) continue;
+            for (IosHome.FeedItem it : e.getValue()) { it.image = null; it.onImage = null; }
+        }
+    }
+
     /** Освобождает память лаунчера: обложки невидимых лент загрузятся заново с диска. */
     void trim() {
         for (List<IosHome.FeedItem> pool : pools.values()) for (IosHome.FeedItem it : pool) { it.image = null; it.onImage = null; }
+        memory.evictAll();
     }
 
     void probe(ProbeSink sink) {

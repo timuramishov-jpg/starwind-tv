@@ -33,6 +33,7 @@ import android.media.tv.TvInputManager;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
+import android.net.NetworkRequest;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
@@ -154,6 +155,7 @@ public class IosHome extends Activity {
     private final Map<String, Integer> cardMemory = new HashMap<>();
     private final List<ObjectAnimator> drift = new ArrayList<>();
     private ImageView glow;
+    private ConnectivityManager.NetworkCallback vpnWatch;
     private boolean dirty = true, lastVpn, wasAway;
     private int ticks;
     private ImageView wordmark;
@@ -177,16 +179,9 @@ public class IosHome extends Activity {
     private final Runnable ticker = new Runnable() {
         @Override public void run() {
             updateClock();
-            boolean on = vpnOn();
-            boolean flipped = on != lastVpn;
-            lastVpn = on;
-            if (flipped) {
-                feed.expire();
-                refreshVpn();
-            }
             ticks++;
             if (ticks % 12 == 0 && zone != CARDS && zone != APPS && !overlayOpen()) rotateFeeds();
-            if (ticks % 4 == 0 || flipped) loadAllFeeds();
+            if (ticks % 4 == 0) loadAllFeeds();
             handler.postDelayed(this, 15000);
         }
     };
@@ -241,10 +236,22 @@ public class IosHome extends Activity {
         f.addAction(Intent.ACTION_PACKAGE_CHANGED);
         f.addDataScheme("package");
         registerReceiver(packages, f);
+        // VPN отслеживается событиями системы, а не опросом.
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        if (cm != null) {
+            vpnWatch = new ConnectivityManager.NetworkCallback() {
+                @Override public void onAvailable(Network n) { handler.post(IosHome.this::vpnChanged); }
+                @Override public void onLost(Network n) { handler.postDelayed(IosHome.this::vpnChanged, 400); }
+            };
+            cm.registerNetworkCallback(new NetworkRequest.Builder().addTransportType(NetworkCapabilities.TRANSPORT_VPN)
+                    .removeCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN).build(), vpnWatch);
+        }
     }
 
     @Override protected void onDestroy() {
         unregisterReceiver(packages);
+        ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
+        if (cm != null && vpnWatch != null) cm.unregisterNetworkCallback(vpnWatch);
         super.onDestroy();
     }
 
@@ -263,6 +270,24 @@ public class IosHome extends Activity {
         refreshVpn();
         loadAllFeeds();
         autoVpn();
+        if (!prefs.getBoolean("hint_seen", false)) handler.postDelayed(this::showHint, 2500);
+    }
+
+    /** Один раз после установки: что умеет экран и где что спрятано. */
+    private void showHint() {
+        if (overlayOpen() || prefs.getBoolean("hint_seen", false)) return;
+        prefs.edit().putBoolean("hint_seen", true).apply();
+        List<String> lines = Arrays.asList(
+                "Вверх и вниз в ленте: соседний сервис",
+                "Долгое ОК на иконке: переместить, скрыть, удалить",
+                "Шестерёнка: Wi-Fi, вход в YouTube, отладка",
+                "Метла в списке приложений: очистить память",
+                "Понятно");
+        List<Runnable> close = new ArrayList<>();
+        for (int k = 0; k < lines.size(); k++) close.add(this::closeMenu);
+        showMenu("Подсказки", lines, close);
+        menuIndex = lines.size() - 1;
+        paintMenu();
     }
 
     private void rotateFeeds() {
@@ -277,6 +302,15 @@ public class IosHome extends Activity {
             showSelected();
             if (z == DOCK) moveTo(DOCK, at);
         }
+    }
+
+    private void vpnChanged() {
+        boolean on = vpnOn();
+        if (on == lastVpn) return;
+        lastVpn = on;
+        feed.expire();
+        refreshVpn();
+        loadAllFeeds();
     }
 
     private void loadAllFeeds() {
@@ -1122,6 +1156,9 @@ public class IosHome extends Activity {
         cardsLayer.setAlpha(1f);
         if (dock.isEmpty()) { showBrand(null); subtitle.setText(""); return; }
         App a = dock.get(selected);
+        Set<String> near = new HashSet<>();
+        for (int k = Math.max(0, selected - 1); k <= Math.min(dock.size() - 1, selected + 1); k++) near.add(dock.get(k).pkg);
+        feed.keepImages(near);
         showBrand(a);
         if (HAPP.equals(a.pkg) || SOTA.equals(a.pkg)) {
             subtitle.setText("");
@@ -1333,34 +1370,21 @@ public class IosHome extends Activity {
     }
 
     private void navigate(int key) {
-        boolean left = key == KeyEvent.KEYCODE_DPAD_LEFT, right = key == KeyEvent.KEYCODE_DPAD_RIGHT;
-        boolean up = key == KeyEvent.KEYCODE_DPAD_UP;
-        int count = views(zone).size();
-        if (zone == DOCK) {
-            if (up && index > 0) moveTo(DOCK, index - 1);
-            else if (up) moveTo(TOP, 0);
-            else if (!left && !right && index < count - 1) moveTo(DOCK, index + 1);
-            else if (right && index == dock.size()) { if (!appViews.isEmpty()) moveTo(APPS, 0); }
-            else if (right && !cardViews.isEmpty()) moveTo(CARDS, remembered());
-        } else if (zone == CARDS) {
-            if (left) { if (index > 0) moveTo(CARDS, index - 1); else moveTo(DOCK, selected); }
-            else if (right) { if (index < count - 1) moveTo(CARDS, index + 1); }
-            else if (up) { if (selected > 0) nextFeed(selected - 1); else moveTo(TOP, 0); }
-            else if (selected + 1 < dock.size()) nextFeed(selected + 1);
-            else moveTo(DOCK, dock.size());
-        } else if (zone == TOP) {
-            if (left && index > 0) moveTo(TOP, index - 1);
-            else if (left) moveTo(DOCK, selected);
-            else if (right && index < count - 1) moveTo(TOP, index + 1);
-            else if (!left && !right && !up) { if (!cardViews.isEmpty()) moveTo(CARDS, remembered()); else moveTo(DOCK, selected); }
-        } else {
-            int col = index % APPS_PER_ROW;
-            if (left) { if (col > 0) moveTo(APPS, index - 1); else moveTo(DOCK, dock.size()); }
-            else if (right) { if (index + 1 < count) moveTo(APPS, index + 1); }
-            else if (up) { if (index >= APPS_PER_ROW) moveTo(APPS, index - APPS_PER_ROW); else moveTo(DOCK, Math.max(0, dock.size() - 1)); }
-            else if (index + APPS_PER_ROW < count) moveTo(APPS, index + APPS_PER_ROW);
-            else if (index / APPS_PER_ROW < (count - 1) / APPS_PER_ROW) moveTo(APPS, count - 1);
-        }
+        IosNav.Screen s = new IosNav.Screen();
+        s.zone = zone;
+        s.index = index;
+        s.selected = selected;
+        s.services = dock.size();
+        s.cards = cardViews.size();
+        s.remembered = remembered();
+        s.apps = appViews.size();
+        s.perRow = APPS_PER_ROW;
+        s.top = topViews.size();
+        int k = key == KeyEvent.KEYCODE_DPAD_LEFT ? IosNav.LEFT : key == KeyEvent.KEYCODE_DPAD_RIGHT ? IosNav.RIGHT
+                : key == KeyEvent.KEYCODE_DPAD_UP ? IosNav.UP : IosNav.DOWN;
+        IosNav.Move m = IosNav.next(s, k);
+        if (m.kind == IosNav.Move.FEED) nextFeed(m.index);
+        else if (m.kind == IosNav.Move.GO) moveTo(m.zone, m.index);
     }
 
     private void launch(App a) {
@@ -1541,6 +1565,8 @@ public class IosHome extends Activity {
                 Toast.makeText(this, "Нет разрешения, выполни tv deploy", Toast.LENGTH_LONG).show();
             }
         });
+        labels.add("Показать подсказки");
+        actions.add(() -> { prefs.edit().putBoolean("hint_seen", false).apply(); handler.postDelayed(this::showHint, 300); });
         labels.add("Прежний лаунчер");
         actions.add(() -> open(new Intent().setClassName(getPackageName(), getPackageName() + ".MainActivity").putExtra("ios_classic", true)));
         showMenu("Настройки", labels, actions);
