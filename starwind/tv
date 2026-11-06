@@ -90,6 +90,15 @@ report() {
 case "${1:-}" in
   deploy) deploy ;;
   report) report ;;
+  acc) online
+    # Текущий аккаунт телевизора в системе Яндекса. tv acc <uid> делает аккаунт текущим.
+    U='content://com.yandex.tv.passport/current_account'
+    [ -n "${2:-}" ] && T "content call --uri $U --method changeActiveAccount --arg $2" | tail -3
+    { say "== текущий"; T "content call --uri $U --method getCurrentAccount"
+      say "== активный"; T "content call --uri $U --method getActiveAccount"
+      say "== все"; T "content call --uri $U --method getAuthorizedAccounts"
+      say "== аккаунты системы"; T 'dumpsys account' | grep -E "Account \{"; } > "$DIR/acc.txt" 2>&1
+    head -c 1500 "$DIR/acc.txt" ;;
   account) online
     # Кинопоиск берёт вход у «текущего аккаунта» телевизора. Возвращаем выключенное в kinofix2 и открываем выбор аккаунта.
     T 'for p in com.yandex.tv.alice com.yandex.tv.music com.yandex.android.advid com.yandex.prebuiltstub com.yandex.tv.webplayer com.yandex.tv.bugreportsender com.yandex.tv.daydream; do pm disable-user --user 0 $p; done' | grep -c disabled
