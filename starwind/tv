@@ -90,6 +90,12 @@ report() {
 case "${1:-}" in
   deploy) deploy ;;
   report) report ;;
+  account) online
+    # Кинопоиск берёт вход у «текущего аккаунта» телевизора. Возвращаем выключенное в kinofix2 и открываем выбор аккаунта.
+    T 'for p in com.yandex.tv.alice com.yandex.tv.music com.yandex.android.advid com.yandex.prebuiltstub com.yandex.tv.webplayer com.yandex.tv.bugreportsender com.yandex.tv.daydream; do pm disable-user --user 0 $p; done' | grep -c disabled
+    T "content call --uri content://com.yandex.tv.passport/current_account --method getCurrentAccount" | tail -1
+    T 'am start -a com.yandex.tv.passport.MANAGE_ACCOUNTS -p com.yandex.tv.services' | tail -1
+    say ">>> На телевизоре открылись аккаунты Яндекса. Выбери или добавь свой, потом открой Кинопоиск." ;;
   kinofix2) online
     # Вход Яндекса в приложениях держит одно «главное» приложение Яндекса. Если им выбрано отключённое,
     # вход не сохраняется. Включаем мелкие отключённые пакеты Яндекса (оболочка остаётся выключенной).

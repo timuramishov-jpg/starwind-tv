@@ -1581,6 +1581,10 @@ public class IosHome extends Activity {
             labels.add(row[0]);
             actions.add(() -> open(SystemSettings.intent(this, row[1])));
         }
+        // Аккаунт Яндекса всего телевизора: за ним следуют Кинопоиск и другие приложения Яндекса.
+        labels.add("Аккаунт Яндекса");
+        actions.add(() -> open(new Intent("com.yandex.tv.passport.MANAGE_ACCOUNTS").setPackage("com.yandex.tv.services")
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
         for (final String pkg : stored("hidden")) {
             String name = pkg;
             try {
