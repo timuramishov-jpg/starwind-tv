@@ -90,6 +90,7 @@ report() {
 case "${1:-}" in
   deploy) deploy ;;
   report) report ;;
+  uninstall) online; T "pm uninstall ${2:?tv uninstall пакет}" | tail -1 ;;
   install) online
     # tv install файл.apk: поставить приложение на телевизор.
     [ -f "${2:-}" ] || die "tv install путь/к/файлу.apk"

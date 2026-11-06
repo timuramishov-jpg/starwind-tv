@@ -507,7 +507,8 @@ public class IosHome extends Activity {
         cardsClip.setClipBounds(new Rect(0, 0, px(1920 - MAIN_X + CARD_CLIP), px(1080)));
         content.addView(cardsClip, at(MAIN_X - CARD_CLIP, 0, 1920 - MAIN_X + CARD_CLIP, 1080));
         cardsLayer = layer();
-        cardsClip.addView(cardsLayer, at(-(MAIN_X - CARD_CLIP), 0, 12000, 1080));
+        // Слой ленты шире всех карточек сразу: 15 широких карточек занимают почти 14 тысяч точек, дальние иначе обрезались.
+        cardsClip.addView(cardsLayer, at(-(MAIN_X - CARD_CLIP), 0, MAIN_X + IosFeed.MAX_ITEMS * (CARD_W + CARD_GAP) + 1920, 1080));
         action = text(30, semibold, ROW_ON_TEXT);
         action.setText("Открыть");
         action.setGravity(Gravity.CENTER);

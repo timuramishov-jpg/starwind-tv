@@ -59,7 +59,8 @@ final class IosFeed {
 
     private static final String SCOPE = "https://www.googleapis.com/auth/youtube.readonly";
     private static final long FRESH_MS = 10 * 60 * 1000L, RETRY_MS = 20 * 1000L;
-    private static final int MAX_ITEMS = 15, POOL = 50, AHEAD = 6, TARGET_W = 880;
+    static final int MAX_ITEMS = 15;
+    private static final int POOL = 50, AHEAD = 6, TARGET_W = 880;
     private static final String TAG = "IosFeed";
     private static final Pattern HEX32 = Pattern.compile("[0-9a-f]{32}");
     static final String YOUTUBE = "com.yandex.tv.ytplayer", RUTUBE = "ru.rutube.app.tv", VK = "com.vk.tv", KINOPOISK = "ru.kinopoisk.yandex.tv", ZONA = "ru.zonaplayer.app";
