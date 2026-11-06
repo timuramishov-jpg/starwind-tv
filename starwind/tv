@@ -1,0 +1,120 @@
+#!/bin/bash
+# Единый инструмент для телевизора StarWind. Запуск: tv <команда>. Без команды печатает справку.
+set -u
+TV=192.168.31.237
+DIR="$HOME/Documents/Claude"
+R="$DIR/cleanyourtv"
+SECRETS="$DIR/secrets.json"
+PKG=com.gathin.tvhome
+export TV_HOST=$TV
+PY="$R/tools/venv/bin/python"
+T() { "$PY" -I "$R/tools/tv.py" "$@"; }
+SHOTS="$DIR/shots"; mkdir -p "$SHOTS"
+say() { printf '%s\n' "$*"; }
+die() { say "ОШИБКА: $*"; exit 1; }
+online() { nc -z -G 3 $TV 5555 2>/dev/null || die "телевизор не отвечает: включи его. Если отладка выключена, включи её в настройках лаунчера."; }
+home() { T "am start -a android.intent.action.MAIN -c android.intent.category.HOME -n $PKG/.IosHome" > /dev/null; }
+
+keys() {
+  [ -f "$SECRETS" ] || die "нет файла $SECRETS"
+  ARGS=$(python3 - "$SECRETS" <<'P'
+import json,sys,shlex
+d=json.load(open(sys.argv[1])); y=d.get("installed",{})
+m={"yt_client_id":y.get("client_id",""),"yt_client_secret":y.get("client_secret",""),"yt_api_key":d.get("api_key",""),"kino_key":d.get("kinopoisk_key","")}
+print(" ".join(f"--es {k} {shlex.quote(v)}" for k,v in m.items() if v))
+P
+)
+  OUT=$(T "am broadcast -n $PKG/.IosConfig $ARGS")
+  case "$OUT" in *"ok "*) say "Ключи переданы в лаунчер" ;; *) say "$OUT"; die "ключи не приняты" ;; esac
+}
+
+fonts() {
+  Z=$(ls "$DIR"/SF-NF*.zip 2>/dev/null | head -1)
+  [ -n "$Z" ] || { say "Нет архива SF, останутся старые шрифты"; return; }
+  python3 - "$Z" "$R/launcher/app/src/main/res/font" <<'P'
+import zipfile,sys
+z=zipfile.ZipFile(sys.argv[1])
+for out,src in {"sf_light":"Light","sf_regular":"Regular","sf_medium":"Medium","sf_semibold":"Semibold"}.items():
+    open(f"{sys.argv[2]}/{out}.ttf","wb").write(z.read(f"SF NF 17.0d11e1/TTF/SFNS-{src}.ttf"))
+P
+}
+
+icons() {
+  cp -n "$R/starwind/fallback/"*.png "$R/launcher/app/src/main/res/drawable-nodpi/"
+  command -v swift > /dev/null || { say "Нет swift, значки Apple не обновлены (xcode-select --install)"; return; }
+  swift "$R/starwind/icons.swift" "$R/launcher/app/src/main/res/drawable-nodpi" || say "Значки не нарисовались, остались прежние"
+}
+
+deploy() {
+  online
+  cd "$R" || die "нет $R"
+  [ "$(git branch --show-current)" = starwind ] || die "в $R не та ветка, нужна starwind"
+  say "== Версия $(git log -1 --format='%h %s')"
+  git status --short | grep -v '^??' | grep . && say "(есть несохранённые правки)"
+  fonts; icons
+  export JAVA_HOME="$(/opt/homebrew/bin/brew --prefix openjdk@17)/libexec/openjdk.jdk/Contents/Home"
+  export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
+  export PATH="$JAVA_HOME/bin:$PATH"
+  say "== Сборка"
+  (cd launcher && ./gradlew assembleRelease --console=plain > "$DIR/build.log" 2>&1) || { tail -30 "$DIR/build.log"; die "сборка не прошла, лог в build.log"; }
+  APK=launcher/app/build/outputs/apk/release/app-release.apk
+  "$PY" -I tools/b64push.py "$APK" /data/local/tmp/tvhome.apk || die "загрузка"
+  OUT=$(T 'pm install -r /data/local/tmp/tvhome.apk; rm -f /data/local/tmp/tvhome.apk'); say "$OUT"
+  case "$OUT" in *Success*) ;; *) die "установка" ;; esac
+  T "pm grant $PKG android.permission.READ_TV_LISTINGS; pm grant $PKG android.permission.WRITE_SECURE_SETTINGS" 2>&1 | grep -v '^$'
+  T "am force-stop $PKG; cmd package set-home-activity --user 0 $PKG/.IosHome" > /dev/null
+  keys
+  home; sleep 12
+  check
+  T --screenshot "$SHOTS/home.png" 2>&1 | tail -1
+  say "РЕЗУЛЬТАТ: готово"
+}
+
+check() {
+  online
+  say "== Домашний экран: $(T 'cmd package resolve-activity --brief -a android.intent.action.MAIN -c android.intent.category.HOME' | tail -1)"
+  say "== На экране: $(T 'dumpsys activity activities | grep mResumedActivity | head -1' | sed 's/.*u0 //;s/ t[0-9]*}//')"
+  say "== Оболочка Яндекса: $(T 'pm list packages -d | grep -c com.yandex.tv.home' | tr -d '\r' | sed 's/1/выключена/;s/0/ВКЛЮЧЕНА/')"
+  say "== VPN: $(T 'dumpsys connectivity | grep -c "VPN CONNECTED"' | tr -d '\r' | sed 's/^0$/выключен/;s/^[1-9].*/включён/')"
+  say "== Ключи в лаунчере: $(T "logcat -d -s IosConfig:* | tail -1" | sed 's/.*keys/принято/')"
+  say "== Свободно памяти: $(T 'dumpsys meminfo | grep "Free RAM"' | sed 's/ *Free RAM: *//;s/ (.*//')"
+  say "== Падения:"; T 'logcat -b crash -d | grep -E "FATAL|Process:" | tail -4'
+}
+
+case "${1:-}" in
+  deploy) deploy ;;
+  check) check ;;
+  keys) online; keys ;;
+  shot) online; T --screenshot "$SHOTS/${2:-now}.png" 2>&1 | tail -1 ;;
+  log) online; T "logcat -d -s IosFeed:* IosHome:* IosConfig:*" | tail -${2:-60} ;;
+  reboot) online; T 'sync'; T --reboot; say "Перезагружаю. Через минуту: tv check" ;;
+  route)
+    online
+    case "${2:-}" in
+      off) T 'am start -a android.intent.action.VIEW -d happ://routing/off -n su.happ.proxyutility/.feature.main.MainActivity' > /dev/null; say "Маршрутизация Happ выключена: через VPN идёт всё" ;;
+      on) bash "$R/starwind/route-on.sh" ;;
+      *) say "tv route on|off" ;;
+    esac ;;
+  adb)
+    online
+    [ "${2:-}" = off ] || { say "tv adb off: выключить отладку. Включить обратно: Настройки лаунчера, Отладка по сети"; exit 0; }
+    T 'settings put global adb_enabled 0' ; say "Отладка выключена. Включить: Настройки лаунчера, Отладка по сети" ;;
+  slim) online; T 'for p in com.yandex.tv.input.efir com.yandex.tv.videoplayer com.yandex.devices.farm.companion com.yandex.tv.home; do pm disable-user --user 0 $p; done' | grep -c disabled-user ;;
+  rollback)
+    online
+    T 'for p in com.yandex.tv.home com.yandex.tv.input.efir com.yandex.tv.videoplayer com.yandex.devices.farm.companion; do pm enable $p; done; cmd package set-home-activity --user 0 com.yandex.tv.home/.HomeActivity' | tail -1
+    say "Вернул оболочку Яндекса домашним экраном. Наш лаунчер остаётся установленным." ;;
+  *) cat <<'H'
+tv deploy        собрать текущую версию, поставить, передать ключи, проверить
+tv check         что сейчас на телевизоре: домашний экран, VPN, память, падения
+tv keys          заново передать ключи сервисов из secrets.json
+tv shot [имя]    снимок экрана в shots/
+tv log [N]       последние строки журнала лаунчера
+tv route on|off  VPN только для YouTube или для всего
+tv adb off       выключить отладку по сети
+tv slim          отключить лишнее Яндекса и его оболочку
+tv rollback      вернуть оболочку Яндекса
+tv reboot        перезагрузить телевизор
+H
+  ;;
+esac

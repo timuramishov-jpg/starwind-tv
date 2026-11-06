@@ -7,6 +7,10 @@
     <uses-feature android:name="android.hardware.wifi" android:required="false" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.READ_TV_LISTINGS" />
+    <uses-permission android:name="android.permission.KILL_BACKGROUND_PROCESSES" />
+    <uses-permission android:name="android.permission.REQUEST_DELETE_PACKAGES" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <!-- Needed since Android 10 to read the Wi-Fi network name for the network pill. Never requested at
@@ -78,6 +82,29 @@
         android:allowBackup="false"
         android:localeConfig="@xml/locales_config">
 
+
+        <activity
+            android:name=".IosHome"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:stateNotNeeded="true"
+            android:excludeFromRecents="true"
+            android:clearTaskOnLaunch="true"
+            android:configChanges="orientation|screenSize|keyboard|keyboardHidden|uiMode"
+            android:screenOrientation="landscape">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.HOME" />
+                <category android:name="android.intent.category.COMMON_HOME" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <!-- ColorOS TV: boot only promotes a HOME that declares this category.
+                     docs/devices/oppo-k9-55-oppocnm632.md (prior art: aerial-tv oppo-coloros-tv.md). -->
+                <category android:name="com.heytap.tv.launcher.category.MODERN_HOME" />
+            </intent-filter>
+        </activity>
+        <!-- Ключи сервисов приходят только из adb (shell держит DUMP), в приложении их нет. -->
+        <receiver android:name=".IosConfig" android:exported="true" android:permission="android.permission.DUMP" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -90,15 +117,6 @@
             <!-- CVTE firmware (ro.CVT_EN_COMMON_HOME_INTENT=1) sends the Home key and boot as MAIN + HOME +
                  COMMON_HOME, which only matches a filter that lists both (#1201). In this one filter, not a second
                  one: a plain HOME intent still matches it, and a second filter could list this activity twice. -->
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.HOME" />
-                <category android:name="android.intent.category.COMMON_HOME" />
-                <category android:name="android.intent.category.DEFAULT" />
-                <!-- ColorOS TV: boot only promotes a HOME that declares this category.
-                     docs/devices/oppo-k9-55-oppocnm632.md (prior art: aerial-tv oppo-coloros-tv.md). -->
-                <category android:name="com.heytap.tv.launcher.category.MODERN_HOME" />
-            </intent-filter>
             <!-- Listed in the TV's own app list, so it can be opened from the stock home screen too. -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

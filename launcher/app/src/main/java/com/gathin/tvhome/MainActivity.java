@@ -455,6 +455,12 @@ public class MainActivity extends Activity implements AppAdapter.TileListener {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        if ((getIntent().getAction() == null || Intent.ACTION_MAIN.equals(getIntent().getAction()))
+                && !getIntent().getBooleanExtra("ios_classic", false)) {
+            startActivity(new Intent(this, IosHome.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+            finish();
+            return;
+        }
         setContentView(R.layout.activity_main);
         density = getResources().getDisplayMetrics().density;
         // config.xml, overlaid by config.json from a pushed theme (see Config and tools/theme.sh).

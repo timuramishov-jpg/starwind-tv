@@ -21,3 +21,11 @@ bench-results/
 *.aab
 launcher/hs_err_pid*.log
 launcher/replay_pid*.log
+
+# Шрифты Apple берутся из архива владельца при сборке, в репозиторий не попадают.
+launcher/app/src/main/res/font/sf_*.ttf
+launcher/app/src/main/res/drawable-nodpi/top_input.png
+launcher/app/src/main/res/drawable-nodpi/top_wifi.png
+launcher/app/src/main/res/drawable-nodpi/top_settings.png
+launcher/app/src/main/res/drawable-nodpi/top_grid.png
+launcher/app/src/main/res/drawable-nodpi/top_clean.png
