@@ -90,6 +90,20 @@ report() {
 case "${1:-}" in
   deploy) deploy ;;
   report) report ;;
+  yashell) online
+    # Активный аккаунт телевизора выставляет только оболочка Яндекса. Включаем её на минуту, выбираем аккаунт, выключаем.
+    T 'pm enable com.yandex.tv.home' | tail -1
+    T 'am start -a android.intent.action.MAIN -c android.intent.category.HOME -n com.yandex.tv.home/.HomeActivity' | tail -1
+    say ">>> На телевизоре оболочка Яндекса. Зайди в профиль (иконка аккаунта вверху) и выбери аккаунт с подпиской."
+    say ">>> Потом нажми Enter здесь."
+    read -r _
+    T 'pm disable-user --user 0 com.yandex.tv.home' | tail -1
+    T "cmd package set-home-activity --user 0 $PKG/.IosHome" > /dev/null; home
+    T 'am force-stop ru.kinopoisk.yandex.tv'; sleep 2
+    T 'am start -a android.intent.action.MAIN -c android.intent.category.LEANBACK_LAUNCHER -f 0x10200000 -n ru.kinopoisk.yandex.tv/ru.kinopoisk.tv.presentation.splash.SplashActivity' > /dev/null
+    sleep 25
+    T --screenshot "$SHOTS/kino-acc.png" 2>&1 | tail -1
+    home; say "Оболочка снова выключена. Кинопоиск перезапущен с нуля, снимок в shots/kino-acc.png" ;;
   acc) online
     # Текущий аккаунт телевизора в системе Яндекса. tv acc <uid> делает аккаунт текущим.
     U='content://com.yandex.tv.passport/current_account'
