@@ -280,7 +280,7 @@ public class IosHome extends Activity {
         List<String> lines = Arrays.asList(
                 "Вверх, вниз в ленте: сервисы",
                 "Долгое ОК: двигать иконку",
-                "Шестерёнка: Wi-Fi, YouTube",
+                "Долгое ОК на YouTube: вход",
                 "Метла: освободить память",
                 "Понятно");
         List<Runnable> close = new ArrayList<>();
@@ -841,7 +841,7 @@ public class IosHome extends Activity {
 
 
 
-    /** Экран VPN: большой переключатель и карточка текущей страны. */
+    /** Экран VPN: три узкие карточки, как афиши. Тумблер, связь (страна и отклик), смена сервера. */
     private void showVpn(App a) {
         boolean on = vpnOn(), own = HAPP.equals(a.pkg);
         int accent = a.logo.accent;
@@ -849,33 +849,42 @@ public class IosHome extends Activity {
         String iso = prefs.getString("vpn_iso", ""), where = prefs.getString("vpn_place", "");
         String[] parts = vpnStats.split("\\|");
         boolean measured = on && parts.length == 3;
+        int grade = measured ? Integer.parseInt(parts[2]) : -1;
 
         FeedItem toggle = new FeedItem();
+        toggle.poster = true;
         toggle.title = on ? "VPN включён" : "VPN выключен";
-        toggle.subtitle = own ? (on ? "ОК, чтобы выключить" : "ОК, чтобы включить") : "Включается в самом приложении";
+        toggle.subtitle = own ? (on ? "ОК, чтобы выключить" : "ОК, чтобы включить") : "Включается в приложении";
         toggle.image = switchArt(on, accent);
         toggle.action = () -> { if (own) vpnCommand(!on); else launch(a); };
 
-        FeedItem place = new FeedItem();
-        place.title = !on ? "Не подключён" : where.isEmpty() ? "Определяю страну" : where;
-        place.subtitle = "ОК, чтобы сменить локацию";
-        place.image = flagArt(on && !iso.isEmpty() ? flagOf(iso) : "\uD83C\uDF10", on ? place.title : "Нет подключения");
-        place.action = () -> launch(a);
+        FeedItem link = new FeedItem();
+        link.poster = true;
+        link.title = !on ? "Нет подключения" : where.isEmpty() ? "Определяю страну" : where;
+        link.subtitle = !on ? "Сначала включи VPN" : (measured ? parts[0] + ", " + parts[1].toLowerCase(new Locale("ru")) + ". " : "Измеряю. ") + "ОК, обновить";
+        link.image = linkArt(on && !iso.isEmpty() ? flagOf(iso) : "\uD83C\uDF10", grade, measured ? parts[0] : on ? "…" : "—", accent);
+        link.action = () -> {
+            prefs.edit().remove("vpn_place").remove("vpn_iso").apply();
+            feed.resetProbe();
+            vpnStats = "";
+            refreshVpn();
+            if (vpnOn()) { checkExit(); checkSpeed(); }
+        };
 
-        FeedItem speed = new FeedItem();
-        speed.title = !on ? "Отклик" : measured ? "Отклик " + parts[0] : "Измеряю отклик";
-        speed.subtitle = (measured ? parts[1] + ". " : "") + "ОК, чтобы перемерить";
-        int grade = measured ? Integer.parseInt(parts[2]) : -1;
-        speed.image = gaugeArt(grade, measured ? parts[0] : on ? "…" : "—", accent);
-        speed.action = () -> { feed.resetProbe(); vpnStats = ""; checkSpeed(); refreshVpn(); };
+        FeedItem server = new FeedItem();
+        server.poster = true;
+        server.title = "Сменить сервер";
+        server.subtitle = own ? "Откроется Happ" : "Откроется приложение";
+        server.image = serverArt(accent);
+        server.action = () -> launch(a);
 
-        FeedItem[] all = {toggle, place, speed};
+        FeedItem[] all = {toggle, link, server};
         for (int i = 0; i < all.length; i++) addCard(all[i], i);
         if (on) { checkExit(); checkSpeed(); }
     }
 
     private Bitmap art() {
-        Bitmap b = Bitmap.createBitmap(px(CARD_W), px(CARD_H), Bitmap.Config.ARGB_8888);
+        Bitmap b = Bitmap.createBitmap(px(POSTER_W), px(CARD_H), Bitmap.Config.ARGB_8888);
         b.eraseColor(PILL);
         return b;
     }
@@ -886,49 +895,38 @@ public class IosHome extends Activity {
         return p;
     }
 
-    /** Большой тумблер: включённый светится цветом секции. */
+    private void glow(Canvas c, float cx, float cy, float r, int accent) {
+        Paint g = paint(accent);
+        g.setShader(new RadialGradient(cx, cy, r, (accent & 0x00FFFFFF) | 0x77000000, accent & 0x00FFFFFF, Shader.TileMode.CLAMP));
+        c.drawCircle(cx, cy, r, g);
+    }
+
+    /** Вертикальный тумблер: включённый светится цветом секции, бегунок наверху. */
     private Bitmap switchArt(boolean on, int accent) {
         Bitmap b = art();
         Canvas c = new Canvas(b);
-        float cx = b.getWidth() / 2f, cy = b.getHeight() / 2f, w = px(340), h = px(180);
-        if (on) {
-            Paint glow = paint(accent);
-            glow.setShader(new RadialGradient(cx, cy, px(420), (accent & 0x00FFFFFF) | 0x88000000, accent & 0x00FFFFFF, Shader.TileMode.CLAMP));
-            c.drawCircle(cx, cy, px(420), glow);
-        }
-        c.drawRoundRect(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2, h / 2, h / 2, paint(on ? accent : 0xFF3A3A3F));
-        float r = h / 2 - px(14), kx = on ? cx + w / 2 - h / 2 : cx - w / 2 + h / 2;
-        Paint shadow = paint(0x55000000);
-        c.drawCircle(kx, cy + px(6), r, shadow);
-        c.drawCircle(kx, cy, r, paint(INK));
+        float cx = b.getWidth() / 2f, cy = b.getHeight() / 2f, w = px(150), h = px(270);
+        if (on) glow(c, cx, cy, px(260), accent);
+        c.drawRoundRect(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2, w / 2, w / 2, paint(on ? accent : 0xFF3A3A3F));
+        float r = w / 2 - px(12), ky = on ? cy - h / 2 + w / 2 : cy + h / 2 - w / 2;
+        c.drawCircle(cx, ky + px(5), r, paint(0x55000000));
+        c.drawCircle(cx, ky, r, paint(INK));
         return b;
     }
 
-    /** Флаг страны крупно и подпись. */
-    private Bitmap flagArt(String flag, String label) {
+    /** Связь: флаг страны выхода сверху, под ним дуга отклика с числом. */
+    private Bitmap linkArt(String flag, int grade, String value, int accent) {
         Bitmap b = art();
         Canvas c = new Canvas(b);
+        float cx = b.getWidth() / 2f;
         Paint f = paint(INK);
-        f.setTextSize(px(230));
+        f.setTextSize(px(150));
         f.setTextAlign(Paint.Align.CENTER);
-        c.drawText(flag, b.getWidth() / 2f, b.getHeight() / 2f + px(40), f);
-        Paint t = paint(INK_2);
-        t.setTypeface(medium);
-        t.setTextSize(px(40));
-        t.setTextAlign(Paint.Align.CENTER);
-        c.drawText(TextUtils.ellipsize(label, new android.text.TextPaint(t), b.getWidth() - px(80), TextUtils.TruncateAt.END).toString(),
-                b.getWidth() / 2f, b.getHeight() - px(60), t);
-        return b;
-    }
-
-    /** Шкала отклика: дуга заполнена по качеству связи, число посередине. */
-    private Bitmap gaugeArt(int grade, String value, int accent) {
-        Bitmap b = art();
-        Canvas c = new Canvas(b);
-        float cx = b.getWidth() / 2f, cy = b.getHeight() / 2f + px(70), r = px(190);
+        c.drawText(flag, cx, px(200), f);
+        float cy = px(400), r = px(110);
         Paint arc = paint(0xFF3A3A3F);
         arc.setStyle(Paint.Style.STROKE);
-        arc.setStrokeWidth(px(30));
+        arc.setStrokeWidth(px(22));
         arc.setStrokeCap(Paint.Cap.ROUND);
         android.graphics.RectF box = new android.graphics.RectF(cx - r, cy - r, cx + r, cy + r);
         c.drawArc(box, 180, 180, false, arc);
@@ -938,9 +936,25 @@ public class IosHome extends Activity {
         }
         Paint t = paint(INK);
         t.setTypeface(semibold);
-        t.setTextSize(px(84));
+        t.setTextSize(px(value.length() > 6 ? 40 : 52));
         t.setTextAlign(Paint.Align.CENTER);
-        c.drawText(value, cx, cy - px(10), t);
+        c.drawText(value, cx, cy - px(8), t);
+        return b;
+    }
+
+    /** Смена сервера: стопка из трёх серверов, верхний светится. */
+    private Bitmap serverArt(int accent) {
+        Bitmap b = art();
+        Canvas c = new Canvas(b);
+        float cx = b.getWidth() / 2f, w = px(200), h = px(56), gap = px(22), top = b.getHeight() / 2f - (3 * h + 2 * gap) / 2;
+        glow(c, cx, top + h / 2, px(180), accent);
+        for (int i = 0; i < 3; i++) {
+            float y = top + i * (h + gap);
+            c.drawRoundRect(cx - w / 2, y, cx + w / 2, y + h, px(16), px(16), paint(i == 0 ? accent : 0xFF3A3A3F));
+            c.drawCircle(cx - w / 2 + px(30), y + h / 2, px(9), paint(i == 0 ? INK : 0xFF6E6E73));
+            Paint line = paint(i == 0 ? INK : 0xFF6E6E73);
+            c.drawRoundRect(cx - w / 2 + px(56), y + h / 2 - px(5), cx + w / 2 - px(28), y + h / 2 + px(5), px(5), px(5), line);
+        }
         return b;
     }
 
@@ -1411,7 +1425,6 @@ public class IosHome extends Activity {
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setPadding(px(24), px(64), px(24), px(40));
-        panel.setMinimumHeight(px(1080));
         panel.setBackgroundColor(PANEL);
         TextView t = text(44, semibold, INK);
         t.setText(title);
@@ -1419,6 +1432,13 @@ public class IosHome extends Activity {
         t.setEllipsize(TextUtils.TruncateAt.END);
         t.setPadding(px(24), 0, px(24), px(32));
         panel.addView(t, new LinearLayout.LayoutParams(-1, -2));
+        // Пункты лежат в отдельном окне: панель стоит на месте, листается только список.
+        FrameLayout window = new FrameLayout(this);
+        window.setClipChildren(true);
+        LinearLayout list = new LinearLayout(this);
+        list.setOrientation(LinearLayout.VERTICAL);
+        window.addView(list, new FrameLayout.LayoutParams(-1, -2));
+        panel.addView(window, new LinearLayout.LayoutParams(-1, 0, 1f));
         for (String l : labels) {
             TextView r = text(30, regular, INK);
             r.setText(l);
@@ -1426,11 +1446,11 @@ public class IosHome extends Activity {
             r.setEllipsize(TextUtils.TruncateAt.END);
             r.setGravity(Gravity.CENTER_VERTICAL);
             r.setPadding(px(24), 0, px(24), 0);
-            panel.addView(r, new LinearLayout.LayoutParams(-1, px(MENU_ROW)));
+            list.addView(r, new LinearLayout.LayoutParams(-1, px(MENU_ROW)));
             menuViews.add(r);
         }
-        overlay.addView(panel, at(1920 - MENU_W, 0, MENU_W, 0));
-        menuPanel = panel;
+        overlay.addView(panel, at(1920 - MENU_W, 0, MENU_W, 1080));
+        menuPanel = list;
         overlay.setVisibility(View.VISIBLE);
         panel.setTranslationX(px(MENU_W));
         panel.animate().translationX(0).setDuration(NORMAL).setInterpolator(ease).start();
@@ -1440,8 +1460,10 @@ public class IosHome extends Activity {
 
     private void paintMenu() {
         if (menuPanel != null) {
-            float bottom = 170 + (menuIndex + 1) * MENU_ROW;
-            menuPanel.animate().translationY(-px(Math.max(0, bottom - 1020))).setDuration(FAST).setInterpolator(ease).start();
+            View window = (View) menuPanel.getParent();
+            float room = window.getHeight() > 0 ? window.getHeight() : px(1080 - 64 - 40 - 90);
+            float bottom = px((menuIndex + 1) * MENU_ROW + MENU_ROW / 2);
+            menuPanel.animate().translationY(-Math.max(0, bottom - room)).setDuration(FAST).setInterpolator(ease).start();
         }
         for (int i = 0; i < menuViews.size(); i++) {
             TextView r = menuViews.get(i);
@@ -1474,6 +1496,10 @@ public class IosHome extends Activity {
         List<Runnable> actions = new ArrayList<>();
         labels.add("Открыть");
         actions.add(() -> launch(a));
+        if (IosFeed.YOUTUBE.equals(a.pkg)) {
+            labels.add(feed.signedIn() ? "Выйти из аккаунта YouTube" : "Войти в YouTube: лента подписок");
+            actions.add(() -> { if (feed.signedIn()) { feed.signOut(); reload(); } else startYouTubeSignIn(); });
+        }
         labels.add("Переместить");
         actions.add(this::startMoving);
         labels.add(inDock ? "Убрать из дока" : "Добавить в док");
@@ -1532,8 +1558,7 @@ public class IosHome extends Activity {
         List<Runnable> actions = new ArrayList<>();
         String[][] rows = {{"Wi-Fi и сеть", Settings.ACTION_WIFI_SETTINGS}, {"Bluetooth и пульты", Settings.ACTION_BLUETOOTH_SETTINGS},
                 {"Звук", Settings.ACTION_SOUND_SETTINGS}, {"Экран", Settings.ACTION_DISPLAY_SETTINGS}, {"Дата и время", Settings.ACTION_DATE_SETTINGS},
-                {"Язык", Settings.ACTION_LOCALE_SETTINGS}, {"Приложения", Settings.ACTION_APPLICATION_SETTINGS},
-                {"Об устройстве", Settings.ACTION_DEVICE_INFO_SETTINGS}, {"Все настройки", Settings.ACTION_SETTINGS}};
+                {"Приложения", Settings.ACTION_APPLICATION_SETTINGS}, {"Все настройки", Settings.ACTION_SETTINGS}};
         for (String[] row : rows) {
             labels.add(row[0]);
             actions.add(() -> open(SystemSettings.intent(this, row[1])));
@@ -1552,23 +1577,6 @@ public class IosHome extends Activity {
                 reload();
             });
         }
-        labels.add(feed.signedIn() ? "Выйти из YouTube" : "Лента подписок YouTube");
-        actions.add(() -> {
-            if (feed.signedIn()) { feed.signOut(); reload(); } else startYouTubeSignIn();
-        });
-        final boolean adb = Settings.Global.getInt(getContentResolver(), Settings.Global.ADB_ENABLED, 0) == 1;
-        labels.add(adb ? "Отладка по сети: включена" : "Отладка по сети: выключена");
-        actions.add(() -> {
-            try {
-                Settings.Global.putInt(getContentResolver(), Settings.Global.ADB_ENABLED, adb ? 0 : 1);
-            } catch (SecurityException e) {
-                Toast.makeText(this, "Нет разрешения, выполни tv deploy", Toast.LENGTH_LONG).show();
-            }
-        });
-        labels.add("Показать подсказки");
-        actions.add(() -> { prefs.edit().putBoolean("hint_seen", false).apply(); handler.postDelayed(this::showHint, 300); });
-        labels.add("Прежний лаунчер");
-        actions.add(() -> open(new Intent().setClassName(getPackageName(), getPackageName() + ".MainActivity").putExtra("ios_classic", true)));
         showMenu("Настройки", labels, actions);
     }
 

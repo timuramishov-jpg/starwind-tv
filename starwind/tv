@@ -66,7 +66,7 @@ deploy() {
   T "am force-stop $PKG; cmd package set-home-activity --user 0 $PKG/.IosHome" > /dev/null
   keys
   home; sleep 12
-  check
+  report
   T --screenshot "$SHOTS/home.png" 2>&1 | tail -1
   say "РЕЗУЛЬТАТ: готово"
 }
@@ -82,8 +82,17 @@ check() {
   say "== Падения:"; T 'logcat -b crash -d | grep -E "FATAL|Process:" | tail -4'
 }
 
+# Отчёт для Claude: состояние и журнал лаунчера в report.txt рядом со скриптом.
+report() {
+  { check; say "== Журнал"; T "logcat -d -s IosFeed:* IosHome:* IosConfig:*" | tail -80; } 2>&1 | tee "$DIR/report.txt" | head -12
+}
+
 case "${1:-}" in
   deploy) deploy ;;
+  report) report ;;
+  kino) online
+    T "am start -a android.intent.action.VIEW -d 'kpatv://film?filmId=${2:-301}' -p ru.kinopoisk.yandex.tv" | tail -1; sleep 10
+    T --screenshot "$SHOTS/kino.png" 2>&1 | tail -1; home; say "Снимок в shots/kino.png" ;;
   check) check ;;
   keys) online; keys ;;
   shot) online; T --screenshot "$SHOTS/${2:-now}.png" 2>&1 | tail -1 ;;
@@ -108,6 +117,7 @@ case "${1:-}" in
   *) cat <<'H'
 tv deploy        собрать текущую версию, поставить, передать ключи, проверить
 tv check         что сейчас на телевизоре: домашний экран, VPN, память, падения
+tv report        то же и журнал лаунчера, в report.txt для Claude
 tv keys          заново передать ключи сервисов из secrets.json
 tv shot [имя]    снимок экрана в shots/
 tv log [N]       последние строки журнала лаунчера

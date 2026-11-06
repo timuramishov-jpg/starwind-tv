@@ -460,7 +460,7 @@ final class IosFeed {
             List<IosHome.FeedItem> out = null;
             String error = null;
             try {
-                out = YOUTUBE.equals(pkg) ? youtube() : RUTUBE.equals(pkg) ? rutube() : KINOPOISK.equals(pkg) ? posters("TOP_POPULAR_ALL", false) : ZONA.equals(pkg) ? zona() : channel(pkg);
+                out = YOUTUBE.equals(pkg) ? youtube() : RUTUBE.equals(pkg) ? rutube() : KINOPOISK.equals(pkg) ? kino() : ZONA.equals(pkg) ? zona() : channel(pkg);
             } catch (Exception e) {
                 error = String.valueOf(e.getMessage());
                 Log.w(TAG, pkg + ": " + e);
@@ -616,11 +616,27 @@ final class IosFeed {
             }
         }
         Log.i(TAG, "previews for " + pkg + ": " + seen);
+        Map<String, Integer> next = new HashMap<>();
+        try (Cursor c = context.getContentResolver().query(TvContract.WatchNextPrograms.CONTENT_URI, new String[]{"package_name"}, null, null, null)) {
+            while (c != null && c.moveToNext()) next.merge(String.valueOf(c.getString(0)), 1, Integer::sum);
+        } catch (Exception e) {
+            Log.i(TAG, "watch next: " + e);
+        }
+        Log.i(TAG, "watch next: " + next);
         Collections.shuffle(out);
         return out;
     }
 
-        private List<IosHome.FeedItem> zona() throws Exception {
+    /** Кинопоиск сам публикует ряды для главного экрана (из аккаунта, с переходом прямо в фильм).
+     *  Пока он их не выложил, показываем афишу из каталога. */
+    private List<IosHome.FeedItem> kino() throws Exception {
+        context.sendBroadcast(new Intent(TvContract.ACTION_INITIALIZE_PROGRAMS).setPackage(KINOPOISK));
+        List<IosHome.FeedItem> own = previews(KINOPOISK);
+        if (!own.isEmpty()) return own;
+        return posters("TOP_POPULAR_ALL", false);
+    }
+
+    private List<IosHome.FeedItem> zona() throws Exception {
         try {
             return posters("POPULAR_SERIES", true);
         } catch (Exception e) {
@@ -651,7 +667,7 @@ final class IosFeed {
             it.urls = new String[]{f.optString("posterUrlPreview"), f.optString("posterUrl")};
             // У Zona нет ссылок на отдельные фильмы, поэтому карточка открывает приложение.
             it.open = inZona ? new Intent(Intent.ACTION_MAIN).setClassName(ZONA, ZONA + ".MainActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    : new Intent(Intent.ACTION_VIEW, Uri.parse("kpatv://film/" + f.optString("kinopoiskId"))).setPackage(KINOPOISK).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    : new Intent(Intent.ACTION_VIEW, Uri.parse("kpatv://film?filmId=" + f.optString("kinopoiskId"))).setPackage(KINOPOISK).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             out.add(it);
         }
         if (out.isEmpty()) throw new Exception("Каталог пуст");
