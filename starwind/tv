@@ -90,6 +90,15 @@ report() {
 case "${1:-}" in
   deploy) deploy ;;
   report) report ;;
+  kinofix) online
+    # Проверка: нужна ли Кинопоиску оболочка Яндекса, чтобы видеть вход. Наш лаунчер остаётся домашним.
+    T 'pm enable com.yandex.tv.home' | tail -1
+    T "cmd package set-home-activity --user 0 $PKG/.IosHome" > /dev/null
+    T 'am force-stop ru.kinopoisk.yandex.tv'; sleep 2
+    T 'am start -a android.intent.action.MAIN -c android.intent.category.LEANBACK_LAUNCHER -f 0x10200000 -n ru.kinopoisk.yandex.tv/ru.kinopoisk.tv.presentation.splash.SplashActivity' > /dev/null
+    sleep 25
+    T --screenshot "$SHOTS/kino-fix.png" 2>&1 | tail -1
+    say "Снимок в shots/kino-fix.png. Оболочка Яндекса пока включена, вернуть как было: tv slim" ;;
   kinotest) online
     # Холодный запуск Кинопоиска тем же способом, что и с иконки: просит ли он вход.
     { say "== Аккаунты"; T 'dumpsys account' | grep -E "Account \{|type=|ServiceInfo: AuthenticatorDescription" | head -30
