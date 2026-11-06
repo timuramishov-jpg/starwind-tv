@@ -51,11 +51,11 @@ deploy() {
   [ "$(git branch --show-current)" = starwind ] || die "в $R не та ветка, нужна starwind"
   say "== Версия $(git log -1 --format='%h %s')"
   git status --short | grep -v '^??' | grep . && say "(есть несохранённые правки)"
-  say "== Тесты пульта"; bash "$R/starwind/test/run.sh" > "$DIR/test.log" 2>&1 || { tail -5 "$DIR/test.log"; die "тесты пульта не прошли, ничего не ставлю"; }
   fonts; icons
   export JAVA_HOME="$(/opt/homebrew/bin/brew --prefix openjdk@17)/libexec/openjdk.jdk/Contents/Home"
   export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
   export PATH="$JAVA_HOME/bin:$PATH"
+  say "== Тесты пульта"; bash "$R/starwind/test/run.sh" > "$DIR/test.log" 2>&1 || { tail -5 "$DIR/test.log"; die "тесты пульта не прошли, ничего не ставлю"; }
   say "== Сборка"
   (cd launcher && ./gradlew assembleRelease --console=plain > "$DIR/build.log" 2>&1) || { tail -30 "$DIR/build.log"; die "сборка не прошла, лог в build.log"; }
   APK=launcher/app/build/outputs/apk/release/app-release.apk
