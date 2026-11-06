@@ -21,4 +21,4 @@ L='-a android.intent.action.VIEW -n su.happ.proxyutility/.feature.deeplink.Deepl
 $TVPY "am start $L -d happ://disconnect_without_ui" > /dev/null; sleep 4
 $TVPY "am start $L -d happ://connect_without_ui" > /dev/null; sleep 6
 $TVPY 'am start -a android.intent.action.MAIN -c android.intent.category.HOME -n com.gathin.tvhome/.IosHome' > /dev/null
-echo "Готово: через VPN идут только YouTube и Google"
+echo "Готово: через VPN идут только YouTube и Google. Happ это запомнил, повторять не нужно."

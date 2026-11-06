@@ -278,10 +278,10 @@ public class IosHome extends Activity {
         if (overlayOpen() || prefs.getBoolean("hint_seen", false)) return;
         prefs.edit().putBoolean("hint_seen", true).apply();
         List<String> lines = Arrays.asList(
-                "Вверх и вниз в ленте: соседний сервис",
-                "Долгое ОК на иконке: переместить, скрыть, удалить",
-                "Шестерёнка: Wi-Fi, вход в YouTube, отладка",
-                "Метла в списке приложений: очистить память",
+                "Вверх, вниз в ленте: сервисы",
+                "Долгое ОК: двигать иконку",
+                "Шестерёнка: Wi-Fi, YouTube",
+                "Метла: освободить память",
                 "Понятно");
         List<Runnable> close = new ArrayList<>();
         for (int k = 0; k < lines.size(); k++) close.add(this::closeMenu);
