@@ -90,6 +90,21 @@ report() {
 case "${1:-}" in
   deploy) deploy ;;
   report) report ;;
+  kinofix2) online
+    # Вход Яндекса в приложениях держит одно «главное» приложение Яндекса. Если им выбрано отключённое,
+    # вход не сохраняется. Включаем мелкие отключённые пакеты Яндекса (оболочка остаётся выключенной).
+    T 'for p in com.yandex.tv.alice com.yandex.tv.music com.yandex.android.advid com.yandex.prebuiltstub com.yandex.tv.webplayer com.yandex.tv.bugreportsender com.yandex.tv.daydream; do pm enable $p; done' | grep -c enabled
+    T "cmd package set-home-activity --user 0 $PKG/.IosHome" > /dev/null
+    T 'am force-stop ru.kinopoisk.yandex.tv'
+    T 'am start -a android.intent.action.MAIN -c android.intent.category.LEANBACK_LAUNCHER -f 0x10200000 -n ru.kinopoisk.yandex.tv/ru.kinopoisk.tv.presentation.splash.SplashActivity' > /dev/null
+    say ">>> Войди в Кинопоиск на телевизоре заново. Когда вошёл и видишь главную, нажми Enter здесь."
+    read -r _
+    T 'am force-stop ru.kinopoisk.yandex.tv'; sleep 2
+    T 'am start -a android.intent.action.MAIN -c android.intent.category.LEANBACK_LAUNCHER -f 0x10200000 -n ru.kinopoisk.yandex.tv/ru.kinopoisk.tv.presentation.splash.SplashActivity' > /dev/null
+    sleep 25
+    T --screenshot "$SHOTS/kino-fix2.png" 2>&1 | tail -1
+    T 'dumpsys account' | grep -E "Account \{" > "$DIR/kinotest.txt"
+    say "Кинопоиск перезапущен с нуля, снимок в shots/kino-fix2.png" ;;
   kinofix) online
     # Проверка: нужна ли Кинопоиску оболочка Яндекса, чтобы видеть вход. Наш лаунчер остаётся домашним.
     T 'pm enable com.yandex.tv.home' | tail -1
