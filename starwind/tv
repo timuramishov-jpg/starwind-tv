@@ -99,9 +99,18 @@ case "${1:-}" in
   aurora) online
     # Aurora Store: магазин приложений Google Play без сервисов Google. Берём с F-Droid.
     mkdir -p "$DIR/apks"
-    curl -fL --progress-bar -o "$DIR/apks/aurora.apk" https://f-droid.org/repo/com.aurora.store_76.apk || die "не скачалось"
-    (cd "$R" && "$PY" -I tools/b64push.py "$DIR/apks/aurora.apk" /data/local/tmp/app.apk) || die "загрузка"
-    T 'pm install -r /data/local/tmp/app.apk; rm -f /data/local/tmp/app.apk' | tail -1
+    if ! T 'pm path com.aurora.store' | grep -q package:; then
+      [ -s "$DIR/apks/aurora.apk" ] || curl -fL --progress-bar -o "$DIR/apks/aurora.apk" https://f-droid.org/repo/com.aurora.store_76.apk || die "не скачалось"
+      (cd "$R" && "$PY" -I tools/b64push.py "$DIR/apks/aurora.apk" /data/local/tmp/app.apk) || die "загрузка"
+      T 'pm install -r /data/local/tmp/app.apk; rm -f /data/local/tmp/app.apk' | tail -1
+    fi
+    # Экраны системных разрешений на этом телевизоре закрыты, поэтому Aurora вылетает на них. Выдаём разрешения сами.
+    T 'am force-stop com.aurora.store
+       appops set com.aurora.store REQUEST_INSTALL_PACKAGES allow
+       appops set com.aurora.store MANAGE_EXTERNAL_STORAGE allow
+       pm grant com.aurora.store android.permission.READ_EXTERNAL_STORAGE
+       pm grant com.aurora.store android.permission.WRITE_EXTERNAL_STORAGE
+       cmd deviceidle whitelist +com.aurora.store' 2>&1 | grep -iv "^$\|added" | head -5
     T 'monkey -p com.aurora.store -c android.intent.category.LAUNCHER 1' > /dev/null 2>&1
     say "Aurora Store стоит и открыта на телевизоре, иконка появится в списке приложений" ;;
   yashell) online
