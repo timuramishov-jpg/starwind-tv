@@ -159,7 +159,10 @@ public class IosHome extends Activity {
     private boolean dirty = true, lastVpn, wasAway;
     private int ticks;
     private ImageView wordmark;
-    private TextView caption, captionSub, counter, appLabel;
+    private TextView caption, captionSub, appLabel;
+    private final Map<View, TextView[]> cardLabels = new HashMap<>();
+    /** Подписи карточек: в покое, у соседей выбранной. */
+    private static final float LABEL_REST = 0.62f, LABEL_DIM = 0.4f;
     private IosFeed feed;
     private final Map<String, String> feedShown = new HashMap<>();
     private ImageView washA, washB, spot;
@@ -494,9 +497,6 @@ public class IosHome extends Activity {
         caption.setSingleLine(true);
         caption.setEllipsize(TextUtils.TruncateAt.END);
         content.addView(caption, at(MAIN_X, CARDS_Y + CARD_H + 30, 1180, 0));
-        counter = text(26, medium, INK_2);
-        counter.setGravity(Gravity.RIGHT);
-        content.addView(counter, at(1920 - 236 - 300, CARDS_Y + CARD_H + 36, 300, 0));
         captionSub = text(26, regular, INK_2);
         captionSub.setSingleLine(true);
         captionSub.setEllipsize(TextUtils.TruncateAt.END);
@@ -1062,14 +1062,37 @@ public class IosHome extends Activity {
             card.addView(d, lp);
         }
         card.setTag(item);
-        float w = item.poster ? POSTER_W : CARD_W;
-        cardsLayer.addView(card, at(MAIN_X + i * (w + CARD_GAP), CARDS_Y, w, CARD_H));
+        float w = item.poster ? POSTER_W : CARD_W, x = MAIN_X + i * (w + CARD_GAP);
+        cardsLayer.addView(card, at(x, CARDS_Y, w, CARD_H));
         cardViews.add(card);
+        // Подпись под каждой карточкой: в покое приглушена, у выбранной яркая и с описанием.
+        TextView name = text(item.poster ? 28 : 34, medium, INK);
+        name.setText(item.title == null ? "" : item.title);
+        name.setSingleLine(true);
+        name.setEllipsize(TextUtils.TruncateAt.END);
+        name.setAlpha(LABEL_REST);
+        cardsLayer.addView(name, at(x + 4, CARDS_Y + CARD_H + 26, w - 8, 0));
+        TextView sub = text(item.poster ? 22 : 26, regular, INK_2);
+        sub.setText(item.subtitle == null ? "" : item.subtitle);
+        sub.setSingleLine(true);
+        sub.setEllipsize(TextUtils.TruncateAt.END);
+        sub.setAlpha(0f);
+        cardsLayer.addView(sub, at(x + 4, CARDS_Y + CARD_H + (item.poster ? 66 : 74), w - 8, 0));
+        cardLabels.put(card, new TextView[]{name, sub});
     }
 
     /** Пока лента в фокусе, остальные карточки притушены, а уехавшие влево прячутся за доком. */
     private void dimCards(View on, int position) {
-        for (View c : cardViews) c.animate().alpha(on == null || c == on ? 1f : 0.5f).setDuration(FAST).start();
+        for (int k = 0; k < cardViews.size(); k++) {
+            View c = cardViews.get(k);
+            boolean lit = c == on;
+            c.animate().alpha(on == null || lit ? 1f : 0.5f).setDuration(FAST).start();
+            TextView[] l = cardLabels.get(c);
+            if (l != null) {
+                l[0].animate().alpha(lit ? 1f : on == null ? LABEL_REST : LABEL_DIM).setDuration(FAST).start();
+                l[1].animate().alpha(lit ? 1f : 0f).setDuration(FAST).start();
+            }
+        }
     }
 
     private void startYouTubeSignIn() {
@@ -1164,6 +1187,7 @@ public class IosHome extends Activity {
     private void showSelected() {
         cardsLayer.removeAllViews();
         cardViews.clear();
+        cardLabels.clear();
         cardsLayer.setTranslationX(0);
         cardsLayer.animate().cancel();
         cardsLayer.setTranslationY(0);
@@ -1212,9 +1236,6 @@ public class IosHome extends Activity {
         if (z == TOP) paintButton(v, false);
         if (z == CARDS) {
             if (v.getTag() instanceof FeedItem) {
-                caption.setText("");
-                captionSub.setText("");
-                counter.setText("");
                 dimCards(null, 0);
                 cardsLayer.animate().translationX(0).setDuration(NORMAL).setInterpolator(ease).start();
             }
@@ -1262,9 +1283,6 @@ public class IosHome extends Activity {
             scrollTo(0);
             if (next.getTag() instanceof FeedItem) {
                 FeedItem item = (FeedItem) next.getTag();
-                caption.setText(item.title);
-                captionSub.setText(item.subtitle);
-                counter.setText(cardViews.size() > 1 ? (i + 1) + " из " + cardViews.size() : "");
                 float w = item.poster ? POSTER_W : CARD_W;
                 cardsLayer.animate().translationX(-px(i * (w + CARD_GAP))).setDuration(NORMAL).setInterpolator(ease).start();
                 next.animate().scaleX(1.03f).scaleY(1.03f).setDuration(FAST).setInterpolator(ease).start();

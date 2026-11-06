@@ -627,6 +627,66 @@ final class IosFeed {
         return out;
     }
 
+    /** Приложение Кинопоиска знает фильм по внутреннему номеру, а каталог даёт номер с сайта:
+     *  спрашиваем у Кинопоиска внутренний и открываем карточку фильма. Не вышло: просто приложение. */
+    void openKino(String kpId) {
+        requests.execute(() -> {
+            String id = kinoContent(kpId);
+            Intent go = id != null
+                    ? new Intent(Intent.ACTION_VIEW, Uri.parse("kpatv://film?filmId=" + id)).setPackage(KINOPOISK)
+                    : context.getPackageManager().getLaunchIntentForPackage(KINOPOISK);
+            if (go == null) return;
+            go.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            main.post(() -> { try { context.startActivity(go); } catch (Exception e) { Log.w(TAG, "kino open: " + e); } });
+        });
+    }
+
+    private static final String[] KINO_QUERIES = {
+            "query F($id: Long!) { film(id: $id) { contentId } }",
+            "query F($id: Long!) { film(id: $id) { onlineViewOptions { contentId } } }",
+            "query F($id: Long!) { movie(id: $id) { contentId } }",
+            "query F($id: Long!) { movie(id: $id) { onlineViewOptions { contentId } } }"};
+
+    private String kinoContent(String kpId) {
+        android.content.SharedPreferences p = context.getSharedPreferences("ios_kino", 0);
+        String known = p.getString(kpId, null);
+        if (known != null) return known.isEmpty() ? null : known;
+        int first = p.getInt("_query", 0);
+        for (int k = 0; k < KINO_QUERIES.length; k++) {
+            int q = (first + k) % KINO_QUERIES.length;
+            try {
+                HttpURLConnection c = (HttpURLConnection) new URL("https://graphql.kinopoisk.ru/graphql/?operationName=F").openConnection();
+                c.setConnectTimeout(5000);
+                c.setReadTimeout(6000);
+                c.setRequestMethod("POST");
+                c.setDoOutput(true);
+                c.setRequestProperty("Content-Type", "application/json");
+                c.setRequestProperty("Service-Id", "25");
+                c.setRequestProperty("Origin", "https://www.kinopoisk.ru");
+                c.setRequestProperty("Referer", "https://www.kinopoisk.ru/");
+                JSONObject body = new JSONObject().put("operationName", "F").put("query", KINO_QUERIES[q])
+                        .put("variables", new JSONObject().put("id", Long.parseLong(kpId)));
+                c.getOutputStream().write(body.toString().getBytes(StandardCharsets.UTF_8));
+                int code = c.getResponseCode();
+                String text = new String(read(code >= 400 ? c.getErrorStream() : c.getInputStream()), StandardCharsets.UTF_8);
+                java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"contentId\"\\s*:\\s*\"([0-9a-f]{32})\"").matcher(text);
+                Log.i(TAG, "kino " + kpId + " q" + q + " " + code + " " + text.substring(0, Math.min(200, text.length())));
+                if (m.find()) {
+                    p.edit().putString(kpId, m.group(1)).putInt("_query", q).apply();
+                    return m.group(1);
+                }
+                if (code == 200 && text.contains("\"data\"") && !text.contains("\"errors\"")) {
+                    p.edit().putString(kpId, "").putInt("_query", q).apply();
+                    return null;
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "kino " + kpId + ": " + e);
+                return null;
+            }
+        }
+        return null;
+    }
+
     /** Кинопоиск сам публикует ряды для главного экрана (из аккаунта, с переходом прямо в фильм).
      *  Пока он их не выложил, показываем афишу из каталога. */
     private List<IosHome.FeedItem> kino() throws Exception {
@@ -667,7 +727,9 @@ final class IosFeed {
             it.urls = new String[]{f.optString("posterUrlPreview"), f.optString("posterUrl")};
             // У Zona нет ссылок на отдельные фильмы, поэтому карточка открывает приложение.
             it.open = inZona ? new Intent(Intent.ACTION_MAIN).setClassName(ZONA, ZONA + ".MainActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    : new Intent(Intent.ACTION_VIEW, Uri.parse("kpatv://film?filmId=" + f.optString("kinopoiskId"))).setPackage(KINOPOISK).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    : context.getPackageManager().getLaunchIntentForPackage(KINOPOISK);
+            final String kp = f.optString("kinopoiskId");
+            if (!inZona) it.action = () -> openKino(kp);
             out.add(it);
         }
         if (out.isEmpty()) throw new Exception("Каталог пуст");
