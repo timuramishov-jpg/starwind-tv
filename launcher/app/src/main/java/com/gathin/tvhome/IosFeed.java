@@ -608,7 +608,14 @@ final class IosFeed {
         List<IosHome.FeedItem> out = new ArrayList<>();
         Map<String, Integer> seen = new HashMap<>();
         String[] columns = {"package_name", "title", "short_description", "poster_art_uri", "thumbnail_uri", "intent_uri", "duration_millis",
-                "author", "long_description", "episode_title", "release_date", "interaction_count", "interaction_type"};
+                "author", "long_description", "episode_title", "release_date", "interaction_count", "interaction_type", "channel_id"};
+        // Названия рядов приложения («Популярное», «Для вас»): ими подписываем, если у видео нет автора.
+        Map<Long, String> rows = new HashMap<>();
+        try (Cursor c = context.getContentResolver().query(TvContract.Channels.CONTENT_URI, new String[]{"_id", "display_name", "package_name"}, null, null, null)) {
+            while (c != null && c.moveToNext()) if (pkg.equals(c.getString(2)) && c.getString(1) != null) rows.put(c.getLong(0), c.getString(1));
+        } catch (Exception e) {
+            Log.i(TAG, "channels: " + e);
+        }
         try (Cursor c = context.getContentResolver().query(TvContract.PreviewPrograms.CONTENT_URI, columns, null, null, null)) {
             while (c != null && c.moveToNext()) {
                 String owner = c.getString(0);
@@ -619,8 +626,9 @@ final class IosFeed {
                 it.subtitle = firstOf(c.getString(7), c.getString(9), c.getString(2), c.getString(8));
                 if (it.subtitle.isEmpty() && c.getLong(11) > 0 && c.getInt(12) == TvContract.PreviewPrograms.INTERACTION_TYPE_VIEWS)
                     it.subtitle = views(c.getLong(11));
+                if (it.subtitle.isEmpty() && rows.containsKey(c.getLong(13))) it.subtitle = rows.get(c.getLong(13));
                 if (out.isEmpty()) Log.i(TAG, "preview row " + pkg + ": author=" + c.getString(7) + " short=" + c.getString(2) + " long=" + c.getString(8)
-                        + " episode=" + c.getString(9) + " date=" + c.getString(10) + " count=" + c.getLong(11) + "/" + c.getInt(12));
+                        + " episode=" + c.getString(9) + " date=" + c.getString(10) + " count=" + c.getLong(11) + "/" + c.getInt(12) + " rows=" + rows);
                 List<String> urls = new ArrayList<>();
                 for (int i = 3; i <= 4; i++) if (c.getString(i) != null && c.getString(i).startsWith("http")) urls.add(c.getString(i));
                 it.urls = urls.toArray(new String[0]);

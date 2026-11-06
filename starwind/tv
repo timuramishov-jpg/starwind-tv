@@ -90,6 +90,16 @@ report() {
 case "${1:-}" in
   deploy) deploy ;;
   report) report ;;
+  kinotest) online
+    # Холодный запуск Кинопоиска тем же способом, что и с иконки: просит ли он вход.
+    { say "== Аккаунты"; T 'dumpsys account' | grep -E "Account \{|type=|ServiceInfo: AuthenticatorDescription" | head -30
+      say "== Отключённые пакеты"; T 'pm list packages -d'; } > "$DIR/kinotest.txt" 2>&1
+    T 'am force-stop ru.kinopoisk.yandex.tv; logcat -c'
+    T 'am start -a android.intent.action.MAIN -c android.intent.category.LEANBACK_LAUNCHER -f 0x10200000 -p ru.kinopoisk.yandex.tv' > /dev/null
+    sleep 20
+    T --screenshot "$SHOTS/kino-cold.png" 2>&1 | tail -1
+    T 'logcat -d' | grep -iE "ActivityTaskManager: START|passport|account" | tail -60 >> "$DIR/kinotest.txt"
+    home; say "Готово: kinotest.txt и shots/kino-cold.png" ;;
   trace) online
     T 'logcat -c'
     say ">>> Открой на телевизоре афишу (или что не работает). Записываю журнал 40 секунд."
