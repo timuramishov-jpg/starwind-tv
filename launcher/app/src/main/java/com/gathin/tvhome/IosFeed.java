@@ -593,10 +593,22 @@ final class IosFeed {
         throw new Exception("Приложение не публикует ленту");
     }
 
+    private static String firstOf(String... v) {
+        for (String s : v) if (s != null && !s.trim().isEmpty()) return s.trim().split("\n")[0];
+        return "";
+    }
+
+    private static String views(long n) {
+        if (n >= 1_000_000) return String.format(java.util.Locale.US, "%.1f", n / 1e6).replace(".0", "").replace('.', ',') + " млн просмотров";
+        if (n >= 1_000) return (n / 1000) + " тыс. просмотров";
+        return n + " просмотров";
+    }
+
     private List<IosHome.FeedItem> previews(String pkg) throws Exception {
         List<IosHome.FeedItem> out = new ArrayList<>();
         Map<String, Integer> seen = new HashMap<>();
-        String[] columns = {"package_name", "title", "short_description", "poster_art_uri", "thumbnail_uri", "intent_uri", "duration_millis"};
+        String[] columns = {"package_name", "title", "short_description", "poster_art_uri", "thumbnail_uri", "intent_uri", "duration_millis",
+                "author", "long_description", "episode_title", "release_date", "interaction_count", "interaction_type"};
         try (Cursor c = context.getContentResolver().query(TvContract.PreviewPrograms.CONTENT_URI, columns, null, null, null)) {
             while (c != null && c.moveToNext()) {
                 String owner = c.getString(0);
@@ -604,7 +616,11 @@ final class IosFeed {
                 if (!pkg.equals(owner) || out.size() >= POOL) continue;
                 IosHome.FeedItem it = new IosHome.FeedItem();
                 it.title = c.getString(1);
-                it.subtitle = c.getString(2) == null ? "" : c.getString(2);
+                it.subtitle = firstOf(c.getString(7), c.getString(9), c.getString(2), c.getString(8));
+                if (it.subtitle.isEmpty() && c.getLong(11) > 0 && c.getInt(12) == TvContract.PreviewPrograms.INTERACTION_TYPE_VIEWS)
+                    it.subtitle = views(c.getLong(11));
+                if (out.isEmpty()) Log.i(TAG, "preview row " + pkg + ": author=" + c.getString(7) + " short=" + c.getString(2) + " long=" + c.getString(8)
+                        + " episode=" + c.getString(9) + " date=" + c.getString(10) + " count=" + c.getLong(11) + "/" + c.getInt(12));
                 List<String> urls = new ArrayList<>();
                 for (int i = 3; i <= 4; i++) if (c.getString(i) != null && c.getString(i).startsWith("http")) urls.add(c.getString(i));
                 it.urls = urls.toArray(new String[0]);
@@ -629,12 +645,21 @@ final class IosFeed {
 
     /** Приложение Кинопоиска знает фильм по внутреннему номеру, а каталог даёт номер с сайта:
      *  спрашиваем у Кинопоиска внутренний и открываем карточку фильма. Не вышло: просто приложение. */
+    /** Тот же запуск, что и с иконки: телевизионная точка входа, задача поднимается целиком. */
+    private Intent kinoHome() {
+        android.content.pm.PackageManager pm = context.getPackageManager();
+        Intent i = pm.getLeanbackLaunchIntentForPackage(KINOPOISK);
+        if (i == null) i = pm.getLaunchIntentForPackage(KINOPOISK);
+        if (i != null) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+        return i;
+    }
+
     void openKino(String kpId) {
         requests.execute(() -> {
             String id = kinoContent(kpId);
             Intent go = id != null
                     ? new Intent(Intent.ACTION_VIEW, Uri.parse("kpatv://film?filmId=" + id)).setPackage(KINOPOISK)
-                    : context.getPackageManager().getLaunchIntentForPackage(KINOPOISK);
+                    : kinoHome();
             if (go == null) return;
             go.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
             main.post(() -> { try { context.startActivity(go); } catch (Exception e) { Log.w(TAG, "kino open: " + e); } });
@@ -727,7 +752,7 @@ final class IosFeed {
             it.urls = new String[]{f.optString("posterUrlPreview"), f.optString("posterUrl")};
             // У Zona нет ссылок на отдельные фильмы, поэтому карточка открывает приложение.
             it.open = inZona ? new Intent(Intent.ACTION_MAIN).setClassName(ZONA, ZONA + ".MainActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    : context.getPackageManager().getLaunchIntentForPackage(KINOPOISK);
+                    : kinoHome();
             final String kp = f.optString("kinopoiskId");
             if (!inZona) it.action = () -> openKino(kp);
             out.add(it);
