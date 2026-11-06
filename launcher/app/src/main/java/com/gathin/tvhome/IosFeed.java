@@ -59,7 +59,7 @@ final class IosFeed {
 
     private static final String SCOPE = "https://www.googleapis.com/auth/youtube.readonly";
     private static final long FRESH_MS = 10 * 60 * 1000L, RETRY_MS = 20 * 1000L;
-    private static final int MAX_ITEMS = 10, POOL = 36, TARGET_W = 880;
+    private static final int MAX_ITEMS = 40, POOL = 60, AHEAD = 6, TARGET_W = 880;
     private static final String TAG = "IosFeed";
     private static final Pattern HEX32 = Pattern.compile("[0-9a-f]{32}");
     static final String YOUTUBE = "com.yandex.tv.ytplayer", RUTUBE = "ru.rutube.app.tv", VK = "com.vk.tv", KINOPOISK = "ru.kinopoisk.yandex.tv", ZONA = "ru.zonaplayer.app";
@@ -329,7 +329,13 @@ final class IosFeed {
     }
 
     /** Обложки выбранного сервиса грузятся все, остальные только первые. */
-    void wantPictures(String pkg) { fetchPictures(cached(pkg), MAX_ITEMS); }
+    void wantPictures(String pkg) { fetchPictures(cached(pkg), AHEAD); }
+
+    /** Лента длинная: обложки держим только вокруг выбранной карточки. */
+    void picturesAround(List<IosHome.FeedItem> list, int at) {
+        int from = Math.max(0, at - 2), to = Math.min(list.size(), at + AHEAD + 1);
+        if (from < to) fetchPictures(list.subList(from, to), to - from);
+    }
 
     private File listFile(String pkg) { return new File(dir, "list-" + pkg + ".json"); }
 
@@ -460,7 +466,7 @@ final class IosFeed {
             List<IosHome.FeedItem> out = null;
             String error = null;
             try {
-                out = YOUTUBE.equals(pkg) ? youtube() : RUTUBE.equals(pkg) ? rutube() : KINOPOISK.equals(pkg) ? kino() : ZONA.equals(pkg) ? zona() : channel(pkg);
+                out = YOUTUBE.equals(pkg) ? youtube() : RUTUBE.equals(pkg) ? rutubeOwn() : KINOPOISK.equals(pkg) ? kino() : ZONA.equals(pkg) ? zona() : channel(pkg);
             } catch (Exception e) {
                 error = String.valueOf(e.getMessage());
                 Log.w(TAG, pkg + ": " + e);
@@ -492,17 +498,25 @@ final class IosFeed {
                 Log.w(TAG, "subscriptions: " + e);
             }
         }
-        JSONObject r = call("https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&chart=mostPopular&regionCode=RU&maxResults=50"
-                + (popularPage.isEmpty() ? "" : "&pageToken=" + popularPage) + "&key=" + apiKey, null, null);
-        popularPage = r.optString("nextPageToken", "");
-        JSONArray list = r.optJSONArray("items");
-        if (list == null) throw new Exception(r.has("error") ? r.getJSONObject("error").optString("message") : "Пустой ответ");
         List<IosHome.FeedItem> out = new ArrayList<>();
-        for (int i = 0; i < list.length(); i++) {
-            JSONObject v = list.getJSONObject(i);
-            IosHome.FeedItem it = youtubeItem(v.getJSONObject("snippet"), v.getString("id"));
-            it.duration = iso(v.optJSONObject("contentDetails") == null ? "" : v.getJSONObject("contentDetails").optString("duration"));
-            out.add(it);
+        for (int round = 0; round < 3 && out.size() < MAX_ITEMS; round++) {
+            JSONObject r = call("https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&chart=mostPopular&regionCode=RU&maxResults=50"
+                    + (popularPage.isEmpty() ? "" : "&pageToken=" + popularPage) + "&key=" + apiKey, null, null);
+            popularPage = r.optString("nextPageToken", "");
+            JSONArray list = r.optJSONArray("items");
+            if (list == null) {
+                if (out.isEmpty()) throw new Exception(r.has("error") ? r.getJSONObject("error").optString("message") : "Пустой ответ");
+                break;
+            }
+            for (int i = 0; i < list.length(); i++) {
+                JSONObject v = list.getJSONObject(i);
+                String d = v.optJSONObject("contentDetails") == null ? "" : v.getJSONObject("contentDetails").optString("duration");
+                if (isShort(v.getJSONObject("snippet").optString("title"), d)) continue;
+                IosHome.FeedItem it = youtubeItem(v.getJSONObject("snippet"), v.getString("id"));
+                it.duration = iso(d);
+                out.add(it);
+            }
+            if (popularPage.isEmpty()) break;
         }
         Collections.shuffle(out);
         return out;
@@ -512,6 +526,22 @@ final class IosFeed {
         for (IosHome.FeedItem f : fresh) for (IosHome.FeedItem o : old) {
             if (f.title.equals(o.title) && o.image != null) { f.image = o.image; break; }
         }
+    }
+
+    /** Шортсы на телевизоре не нужны: вертикальные ролики до трёх минут и всё, что помечено #shorts. */
+    static boolean isShort(String title, String isoDuration) {
+        String t = title == null ? "" : title.toLowerCase(java.util.Locale.ROOT);
+        if (t.contains("#short") || t.contains("#шортс") || t.contains("#шорт")) return true;
+        int s = seconds(isoDuration);
+        return s > 0 && s <= 180;
+    }
+
+    static int seconds(String d) {
+        java.util.regex.Matcher m = Pattern.compile("P(?:(\\d+)D)?T?(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+)S)?").matcher(d == null ? "" : d);
+        if (!m.matches()) return 0;
+        int[] v = new int[4];
+        for (int k = 0; k < 4; k++) v[k] = m.group(k + 1) == null ? 0 : Integer.parseInt(m.group(k + 1));
+        return v[0] * 86400 + v[1] * 3600 + v[2] * 60 + v[3];
     }
 
     /** PT1H2M3S в 1:02:03. */
@@ -548,9 +578,9 @@ final class IosFeed {
         List<Integer> picks = new ArrayList<>();
         for (int i = 0; i < list.length(); i++) picks.add(i);
         Collections.shuffle(picks);
-        for (int i : picks.subList(0, Math.min(16, picks.size()))) {
+        for (int i : picks.subList(0, Math.min(25, picks.size()))) {
             String channel = list.getJSONObject(i).getJSONObject("snippet").getJSONObject("resourceId").getString("channelId");
-            jobs.add(() -> call("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=3&playlistId=UU" + channel.substring(2), null, token));
+            jobs.add(() -> call("https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&maxResults=4&playlistId=UU" + channel.substring(2), null, token));
         }
         List<Object[]> found = new ArrayList<>();
         for (Future<JSONObject> done : requests.invokeAll(jobs)) {
@@ -565,7 +595,7 @@ final class IosFeed {
         Collections.sort(found, (a, b) -> ((String) b[0]).compareTo((String) a[0]));
         List<IosHome.FeedItem> out = new ArrayList<>();
         for (Object[] f : found) {
-            if (out.size() >= POOL) break;
+            if (out.size() >= 50) break;
             JSONObject s = (JSONObject) f[1];
             out.add(youtubeItem(s, s.getJSONObject("resourceId").getString("videoId")));
         }
@@ -574,8 +604,15 @@ final class IosFeed {
             for (IosHome.FeedItem it : out) ids.append(ids.length() == 0 ? "" : ",").append(Uri.parse(Uri.decode(it.open.getDataString())).getQueryParameter("v"));
             JSONArray d = call("https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=" + ids + "&key=" + apiKey, null, null).optJSONArray("items");
             Map<String, String> len = new HashMap<>();
-            for (int i = 0; d != null && i < d.length(); i++) len.put(d.getJSONObject(i).getString("id"), iso(d.getJSONObject(i).getJSONObject("contentDetails").optString("duration")));
-            for (IosHome.FeedItem it : out) it.duration = len.get(it.open.getData().getQueryParameter("v"));
+            for (int i = 0; d != null && i < d.length(); i++) len.put(d.getJSONObject(i).getString("id"), d.getJSONObject(i).getJSONObject("contentDetails").optString("duration"));
+            List<IosHome.FeedItem> keep = new ArrayList<>();
+            for (IosHome.FeedItem it : out) {
+                String raw = len.get(it.open.getData().getQueryParameter("v"));
+                if (isShort(it.title, raw)) continue;
+                it.duration = iso(raw);
+                keep.add(it);
+            }
+            out = keep;
         } catch (Exception e) {
             Log.w(TAG, "durations: " + e);
         }
@@ -651,73 +688,13 @@ final class IosFeed {
         return out;
     }
 
-    /** Приложение Кинопоиска знает фильм по внутреннему номеру, а каталог даёт номер с сайта:
-     *  спрашиваем у Кинопоиска внутренний и открываем карточку фильма. Не вышло: просто приложение. */
-    /** Тот же запуск, что и с иконки: телевизионная точка входа, задача поднимается целиком. */
+    /** Афиша открывает Кинопоиск так же, как иконка: телевизионная точка входа, задача поднимается целиком. */
     private Intent kinoHome() {
         android.content.pm.PackageManager pm = context.getPackageManager();
         Intent i = pm.getLeanbackLaunchIntentForPackage(KINOPOISK);
         if (i == null) i = pm.getLaunchIntentForPackage(KINOPOISK);
         if (i != null) i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
         return i;
-    }
-
-    void openKino(String kpId) {
-        requests.execute(() -> {
-            String id = kinoContent(kpId);
-            Intent go = id != null
-                    ? new Intent(Intent.ACTION_VIEW, Uri.parse("kpatv://film?filmId=" + id)).setPackage(KINOPOISK)
-                    : kinoHome();
-            if (go == null) return;
-            go.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            main.post(() -> { try { context.startActivity(go); } catch (Exception e) { Log.w(TAG, "kino open: " + e); } });
-        });
-    }
-
-    private static final String[] KINO_QUERIES = {
-            "query F($id: Long!) { film(id: $id) { contentId } }",
-            "query F($id: Long!) { film(id: $id) { onlineViewOptions { contentId } } }",
-            "query F($id: Long!) { movie(id: $id) { contentId } }",
-            "query F($id: Long!) { movie(id: $id) { onlineViewOptions { contentId } } }"};
-
-    private String kinoContent(String kpId) {
-        android.content.SharedPreferences p = context.getSharedPreferences("ios_kino", 0);
-        String known = p.getString(kpId, null);
-        if (known != null) return known.isEmpty() ? null : known;
-        int first = p.getInt("_query", 0);
-        for (int k = 0; k < KINO_QUERIES.length; k++) {
-            int q = (first + k) % KINO_QUERIES.length;
-            try {
-                HttpURLConnection c = (HttpURLConnection) new URL("https://graphql.kinopoisk.ru/graphql/?operationName=F").openConnection();
-                c.setConnectTimeout(5000);
-                c.setReadTimeout(6000);
-                c.setRequestMethod("POST");
-                c.setDoOutput(true);
-                c.setRequestProperty("Content-Type", "application/json");
-                c.setRequestProperty("Service-Id", "25");
-                c.setRequestProperty("Origin", "https://www.kinopoisk.ru");
-                c.setRequestProperty("Referer", "https://www.kinopoisk.ru/");
-                JSONObject body = new JSONObject().put("operationName", "F").put("query", KINO_QUERIES[q])
-                        .put("variables", new JSONObject().put("id", Long.parseLong(kpId)));
-                c.getOutputStream().write(body.toString().getBytes(StandardCharsets.UTF_8));
-                int code = c.getResponseCode();
-                String text = new String(read(code >= 400 ? c.getErrorStream() : c.getInputStream()), StandardCharsets.UTF_8);
-                java.util.regex.Matcher m = java.util.regex.Pattern.compile("\"contentId\"\\s*:\\s*\"([0-9a-f]{32})\"").matcher(text);
-                Log.i(TAG, "kino " + kpId + " q" + q + " " + code + " " + text.substring(0, Math.min(200, text.length())));
-                if (m.find()) {
-                    p.edit().putString(kpId, m.group(1)).putInt("_query", q).apply();
-                    return m.group(1);
-                }
-                if (code == 200 && text.contains("\"data\"") && !text.contains("\"errors\"")) {
-                    p.edit().putString(kpId, "").putInt("_query", q).apply();
-                    return null;
-                }
-            } catch (Exception e) {
-                Log.w(TAG, "kino " + kpId + ": " + e);
-                return null;
-            }
-        }
-        return null;
     }
 
     /** Кинопоиск сам публикует ряды для главного экрана (из аккаунта, с переходом прямо в фильм).
@@ -727,6 +704,14 @@ final class IosFeed {
         List<IosHome.FeedItem> own = previews(KINOPOISK);
         if (!own.isEmpty()) return own;
         return posters("TOP_POPULAR_ALL", false);
+    }
+
+    /** Рутуб сам публикует ряды для главного экрана: они открываются сразу в его приложении. */
+    private List<IosHome.FeedItem> rutubeOwn() throws Exception {
+        context.sendBroadcast(new Intent(TvContract.ACTION_INITIALIZE_PROGRAMS).setPackage(RUTUBE));
+        List<IosHome.FeedItem> own = previews(RUTUBE);
+        if (own.size() >= 10) return own;
+        return rutube();
     }
 
     private List<IosHome.FeedItem> zona() throws Exception {
@@ -739,15 +724,21 @@ final class IosFeed {
 
     private List<IosHome.FeedItem> posters(String collection, boolean inZona) throws Exception {
         if (kinoKey.isEmpty()) throw new Exception("Нет ключа");
-        HttpURLConnection c = (HttpURLConnection) new URL("https://kinopoiskapiunofficial.tech/api/v2.2/films/collections?type=" + collection + "&page=" + (1 + new Random().nextInt(3))).openConnection();
-        c.setConnectTimeout(12000);
-        c.setReadTimeout(15000);
-        c.setRequestProperty("X-API-KEY", kinoKey);
-        c.setRequestProperty("Accept", "application/json");
-        int code = c.getResponseCode();
-        Log.i(TAG, collection + " " + code);
-        if (code >= 400) throw new Exception("Каталог ответил " + code);
-        JSONArray list = new JSONObject(new String(read(c.getInputStream()), StandardCharsets.UTF_8)).getJSONArray("items");
+        // Две страницы подборки подряд: сорок афиш.
+        JSONArray list = new JSONArray();
+        int first = 1 + new Random().nextInt(2);
+        for (int page = first; page < first + 2; page++) {
+            HttpURLConnection c = (HttpURLConnection) new URL("https://kinopoiskapiunofficial.tech/api/v2.2/films/collections?type=" + collection + "&page=" + page).openConnection();
+            c.setConnectTimeout(12000);
+            c.setReadTimeout(15000);
+            c.setRequestProperty("X-API-KEY", kinoKey);
+            c.setRequestProperty("Accept", "application/json");
+            int code = c.getResponseCode();
+            Log.i(TAG, collection + " p" + page + " " + code);
+            if (code >= 400) { if (list.length() == 0) throw new Exception("Каталог ответил " + code); break; }
+            JSONArray got = new JSONObject(new String(read(c.getInputStream()), StandardCharsets.UTF_8)).getJSONArray("items");
+            for (int k = 0; k < got.length(); k++) list.put(got.get(k));
+        }
         List<IosHome.FeedItem> out = new ArrayList<>();
         for (int i = 0; i < list.length() && out.size() < POOL; i++) {
             JSONObject f = list.getJSONObject(i);
@@ -761,8 +752,7 @@ final class IosFeed {
             // У Zona нет ссылок на отдельные фильмы, поэтому карточка открывает приложение.
             it.open = inZona ? new Intent(Intent.ACTION_MAIN).setClassName(ZONA, ZONA + ".MainActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     : kinoHome();
-            final String kp = f.optString("kinopoiskId");
-            if (!inZona) it.action = () -> openKino(kp);
+
             out.add(it);
         }
         if (out.isEmpty()) throw new Exception("Каталог пуст");

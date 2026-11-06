@@ -90,6 +90,20 @@ report() {
 case "${1:-}" in
   deploy) deploy ;;
   report) report ;;
+  install) online
+    # tv install файл.apk: поставить приложение на телевизор.
+    [ -f "${2:-}" ] || die "tv install путь/к/файлу.apk"
+    F="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
+    (cd "$R" && "$PY" -I tools/b64push.py "$F" /data/local/tmp/app.apk) || die "загрузка"
+    T 'pm install -r /data/local/tmp/app.apk; rm -f /data/local/tmp/app.apk' | tail -1 ;;
+  aurora) online
+    # Aurora Store: магазин приложений Google Play без сервисов Google. Берём с F-Droid.
+    mkdir -p "$DIR/apks"
+    curl -fL --progress-bar -o "$DIR/apks/aurora.apk" https://f-droid.org/repo/com.aurora.store_76.apk || die "не скачалось"
+    (cd "$R" && "$PY" -I tools/b64push.py "$DIR/apks/aurora.apk" /data/local/tmp/app.apk) || die "загрузка"
+    T 'pm install -r /data/local/tmp/app.apk; rm -f /data/local/tmp/app.apk' | tail -1
+    T 'monkey -p com.aurora.store -c android.intent.category.LAUNCHER 1' > /dev/null 2>&1
+    say "Aurora Store стоит и открыта на телевизоре, иконка появится в списке приложений" ;;
   yashell) online
     # Активный аккаунт телевизора выставляет только оболочка Яндекса. Включаем её на минуту, выбираем аккаунт, выключаем.
     T 'pm enable com.yandex.tv.home' | tail -1
@@ -193,6 +207,8 @@ tv shot [имя]    снимок экрана в shots/
 tv log [N]       последние строки журнала лаунчера
 tv route on|off  VPN только для YouTube или для всего
 tv adb off       выключить отладку по сети
+tv aurora        поставить Aurora Store (Google Play без сервисов Google)
+tv install F.apk поставить любое приложение
 tv slim          отключить лишнее Яндекса и его оболочку
 tv rollback      вернуть оболочку Яндекса
 tv reboot        перезагрузить телевизор

@@ -1020,23 +1020,27 @@ public class IosHome extends Activity {
         ImageView pic = new ImageView(this);
         pic.setScaleType(ImageView.ScaleType.CENTER_CROP);
         card.addView(pic, new FrameLayout.LayoutParams(-1, -1));
-        if (item.image != null) pic.setImageBitmap(item.image);
-        else {
+        if (item.image != null) {
+            pic.setImageBitmap(item.image);
+            item.onImage = () -> pic.setImageBitmap(item.image);
+        } else {
             // Пока обложка грузится, карточка мягко дышит.
-            ObjectAnimator pulse = ObjectAnimator.ofFloat(card, "alpha", 1f, 0.55f);
-            pulse.setDuration(SLOW * 2);
-            pulse.setRepeatCount(ValueAnimator.INFINITE);
-            pulse.setRepeatMode(ValueAnimator.REVERSE);
-            pulse.start();
+            // Дышат только первые карточки: дальние за краем экрана, анимация там лишь грузит процессор.
+            final ObjectAnimator pulse = i < 6 ? ObjectAnimator.ofFloat(card, "alpha", 1f, 0.55f) : null;
+            if (pulse != null) {
+                pulse.setDuration(SLOW * 2);
+                pulse.setRepeatCount(ValueAnimator.INFINITE);
+                pulse.setRepeatMode(ValueAnimator.REVERSE);
+                pulse.start();
+            }
             item.onImage = () -> {
-                pulse.cancel();
-                card.setAlpha(1f);
+                if (pulse != null) { pulse.cancel(); card.setAlpha(1f); }
                 pic.setAlpha(0f);
                 pic.setImageBitmap(item.image);
                 pic.animate().alpha(1f).setDuration(NORMAL).setInterpolator(ease).start();
             };
             item.onFail = () -> {
-                pulse.cancel();
+                if (pulse != null) pulse.cancel();
                 card.setAlpha(1f);
                 bg.setColor((accent & 0x00FFFFFF) | 0x55000000);
                 TextView t = text(item.poster ? 34 : 44, semibold, INK);
@@ -1079,6 +1083,21 @@ public class IosHome extends Activity {
         sub.setAlpha(0f);
         cardsLayer.addView(sub, at(x + 4, CARDS_Y + CARD_H + (item.poster ? 66 : 74), w - 8, 0));
         cardLabels.put(card, new TextView[]{name, sub});
+    }
+
+    /** В длинной ленте обложки живут только рядом с выбранной карточкой: так 40 карточек не съедают память. */
+    private void lazyCards(int at) {
+        List<FeedItem> list = new ArrayList<>();
+        for (View c : cardViews) if (c.getTag() instanceof FeedItem) list.add((FeedItem) c.getTag());
+        for (int k = 0; k < cardViews.size(); k++) {
+            View c = cardViews.get(k);
+            if (!(c.getTag() instanceof FeedItem)) continue;
+            FeedItem it = (FeedItem) c.getTag();
+            if (it.urls == null || it.urls.length == 0 || Math.abs(k - at) <= 9) continue;
+            ImageView pic = (ImageView) ((FrameLayout) c).getChildAt(0);
+            if (pic.getDrawable() != null) { pic.setImageDrawable(null); it.image = null; }
+        }
+        feed.picturesAround(list, at);
     }
 
     /** Пока лента в фокусе, остальные карточки притушены, а уехавшие влево прячутся за доком. */
@@ -1284,6 +1303,7 @@ public class IosHome extends Activity {
             if (next.getTag() instanceof FeedItem) {
                 FeedItem item = (FeedItem) next.getTag();
                 float w = item.poster ? POSTER_W : CARD_W;
+                lazyCards(i);
                 cardsLayer.animate().translationX(-px(i * (w + CARD_GAP))).setDuration(NORMAL).setInterpolator(ease).start();
                 next.animate().scaleX(1.03f).scaleY(1.03f).setDuration(FAST).setInterpolator(ease).start();
                 dimCards(next, i);
