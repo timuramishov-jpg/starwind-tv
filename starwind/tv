@@ -57,15 +57,41 @@ icons() {
 
 # Свой ключ подписи в ~/Documents/Claude: создаётся один раз, пароль рядом, оба вне git.
 signing() {
-  KS="$DIR/starwind.jks"; KP="$DIR/starwind.pass"
+  KS="$DIR/starwind.jks"; KP="$DIR/starwind.pass"; KA="$DIR/starwind.alias"
   if [ ! -f "$KS" ]; then
-    say "== Создаю свой ключ подписи (один раз)"
-    openssl rand -hex 16 > "$KP"; chmod 600 "$KP"
-    keytool -genkeypair -keystore "$KS" -storepass "$(cat "$KP")" -keypass "$(cat "$KP")" -alias starwind \
-      -keyalg RSA -keysize 2048 -validity 36500 -dname "CN=Starwind launcher" > /dev/null 2>&1 || die "ключ не создался"
-    chmod 600 "$KS"
+    if [ -f "$HOME/.android/debug.keystore" ]; then
+      # Ключ, которым подписан лаунчер на телевизоре: обновление встаёт поверх, настройки и вход в YouTube остаются.
+      say "== Сохраняю ключ подписи в $KS (один раз)"
+      cp "$HOME/.android/debug.keystore" "$KS"; printf android > "$KP"; printf androiddebugkey > "$KA"
+    else
+      say "== Создаю свой ключ подписи (один раз)"
+      openssl rand -hex 16 > "$KP"; printf starwind > "$KA"
+      keytool -genkeypair -keystore "$KS" -storepass "$(cat "$KP")" -keypass "$(cat "$KP")" -alias starwind \
+        -keyalg RSA -keysize 2048 -validity 36500 -dname "CN=Starwind launcher" > /dev/null 2>&1 || die "ключ не создался"
+    fi
+    chmod 600 "$KS" "$KP" "$KA"
   fi
-  export STARWIND_KEYSTORE="$KS" STARWIND_KEY_PASS="$(cat "$KP")"
+  [ -f "$KA" ] || printf starwind > "$KA"
+  export STARWIND_KEYSTORE="$KS" STARWIND_KEY_PASS="$(cat "$KP")" STARWIND_KEY_ALIAS="$(cat "$KA")"
+}
+
+# Настройки лаунчера с телевизора в $DIR/backup (лаунчер сам держит их копию в Android/data).
+backup() {
+  rm -rf "$DIR/backup"; mkdir -p "$DIR/backup"
+  for f in $(T "ls /sdcard/Android/data/$PKG/files/backup/ 2>/dev/null" | tr -d '\r' | grep '\.xml$'); do
+    T "cat /sdcard/Android/data/$PKG/files/backup/$f" > "$DIR/backup/$f"
+  done
+  ls "$DIR/backup"/*.xml > /dev/null 2>&1
+}
+
+# Вернуть настройки из $DIR/backup: лаунчер заберёт их при следующем запуске.
+restore() {
+  ls "$DIR/backup"/*.xml > /dev/null 2>&1 || return 1
+  T "mkdir -p /sdcard/Android/data/$PKG/files/restore"
+  for f in "$DIR/backup"/*.xml; do
+    "$PY" -I tools/b64push.py "$f" "/sdcard/Android/data/$PKG/files/restore/$(basename "$f")" > /dev/null || return 1
+  done
+  T "am force-stop $PKG"
 }
 
 # Выложить собранный APK в релиз GitHub: телевизор сам обновится из шестерёнки.
@@ -99,12 +125,17 @@ deploy() {
   OUT=$(T 'pm install -r /data/local/tmp/tvhome.apk'); say "$OUT"
   case "$OUT" in
     *UPDATE_INCOMPATIBLE*)
-      # Один раз: старый лаунчер подписан отладочным ключом, новый — своим. Поверх не ставится.
-      say ">>> Лаунчер переходит на свой ключ подписи. Старый надо удалить: порядок дока и вход в YouTube придётся настроить заново."
+      # Лаунчер на телевизоре подписан другим ключом: поверх не встаёт, только удалить и поставить заново.
+      if backup; then
+        say ">>> Ключ подписи сменился. Лаунчер переустановлю, настройки сохранены в $DIR/backup и вернутся."
+      else
+        say ">>> Ключ подписи сменился, а копии настроек нет: порядок дока и вход в YouTube придётся настроить заново."
+      fi
       printf "Продолжить? [y/N] "; read -r yes
       [ "$yes" = y ] || { T 'rm -f /data/local/tmp/tvhome.apk'; die "отменено"; }
       T "pm uninstall $PKG" | tail -1
-      OUT=$(T 'pm install -r /data/local/tmp/tvhome.apk'); say "$OUT" ;;
+      OUT=$(T 'pm install -r /data/local/tmp/tvhome.apk'); say "$OUT"
+      case "$OUT" in *Success*) restore && say "Настройки вернул" ;; esac ;;
   esac
   T 'rm -f /data/local/tmp/tvhome.apk'
   case "$OUT" in *Success*) ;; *) die "установка" ;; esac

@@ -15,7 +15,7 @@ import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Locale;
 
-/** Погода для шапки: Open-Meteo без ключа. Город по адресу в обход VPN (ipwho.is), иначе Москва.
+/** Погода для шапки: Open-Meteo без ключа, город Москва.
  *  Раз в 30 минут, последнее значение помнится. */
 final class IosWeather {
     interface Sink { void done(String line); }
@@ -30,9 +30,7 @@ final class IosWeather {
     /** Для заставки: температура, слово, макс., мин., город — что знаем. */
     static String[] details(Context c) {
         SharedPreferences p = c.getSharedPreferences("ios_weather", 0);
-        String city = p.getString("city", "");
-        return new String[]{p.getString("temp", ""), p.getString("word", ""), p.getString("hi", ""), p.getString("lo", ""),
-                city.isEmpty() ? "Москва" : city};
+        return new String[]{p.getString("temp", ""), p.getString("word", ""), p.getString("hi", ""), p.getString("lo", ""), "Москва"};
     }
 
     /** Последняя строка «+3°, облачно», пустая — ещё не знаем. */
@@ -44,21 +42,8 @@ final class IosWeather {
         at = now;
         new Thread(() -> {
             try {
-                double lat = Double.longBitsToDouble(prefs.getLong("lat", Double.doubleToLongBits(55.7558)));
-                double lon = Double.longBitsToDouble(prefs.getLong("lon", Double.doubleToLongBits(37.6173)));
-                if (!prefs.getBoolean("located", false)) {
-                    try {
-                        JSONObject g = get("https://ipwho.is/?fields=latitude,longitude,city,success");
-                        if (g.optBoolean("success") && g.has("latitude")) {
-                            lat = g.getDouble("latitude");
-                            lon = g.getDouble("longitude");
-                            prefs.edit().putLong("lat", Double.doubleToLongBits(lat)).putLong("lon", Double.doubleToLongBits(lon))
-                                    .putString("city", g.optString("city")).putBoolean("located", true).apply();
-                        }
-                    } catch (Exception e) {
-                        Log.w(TAG, "where: " + e);
-                    }
-                }
+                // Город всегда Москва: по адресу его не определить, пока работает VPN.
+                double lat = 55.7558, lon = 37.6173;
                 JSONObject w = get(String.format(Locale.ROOT,
                         "https://api.open-meteo.com/v1/forecast?latitude=%.3f&longitude=%.3f&current=temperature_2m,weather_code"
                                 + "&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto", lat, lon));

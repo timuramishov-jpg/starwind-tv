@@ -62,7 +62,6 @@ final class IosFeed {
     static final int MAX_ITEMS = 30;
     private static final int POOL = 50, AHEAD = 6, TARGET_W = 880, POSTER_W = 330;
     private static final String TAG = "IosFeed";
-    private static final Pattern HEX32 = Pattern.compile("[0-9a-f]{32}");
     static final String YOUTUBE = "com.yandex.tv.ytplayer", RUTUBE = "ru.rutube.app.tv", VK = "com.vk.tv", KINOPOISK = "ru.kinopoisk.yandex.tv", ZONA = "ru.zonaplayer.app";
     private final Context context;
     private final SharedPreferences prefs;
@@ -369,14 +368,7 @@ final class IosFeed {
         }
     }
 
-    private static String[] sizes(JSONObject thumbs) {
-        List<String> out = new ArrayList<>();
-        for (String k : new String[]{"standard", "high", "medium"}) {
-            JSONObject o = thumbs.optJSONObject(k);
-            if (o != null) out.add(o.optString("url"));
-        }
-        return out.toArray(new String[0]);
-    }
+    private static String[] sizes(JSONObject thumbs) { return IosParse.sizes(thumbs); }
 
     /** Список появляется сразу, обложки подъезжают по мере загрузки. */
     private void fetchPictures(List<IosHome.FeedItem> list, int limit) {
@@ -656,25 +648,12 @@ final class IosFeed {
             JSONObject r = call("https://www.googleapis.com/youtube/v3/videos?part=snippet,contentDetails&chart=mostPopular&regionCode=RU&maxResults=50"
                     + (popularPage.isEmpty() ? "" : "&pageToken=" + popularPage) + "&key=" + apiKey, null, null);
             popularPage = r.optString("nextPageToken", "");
-            JSONArray list = r.optJSONArray("items");
-            if (list == null) {
-                if (out.isEmpty()) throw new Exception(r.has("error") ? r.getJSONObject("error").optString("message") : "Пустой ответ");
-                break;
-            }
+            List<IosParse.Entry> list;
+            try { list = IosParse.youtubeVideos(r); } catch (Exception e) { if (out.isEmpty()) throw e; break; }
             Map<String, String> len = new HashMap<>(), names = new HashMap<>();
-            for (int i = 0; i < list.length(); i++) {
-                JSONObject v = list.getJSONObject(i);
-                len.put(v.getString("id"), v.optJSONObject("contentDetails") == null ? "" : v.getJSONObject("contentDetails").optString("duration"));
-                names.put(v.getString("id"), v.getJSONObject("snippet").optString("title"));
-            }
+            for (IosParse.Entry v : list) { len.put(v.id, v.duration); names.put(v.id, v.title); }
             Set<String> shorts = shortsAmong(len, names);
-            for (int i = 0; i < list.length(); i++) {
-                JSONObject v = list.getJSONObject(i);
-                if (shorts.contains(v.getString("id"))) continue;
-                IosHome.FeedItem it = youtubeItem(v.getJSONObject("snippet"), v.getString("id"));
-                it.duration = iso(len.get(v.getString("id")));
-                out.add(it);
-            }
+            for (IosParse.Entry v : list) if (!shorts.contains(v.id)) out.add(youtubeItem(v));
             if (popularPage.isEmpty()) break;
         }
         Collections.shuffle(out);
@@ -745,13 +724,18 @@ final class IosFeed {
     static String clock(int s) { return IosText.clock(s); }
 
     private IosHome.FeedItem youtubeItem(JSONObject s, String id) throws Exception {
+        return youtubeItem(IosParse.youtube(s, id));
+    }
+
+    private IosHome.FeedItem youtubeItem(IosParse.Entry e) {
         IosHome.FeedItem it = new IosHome.FeedItem();
-        it.title = s.optString("title");
-        it.subtitle = s.optString("channelTitle");
-        it.open = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=" + id))
+        it.title = e.title;
+        it.subtitle = e.sub;
+        it.open = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=" + e.id))
                 .setPackage(YOUTUBE).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        it.urls = sizes(s.getJSONObject("thumbnails"));
-        it.published = when(s.optString("publishedAt"));
+        it.urls = e.urls;
+        it.published = e.published;
+        if (!e.duration.isEmpty()) it.duration = iso(e.duration);
         return it;
     }
 
@@ -902,10 +886,8 @@ final class IosFeed {
         List<IosHome.FeedItem> out = new ArrayList<>();
         JSONObject r = call("https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&regionCode=RU&q="
                 + Uri.encode(q) + "&key=" + apiKey, null, null);
-        JSONArray list = r.optJSONArray("items");
-        for (int i = 0; list != null && i < list.length(); i++) {
-            JSONObject v = list.getJSONObject(i);
-            IosHome.FeedItem it = youtubeItem(v.getJSONObject("snippet"), v.getJSONObject("id").getString("videoId"));
+        for (IosParse.Entry e : IosParse.youtubeSearch(r)) {
+            IosHome.FeedItem it = youtubeItem(e);
             it.subtitle = "YouTube · " + it.subtitle;
             out.add(it);
         }
@@ -917,17 +899,12 @@ final class IosFeed {
         JSONObject r = call("https://rutube.ru/api/search/video/?format=json&query=" + Uri.encode(q), null, null);
         JSONArray list = r.optJSONArray("results");
         for (int i = 0; list != null && i < list.length() && out.size() < 8; i++) {
-            JSONObject v = list.getJSONObject(i);
-            String id = v.optString("id");
-            if (id.isEmpty()) continue;
-            IosHome.FeedItem it = new IosHome.FeedItem();
-            it.title = v.optString("title");
-            JSONObject author = v.optJSONObject("author");
-            it.subtitle = "Рутуб" + (author == null ? "" : " · " + author.optString("name"));
-            it.open = new Intent(Intent.ACTION_VIEW, Uri.parse("rutube://rutube.ru/video/" + id + "/"))
-                    .setPackage(RUTUBE).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            String thumb = v.optString("thumbnail_url").replaceAll("\\?.*$", "");
-            it.urls = thumb.isEmpty() ? new String[0] : new String[]{thumb};
+            JSONObject v = list.optJSONObject(i);
+            String id = IosParse.str(v, "id");
+            if (v == null || id.isEmpty()) continue;
+            IosHome.FeedItem it = rutubeItem(IosParse.rutube(id, v));
+            it.subtitle = "Рутуб" + (it.subtitle.isEmpty() ? "" : " · " + it.subtitle);
+            it.duration = null;
             out.add(it);
         }
         return out;
@@ -942,17 +919,13 @@ final class IosFeed {
         c.setRequestProperty("X-API-KEY", kinoKey);
         if (c.getResponseCode() >= 400) return out;
         JSONArray films = new JSONObject(new String(read(c.getInputStream()), StandardCharsets.UTF_8)).optJSONArray("films");
-        for (int i = 0; films != null && i < films.length() && out.size() < 8; i++) {
-            JSONObject f = films.getJSONObject(i);
+        for (IosParse.Entry f : IosParse.kino(films, 8)) {
             IosHome.FeedItem it = new IosHome.FeedItem();
-            it.title = f.optString("nameRu", f.optString("nameEn"));
-            if (it.title.isEmpty() || it.title.equals("null")) continue;
-            String year = f.optString("year");
-            it.subtitle = "Кинопоиск" + (year.isEmpty() || year.equals("null") ? "" : " · " + year);
+            it.title = f.title;
+            it.subtitle = "Кинопоиск" + (f.year.isEmpty() ? "" : " · " + f.year);
             it.poster = true;
             it.open = kinoHome();
-            String poster = f.optString("posterUrlPreview");
-            it.urls = poster.isEmpty() ? new String[0] : new String[]{poster};
+            it.urls = f.urls;
             out.add(it);
         }
         return out;
@@ -1010,16 +983,13 @@ final class IosFeed {
             for (int k = 0; k < got.length(); k++) list.put(got.get(k));
         }
         List<IosHome.FeedItem> out = new ArrayList<>();
-        for (int i = 0; i < list.length() && out.size() < POOL; i++) {
-            JSONObject f = list.getJSONObject(i);
+        for (IosParse.Entry f : IosParse.kino(list, POOL)) {
             IosHome.FeedItem it = new IosHome.FeedItem();
-            it.title = f.optString("nameRu", f.optString("nameOriginal"));
-            if (it.title.isEmpty() || "null".equals(it.title)) it.title = f.optString("nameOriginal");
-            String rating = f.optString("ratingKinopoisk"), year = f.optString("year");
-            it.subtitle = (year.equals("null") ? "" : year) + (rating.isEmpty() || rating.equals("null") ? "" : ", рейтинг " + rating)
+            it.title = f.title;
+            it.subtitle = f.year + (f.rating.isEmpty() ? "" : (f.year.isEmpty() ? "" : ", ") + "рейтинг " + f.rating)
                     + (inZona ? " · ОК: найти в Зоне" : " · ОК: найти в Кинопоиске");
             it.poster = true;
-            it.urls = new String[]{f.optString("posterUrlPreview"), f.optString("posterUrl")};
+            it.urls = f.urls;
             // У Zona нет ссылок на отдельные фильмы, поэтому карточка открывает приложение.
             it.open = inZona ? new Intent(Intent.ACTION_MAIN).setClassName(ZONA, ZONA + ".MainActivity").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     : kinoHome();
@@ -1053,47 +1023,22 @@ final class IosFeed {
         List<IosHome.FeedItem> out = new ArrayList<>();
         for (Map.Entry<String, JSONObject> e : videos.entrySet()) {
             if (out.size() >= POOL) break;
-            JSONObject v = e.getValue();
-            IosHome.FeedItem it = new IosHome.FeedItem();
-            it.title = v.optString("title");
-            JSONObject author = v.optJSONObject("author");
-            it.subtitle = author == null ? "" : author.optString("name");
-            it.open = new Intent(Intent.ACTION_VIEW, Uri.parse("rutube://rutube.ru/video/" + e.getKey() + "/"))
-                    .setPackage(RUTUBE).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            String thumb = v.optString("thumbnail_url").replaceAll("\\?.*$", "");
-            it.urls = new String[]{thumb + "?size=l", thumb};
-            it.duration = clock(v.optInt("duration"));
-            out.add(it);
+            out.add(rutubeItem(IosParse.rutube(e.getKey(), e.getValue())));
         }
         Collections.shuffle(out);
         return out;
     }
 
-    /** Ответы Рутуба бывают разной формы: ищем ролики и ссылки на источники на любой глубине. */
-    private void walk(Object o, Map<String, JSONObject> videos, Deque<String> queue) {
-        if (o instanceof JSONArray) {
-            JSONArray a = (JSONArray) o;
-            for (int i = 0; i < a.length(); i++) walk(a.opt(i), videos, queue);
-        } else if (o instanceof JSONObject) {
-            JSONObject j = (JSONObject) o;
-            String id = j.optString("id"), thumb = j.optString("thumbnail_url"), title = j.optString("title");
-            if (id.length() != 32) {
-                Matcher m = HEX32.matcher(j.optString("video_url"));
-                id = m.find() ? m.group() : "";
-            }
-            if (!id.isEmpty() && !thumb.isEmpty() && !title.isEmpty() && !j.optBoolean("is_adult")) {
-                if (!videos.containsKey(id)) videos.put(id, j);
-                return;
-            }
-            for (String k : new String[]{"url", "feed_url", "source_url"}) {
-                String u = j.optString(k);
-                if (!u.contains("/api/")) continue;
-                if (u.startsWith("/")) u = "https://rutube.ru" + u;
-                u = u.replace("http://", "https://");
-                if (u.startsWith("https://rutube.ru/")) queue.add(u + (u.contains("?") ? "&" : "?") + "format=json");
-            }
-            Iterator<String> keys = j.keys();
-            while (keys.hasNext()) walk(j.opt(keys.next()), videos, queue);
-        }
+    private IosHome.FeedItem rutubeItem(IosParse.Entry e) {
+        IosHome.FeedItem it = new IosHome.FeedItem();
+        it.title = e.title;
+        it.subtitle = e.sub;
+        it.open = new Intent(Intent.ACTION_VIEW, Uri.parse("rutube://rutube.ru/video/" + e.id + "/"))
+                .setPackage(RUTUBE).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+        it.urls = e.urls;
+        it.duration = e.duration.isEmpty() ? null : e.duration;
+        return it;
     }
+
+    private void walk(Object o, Map<String, JSONObject> videos, Deque<String> queue) { IosParse.walk(o, videos, queue); }
 }

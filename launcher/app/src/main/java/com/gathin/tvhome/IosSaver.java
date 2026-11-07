@@ -95,9 +95,11 @@ final class IosSaver extends View {
         @Override public void run() {
             if (!running) return;
             invalidate();
-            // Плавным стилям — 30 кадров, часам — раз в секунду, ровно на смене секунды.
+            // Плавным стилям — 30 кадров, через час — 10: движение то же, процессор отдыхает.
+            // Часам — раз в секунду, ровно на смене секунды.
             boolean smooth = style == 2 || style == 5 || style == 6;
-            main.postDelayed(this, smooth ? 33 : 1000 - System.currentTimeMillis() % 1000);
+            boolean calm = SystemClock.uptimeMillis() - started > 60 * 60_000L;
+            main.postDelayed(this, smooth ? (calm ? 100 : 33) : 1000 - System.currentTimeMillis() % 1000);
         }
     };
 
@@ -166,26 +168,32 @@ final class IosSaver extends View {
         if (style == 6) new Thread(this::loadPhotos, "saver").start();
     }
 
-    /** Фото дня: восемь последних картинок дня Bing, с подписями мест. Кэш на сутки. */
+    /** Фото дня: последние картинки дня Bing с подписями мест, только места, без людей. Кэш на сутки. */
     private void loadPhotos() {
         File dir = new File(context.getCacheDir(), "saver");
         dir.mkdirs();
-        try {
-            JSONArray images = new JSONObject(text("https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=ru-RU")).getJSONArray("images");
-            for (int i = 0; i < images.length(); i++) {
-                JSONObject im = images.getJSONObject(i);
-                String url = "https://www.bing.com" + im.getString("urlbase") + "_1920x1080.jpg";
-                File f = new File(dir, "p" + Integer.toHexString(url.hashCode()) + ".jpg");
-                if (!f.exists()) try (FileOutputStream out = new FileOutputStream(f)) { out.write(bytes(url)); }
-                BitmapFactory.Options o = new BitmapFactory.Options();
-                o.inPreferredConfig = Bitmap.Config.RGB_565;
-                Bitmap b = BitmapFactory.decodeFile(f.getPath(), o);
-                String place = im.optString("copyright").replaceAll("\\s*\\(©.*$", "").trim();
-                if (b != null) main.post(() -> { photos.add(b); places.add(place); });
-                if (i >= 3) break;
+        int got = 0;
+        for (int page : new int[]{0, 7}) {
+            if (got >= 4) break;
+            try {
+                JSONArray images = new JSONObject(text("https://www.bing.com/HPImageArchive.aspx?format=js&idx=" + page + "&n=8&mkt=ru-RU")).getJSONArray("images");
+                for (int i = 0; i < images.length() && got < 4; i++) {
+                    JSONObject im = images.getJSONObject(i);
+                    String place = im.optString("copyright").replaceAll("\\s*\\(©.*$", "").trim();
+                    if (IosText.hasPeople(place + " " + im.optString("title"))) continue;
+                    String url = "https://www.bing.com" + im.getString("urlbase") + "_1920x1080.jpg";
+                    File f = new File(dir, "p" + Integer.toHexString(url.hashCode()) + ".jpg");
+                    if (!f.exists()) try (FileOutputStream out = new FileOutputStream(f)) { out.write(bytes(url)); }
+                    BitmapFactory.Options o = new BitmapFactory.Options();
+                    o.inPreferredConfig = Bitmap.Config.RGB_565;
+                    Bitmap b = BitmapFactory.decodeFile(f.getPath(), o);
+                    if (b == null) continue;
+                    got++;
+                    main.post(() -> { photos.add(b); places.add(place); });
+                }
+            } catch (Exception | OutOfMemoryError e) {
+                Log.w(TAG, "photos: " + e);
             }
-        } catch (Exception | OutOfMemoryError e) {
-            Log.w(TAG, "photos: " + e);
         }
     }
 

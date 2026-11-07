@@ -1,0 +1,5 @@
+{"results":[{"name":"Рекомендации","url":"/api/feeds/tabs/123/","content":[
+ {"id":"0123456789abcdef0123456789abcdef","title":"Сериал, серия 1","thumbnail_url":"https://pic.rutubelist.ru/video/aa/bb.jpg?size=s","duration":2710,"author":{"name":"Студия"}},
+ {"id":"fedcba9876543210fedcba9876543210","title":"Для взрослых","thumbnail_url":"https://pic.rutubelist.ru/x.jpg","is_adult":true},
+ {"video_url":"https://rutube.ru/video/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/","title":"Через ссылку","thumbnail_url":"https://pic.rutubelist.ru/y.jpg"}
+]}]}

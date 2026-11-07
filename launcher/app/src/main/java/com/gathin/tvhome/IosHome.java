@@ -212,6 +212,8 @@ public class IosHome extends Activity {
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        // Настройки после переустановки: раньше всех, кто их читает.
+        IosBackup.restore(this);
         IosCrash.install(this);
         prefs = getSharedPreferences("ios_home_v4", MODE_PRIVATE);
         feed = new IosFeed(this);
@@ -355,6 +357,7 @@ public class IosHome extends Activity {
         handler.removeCallbacks(ticker);
         for (ObjectAnimator a : drift) a.pause();
         wasAway = true;
+        IosBackup.save(this);
         super.onPause();
     }
 
@@ -1017,7 +1020,12 @@ public class IosHome extends Activity {
         List<FeedItem> items = feed.cached(a.pkg);
         subtitle.setText("");
         for (int i = 0; i < items.size(); i++) addCard(items.get(i), i);
-        if (items.isEmpty()) addPill("Открыть", a.logo.accent, () -> launch(a));
+        if (items.isEmpty()) {
+            // Сервис не ответил: говорим об этом, а не показываем пустоту.
+            String err = feed.error(a.pkg);
+            if (err != null) subtitle.setText(a.label + " сейчас не отвечает. Лента появится, как только ответит");
+            addPill("Открыть", a.logo.accent, () -> launch(a));
+        }
         loadFeed(a.pkg);
         feed.wantPictures(a.pkg);
     }

@@ -82,4 +82,16 @@ final class IosText {
         long r = Math.round(t);
         return (r > 0 ? "+" : r < 0 ? "−" : "") + Math.abs(r) + "°";
     }
+
+    private static final String[] PEOPLE = {"человек", "люд", "мужчин", "женщин", "девушк", "девочк", "мальчик", "парн", "ребён",
+            "ребен", "дети", "детск", "семья", "семей", "туристы", "толп", "фестивал", "праздн", "карнавал", "парад", "серфер",
+            "лыжник", "сноубордист", "альпинист", "велосипедист", "бегун", "рыбак", "пастух", "монах", "танц", "музыкант",
+            "спортсмен", "портрет", "участник", "зрител", "паломник", "жители", "фермер"};
+
+    /** Есть ли на фото дня люди — по подписи. Нужны только места. */
+    static boolean hasPeople(String caption) {
+        String t = caption == null ? "" : caption.toLowerCase(java.util.Locale.ROOT);
+        for (String w : PEOPLE) if (t.contains(w)) return true;
+        return false;
+    }
 }

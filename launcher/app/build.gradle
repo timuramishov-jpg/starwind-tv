@@ -38,7 +38,7 @@ android {
             if (store) {
                 storeFile file(store)
                 storePassword System.getenv('STARWIND_KEY_PASS')
-                keyAlias 'starwind'
+                keyAlias System.getenv('STARWIND_KEY_ALIAS') ?: 'starwind'
                 keyPassword System.getenv('STARWIND_KEY_PASS')
             }
         }

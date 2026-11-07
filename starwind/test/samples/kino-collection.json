@@ -1,0 +1,5 @@
+{"total":250,"totalPages":13,"items":[
+ {"kinopoiskId":301,"nameRu":"Матрица","nameOriginal":"The Matrix","year":1999,"ratingKinopoisk":8.5,"posterUrl":"https://kinopoiskapiunofficial.tech/images/posters/kp/301.jpg","posterUrlPreview":"https://kinopoiskapiunofficial.tech/images/posters/kp_small/301.jpg"},
+ {"kinopoiskId":302,"nameRu":null,"nameOriginal":"Untitled Film","year":null,"ratingKinopoisk":null,"posterUrl":"https://x/302.jpg","posterUrlPreview":"https://x/302s.jpg"},
+ {"kinopoiskId":303,"nameRu":null,"nameOriginal":null}
+]}

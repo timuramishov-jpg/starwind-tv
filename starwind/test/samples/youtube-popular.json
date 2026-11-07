@@ -1,0 +1,5 @@
+{"kind":"youtube#videoListResponse","nextPageToken":"CDIQAA","items":[
+ {"kind":"youtube#video","id":"dQw4w9WgXcQ","snippet":{"publishedAt":"2026-11-06T18:00:00Z","channelId":"UC1","title":"Обзор телевизора","channelTitle":"Канал Тест","thumbnails":{"default":{"url":"https://i.ytimg.com/vi/dQw4w9WgXcQ/default.jpg"},"medium":{"url":"https://i.ytimg.com/vi/dQw4w9WgXcQ/mqdefault.jpg"},"high":{"url":"https://i.ytimg.com/vi/dQw4w9WgXcQ/hqdefault.jpg"},"standard":{"url":"https://i.ytimg.com/vi/dQw4w9WgXcQ/sddefault.jpg"}}},"contentDetails":{"duration":"PT12M5S"}},
+ {"kind":"youtube#video","id":"short000001","snippet":{"publishedAt":"2026-11-05T10:00:00Z","title":"Котик #shorts","channelTitle":"Коты","thumbnails":{"high":{"url":"https://i.ytimg.com/vi/short000001/hqdefault.jpg"}}},"contentDetails":{"duration":"PT45S"}},
+ {"kind":"youtube#video","id":"broken","contentDetails":{"duration":"PT1M"}}
+]}
