@@ -123,6 +123,9 @@ nav button:active{transform:none}
     <button onclick="go('vol',{d:'down'})" aria-label="Тише"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M17 12h4"/></svg></button>
     <button onclick="go('vol',{d:'mute'})" aria-label="Без звука"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M17 9l5 6M22 9l-5 6"/></svg></button>
     <button onclick="go('vol',{d:'up'})" aria-label="Громче"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M17 12h4M19 10v4"/></svg></button>
+    <button onclick="go('power',{on:0})" aria-label="Выключить телевизор" style="color:var(--red)"><svg viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M6.3 6.3a8 8 0 1011.4 0"/></svg></button>
+    <button onclick="go('key',{c:'MENU'})" aria-label="Меню"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <button onclick="go('power',{on:1})" aria-label="Включить телевизор"><svg viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M6.3 6.3a8 8 0 1011.4 0"/></svg></button>
   </div>
   <h2>Напечатать на телевизоре</h2>
   <div class="card"><div class="row"><input type="text" id="tx" placeholder="Текст в поле на экране" enterkeyhint="send"><button onclick="typeText()">Ввести</button></div>
@@ -287,13 +290,20 @@ async function topApps(){
 async function tweak(w,on){await go('tweak',{w,v:on?1:0});state()}
 async function state(){try{const s=await call('state');$('anim').checked=!!s.anim;$('dns').checked=!!s.dns;
   if(s.vpn!=null){$('vpn').checked=!!s.vpn;$('vpnl').textContent=s.vpn?(s.place||'Включён'):'Выключен'}
-  const tb=$('typebar');if(!!s.typing!==typingShown){typingShown=!!s.typing;tb.classList.toggle('on',typingShown);if(typingShown){$('tv-in').focus();if(navigator.vibrate)navigator.vibrate(20)}}
+  const tb=$('typebar');typingMode=s.typing===true?'ime':(s.typing||'');
+  if(!!typingMode!==typingShown){typingShown=!!typingMode;tb.classList.toggle('on',typingShown);
+    $('tv-in').placeholder=typingMode==='app'?'Текст для поиска на телевизоре':'Печатай — текст появится на телевизоре';
+    if(typingShown&&typingMode==='ime'){$('tv-in').focus();if(navigator.vibrate)navigator.vibrate(20)}}
   if(s.sleep!=null){sleepLeft=s.sleep;$('sleepl').textContent=s.sleep?'Через '+s.sleep+' мин':'Выключен'}}catch(e){}}
 function shot(){toast('Снимаю экран');const img=new Image();img.className='shot';img.alt='Снимок экрана телевизора';
   img.onload=()=>{$('shotbox').innerHTML='';const a=document.createElement('a');a.href=img.src;a.download='tv.png';a.appendChild(img);$('shotbox').appendChild(a)};
   img.onerror=()=>toast('Не получилось снять экран');img.src=url('shot',{t:Date.now()})}
 let typingShown=false;
-async function sendType(done){const t=$('tv-in').value;$('tv-in').value='';await call('type',{t,done:done?1:0})}
+// ime — наша клавиатура: текст вставляется целиком; app — у приложения своя клавиатура (YouTube): печатаем событиями.
+let typingMode='';
+async function sendType(done){const t=$('tv-in').value;$('tv-in').value='';
+  if(typingMode==='ime'){await call('type',{t,done:done?1:0});return}
+  if(t)await call('text',{t});if(done)await call('key',{c:'ENTER'})}
 $('tv-in').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendType(true)}});
 // Каждое слово уходит сразу: после пробела отправляем набранное.
 $('tv-in').addEventListener('input',e=>{const v=$('tv-in').value;if(v.endsWith(' '))sendType(false)});

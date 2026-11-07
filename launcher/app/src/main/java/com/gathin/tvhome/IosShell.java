@@ -123,6 +123,13 @@ public final class IosShell {
                 break;
             }
             case "home": press(KeyEvent.KEYCODE_HOME); json = "{}"; break;
+            case "power": {
+                // Сон и пробуждение, как кнопка питания пульта. Будить можно, пока телевизор в сети (быстрый режим ожидания).
+                boolean on = "1".equals(a.get("on"));
+                press(on ? KeyEvent.KEYCODE_WAKEUP : KeyEvent.KEYCODE_SLEEP);
+                json = say(on ? "Включаю телевизор" : "Выключаю телевизор");
+                break;
+            }
             case "vol": {
                 String d = a.get("d");
                 press("up".equals(d) ? KeyEvent.KEYCODE_VOLUME_UP : "down".equals(d) ? KeyEvent.KEYCODE_VOLUME_DOWN : KeyEvent.KEYCODE_VOLUME_MUTE);
@@ -213,18 +220,40 @@ public final class IosShell {
         return "{}";
     }
 
-    /** Латиница — по буквам; кириллица — через буфер обмена лаунчера и «вставить». */
+    /** Текст в поле на экране. Наша клавиатура открыта — вставляем целиком через неё. Иначе латиница — по буквам,
+     *  а кириллица — одним «многосимвольным» событием клавиатуры: его понимают и приложения со своей клавиатурой (YouTube). */
     private static String type(String t) throws Exception {
         if (t == null || t.isEmpty()) return say("Напиши текст");
-        KeyEvent[] events = KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD).getEvents(t.toCharArray());
-        if (events != null) {
-            for (KeyEvent e : events) send(e);
-        } else {
-            command("clip", t);
-            SystemClock.sleep(600);
-            press(KeyEvent.KEYCODE_PASTE);
+        if ("1".equals(read(DIR + "/typing").trim())) {
+            sh("am broadcast -a " + IosKeyboard.TYPE + " -p " + PKG + " --es k " + quote(read(DIR + "/key").trim()) + " --es t " + quote(t));
+            return "{}";
         }
-        return say("Напечатал");
+        KeyEvent[] events = KeyCharacterMap.load(KeyCharacterMap.VIRTUAL_KEYBOARD).getEvents(t.toCharArray());
+        if (events != null) for (KeyEvent e : events) send(e);
+        else send(new KeyEvent(SystemClock.uptimeMillis(), t, KeyCharacterMap.VIRTUAL_KEYBOARD, 0));
+        return "{}";
+    }
+
+    /** Приложения со своей экранной клавиатурой: пока они на экране, телефон держит поле ввода наготове. */
+    private static final String[] OWN_KEYBOARD = {"com.yandex.tv.ytplayer", "com.google.android.youtube.tv"};
+    private static String front = "";
+    private static long frontAt;
+
+    private static synchronized String front() {
+        if (SystemClock.uptimeMillis() - frontAt < 1500) return front;
+        frontAt = SystemClock.uptimeMillis();
+        try {
+            Matcher m = Pattern.compile("mResumedActivity: ActivityRecord\\{\\S+ \\S+ ([\\w.]+)/").matcher(sh("dumpsys activity activities | grep -m1 mResumedActivity"));
+            front = m.find() ? m.group(1) : "";
+        } catch (Exception e) { front = ""; }
+        return front;
+    }
+
+    private static String typingMode() {
+        if ("1".equals(read(DIR + "/typing").trim())) return "ime";
+        String f = front();
+        for (String p : OWN_KEYBOARD) if (p.equals(f)) return "app";
+        return "";
     }
 
     // ---------- Приложения и ссылки ----------
@@ -325,7 +354,7 @@ public final class IosShell {
         long sleepAt = s.optLong("sleepAt");
         return new JSONObject().put("anim", "0.5".equals(anim)).put("dns", "hostname".equals(mode) && IosTools.DNS_HOST.equals(host))
                 .put("vpn", new File("/sys/class/net/tun0").exists()).put("place", s.optString("place"))
-                .put("typing", "1".equals(read(DIR + "/typing").trim()))
+                .put("typing", typingMode())
                 .put("sleep", sleepAt <= System.currentTimeMillis() ? 0 : (sleepAt - System.currentTimeMillis() + 59_999) / 60000).toString();
     }
 
