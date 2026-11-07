@@ -669,54 +669,20 @@ final class IosFeed {
     static boolean taggedShort(String title) { return IosText.taggedShort(title); }
     static int seconds(String d) { return IosText.seconds(d); }
 
-    /** Что из роликов шортсы. Длиннее 3 минут шортсов не бывает. Короче — спрашиваем YouTube:
-     *  адрес youtube.com/shorts/ID у шортса открывается, у обычного ролика перенаправляет на watch.
-     *  Ответ запоминается; если спросить не вышло, шортсом считаем то, что короче минуты. */
+    /** Что из роликов шортсы — проверенное правило: всё до 3 минут и всё с меткой #shorts.
+     *  Проверка через youtube.com/shorts/ID отвечала по-разному (через VPN приходили перенаправления) и пропускала шортсы. */
     private Set<String> shortsAmong(Map<String, String> durations, Map<String, String> titles) {
         Set<String> out = new HashSet<>();
-        List<String> ask = new ArrayList<>();
         for (Map.Entry<String, String> e : durations.entrySet()) {
-            String id = e.getKey();
             int sec = seconds(e.getValue());
-            if (taggedShort(titles.get(id))) out.add(id);
-            else if (sec > 0 && sec <= 180) {
-                String known = prefs.getString("short_" + id, "");
-                if (known.equals("1")) out.add(id);
-                else if (known.isEmpty()) ask.add(id);
-            }
+            if (taggedShort(titles.get(e.getKey())) || sec > 0 && sec <= 180) out.add(e.getKey());
         }
-        if (ask.isEmpty()) return out;
-        // Память о шортсах не растёт бесконечно: после 3000 записей начинаем заново.
-        if (prefs.getAll().size() > 3000) {
+        // Старые ответы проверки больше не нужны.
+        if (!prefs.getBoolean("shorts_v2", false)) {
             SharedPreferences.Editor clean = prefs.edit();
             for (String k : prefs.getAll().keySet()) if (k.startsWith("short_")) clean.remove(k);
-            clean.apply();
+            clean.putBoolean("shorts_v2", true).apply();
         }
-        List<Callable<Integer>> jobs = new ArrayList<>();
-        for (String id : ask) jobs.add(() -> {
-            HttpURLConnection c = (HttpURLConnection) new URL("https://www.youtube.com/shorts/" + id).openConnection();
-            c.setInstanceFollowRedirects(false);
-            c.setRequestMethod("HEAD");
-            c.setConnectTimeout(4000);
-            c.setReadTimeout(4000);
-            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/120.0 Safari/537.36");
-            try { return c.getResponseCode(); } finally { c.disconnect(); }
-        });
-        SharedPreferences.Editor ed = prefs.edit();
-        try {
-            List<Future<Integer>> done = requests.invokeAll(jobs);
-            for (int i = 0; i < ask.size(); i++) {
-                String id = ask.get(i);
-                int code;
-                try { code = done.get(i).get(); } catch (ExecutionException e) { code = -1; }
-                if (code == 200) { out.add(id); ed.putString("short_" + id, "1"); }
-                else if (code >= 300 && code < 400) ed.putString("short_" + id, "0");
-                else if (seconds(durations.get(id)) <= 60) out.add(id);
-            }
-        } catch (InterruptedException e) {
-            for (String id : ask) if (seconds(durations.get(id)) <= 60) out.add(id);
-        }
-        ed.apply();
         return out;
     }
 
@@ -838,7 +804,7 @@ final class IosFeed {
                 if (it.subtitle.isEmpty() && c.getLong(11) > 0 && c.getInt(12) == TvContract.PreviewPrograms.INTERACTION_TYPE_VIEWS)
                     it.subtitle = views(c.getLong(11));
                 if (it.subtitle.isEmpty() && rows.containsKey(c.getLong(13))) it.subtitle = rows.get(c.getLong(13));
-                if (out.isEmpty()) Log.i(TAG, "preview row " + pkg + ": author=" + c.getString(7) + " short=" + c.getString(2) + " long=" + c.getString(8)
+                if (out.size() < 3) Log.i(TAG, "preview row " + pkg + ": intent=" + c.getString(5) + " author=" + c.getString(7) + " short=" + c.getString(2) + " long=" + c.getString(8)
                         + " episode=" + c.getString(9) + " date=" + c.getString(10) + " count=" + c.getLong(11) + "/" + c.getInt(12) + " rows=" + rows);
                 List<String> urls = new ArrayList<>();
                 for (int i = 3; i <= 4; i++) if (c.getString(i) != null && c.getString(i).startsWith("http")) urls.add(c.getString(i));
@@ -986,8 +952,7 @@ final class IosFeed {
         for (IosParse.Entry f : IosParse.kino(list, POOL)) {
             IosHome.FeedItem it = new IosHome.FeedItem();
             it.title = f.title;
-            it.subtitle = f.year + (f.rating.isEmpty() ? "" : (f.year.isEmpty() ? "" : ", ") + "рейтинг " + f.rating)
-                    + (inZona ? " · ОК: найти в Зоне" : " · ОК: найти в Кинопоиске");
+            it.subtitle = f.year + (f.rating.isEmpty() ? "" : (f.year.isEmpty() ? "" : ", ") + "рейтинг " + f.rating);
             it.poster = true;
             it.urls = f.urls;
             // У Zona нет ссылок на отдельные фильмы, поэтому карточка открывает приложение.

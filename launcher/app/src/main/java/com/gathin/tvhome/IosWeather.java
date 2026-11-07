@@ -36,22 +36,47 @@ final class IosWeather {
     /** Последняя строка «+3°, облачно», пустая — ещё не знаем. */
     String last() { return prefs.getString("line", ""); }
 
+    /** Температура «+3°», пустая — ещё не знаем. */
+    String temp() { return prefs.getString("temp", ""); }
+
+    /** Значок погоды SF Symbols (R.drawable.w_*), 0 — ещё не знаем. */
+    int icon() { return icon(prefs); }
+
+    static int icon(Context c) { return icon(c.getSharedPreferences("ios_weather", 0)); }
+
+    private static int icon(SharedPreferences p) {
+        if (!p.contains("code")) return 0;
+        switch (IosText.weatherIcon(p.getInt("code", 3), p.getBoolean("day", true))) {
+            case "sun": return R.drawable.w_sun;
+            case "moon": return R.drawable.w_moon;
+            case "sun_cloud": return R.drawable.w_sun_cloud;
+            case "moon_cloud": return R.drawable.w_moon_cloud;
+            case "fog": return R.drawable.w_fog;
+            case "drizzle": return R.drawable.w_drizzle;
+            case "rain": return R.drawable.w_rain;
+            case "snow": return R.drawable.w_snow;
+            case "storm": return R.drawable.w_storm;
+            default: return R.drawable.w_cloud;
+        }
+    }
+
     void refresh(Sink sink) {
         long now = System.currentTimeMillis();
-        if (now - at < 30 * 60_000L && !last().isEmpty()) return;
+        if (now - at < 30 * 60_000L && !last().isEmpty() && prefs.contains("code")) return;
         at = now;
         new Thread(() -> {
             try {
                 // Город всегда Москва: по адресу его не определить, пока работает VPN.
                 double lat = 55.7558, lon = 37.6173;
                 JSONObject w = get(String.format(Locale.ROOT,
-                        "https://api.open-meteo.com/v1/forecast?latitude=%.3f&longitude=%.3f&current=temperature_2m,weather_code"
+                        "https://api.open-meteo.com/v1/forecast?latitude=%.3f&longitude=%.3f&current=temperature_2m,weather_code,is_day"
                                 + "&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto", lat, lon));
                 JSONObject cur = w.getJSONObject("current");
                 String line = IosText.degrees(cur.getDouble("temperature_2m")) + ", " + word(cur.optInt("weather_code"));
                 SharedPreferences.Editor e = prefs.edit().putString("line", line)
                         .putString("temp", IosText.degrees(cur.getDouble("temperature_2m")))
-                        .putString("word", word(cur.optInt("weather_code")));
+                        .putString("word", word(cur.optInt("weather_code")))
+                        .putInt("code", cur.optInt("weather_code")).putBoolean("day", cur.optInt("is_day", 1) == 1);
                 JSONObject daily = w.optJSONObject("daily");
                 if (daily != null && daily.optJSONArray("temperature_2m_max") != null) {
                     e.putString("hi", IosText.degrees(daily.getJSONArray("temperature_2m_max").getDouble(0)));

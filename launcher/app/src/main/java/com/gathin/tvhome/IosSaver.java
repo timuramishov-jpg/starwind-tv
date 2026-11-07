@@ -43,12 +43,15 @@ import java.util.TimeZone;
 /** Заставки по макетам «Заставки Starwind»: квадратный циферблат с календарём, прямоугольный циферблат,
  *  большие цифры внахлёст, карта дня и ночи, виджеты, афиши кино, фото дня.
  *  Рисуется в координатах 1920×1080 и масштабируется под экран. Один стиль на всё:
- *  оранжевый #FF9F0A, красный #FF453A, белый #F5F5F7, приглушённый серый, SF Pro. */
+ *  цвета IosPalette, шрифт SF Pro. Влево и вправо на пульте листают заставки.
+ *  Каждая кисть (Paint) — новая: общая кисть таскала выравнивание из прошлого кадра, и тексты уезжали за край. */
 final class IosSaver extends View {
     static final String[] NAMES = {"Циферблат и календарь", "Прямоугольный циферблат", "Большие цифры",
             "Карта мира", "Виджеты", "Афиши кино", "Фото дня"};
 
-    private static final int ORANGE = 0xFFFF9F0A, RED = 0xFFFF453A, INK = 0xFFF5F5F7, SUB = 0x99F5F5F7, DIM = 0x52F5F5F7;
+    // Цвета — только из IosPalette.
+    private static final int ORANGE = IosPalette.ORANGE, RED = IosPalette.RED, INK = IosPalette.INK,
+            SUB = IosPalette.alpha(IosPalette.INK, 0.6f), DIM = IosPalette.alpha(IosPalette.INK, 0.32f);
     private static final String TAG = "IosSaver";
     private static final String[] MONTHS = {"ЯНВАРЬ", "ФЕВРАЛЬ", "МАРТ", "АПРЕЛЬ", "МАЙ", "ИЮНЬ", "ИЮЛЬ", "АВГУСТ", "СЕНТЯБРЬ", "ОКТЯБРЬ", "НОЯБРЬ", "ДЕКАБРЬ"};
     private static final String[] DAYS = {"ВС", "ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ"};
@@ -78,12 +81,15 @@ final class IosSaver extends View {
             "................#...........................................",
             "............................................................"};
 
-    private final int style;
+    private int style;
     private final Context context;
     private final Handler main = new Handler(Looper.getMainLooper());
-    private final Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Typeface semibold, medium, bold, expanded, rounded;
-    private final long started = SystemClock.uptimeMillis();
+    private long started = SystemClock.uptimeMillis();
+    private final boolean[] loaded = new boolean[NAMES.length];
+    /** Афиши показываются, когда загружены все: иначе мозаика перетасовывается на глазах. */
+    private boolean coversReady;
+    private long coversAt;
     private final List<Bitmap> covers = new ArrayList<>();
     private final List<Bitmap> photos = new ArrayList<>();
     private final List<String> places = new ArrayList<>();
@@ -112,8 +118,30 @@ final class IosSaver extends View {
         bold = semibold;
         expanded = asset(c, "sf_expanded.ttf", null, medium);
         rounded = asset(c, "sf_rounded.ttf", "'wght' 800", semibold);
-        setBackgroundColor(0xFF000000);
+        setBackgroundColor(IosPalette.BLACK);
         load();
+    }
+
+    int style() { return style; }
+
+    static int stepFor(int key) {
+        return key == android.view.KeyEvent.KEYCODE_DPAD_RIGHT ? 1 : key == android.view.KeyEvent.KEYCODE_DPAD_LEFT ? -1 : 0;
+    }
+
+    /** Листание пультом. Если в настройках выбрана одна заставка — запоминаем новую; «по очереди» не трогаем. */
+    static void remember(Context c, IosSaver saver, int step) {
+        saver.step(step);
+        SharedPreferences s = c.getSharedPreferences("ios_saver", 0);
+        if (s.getInt("style", -1) >= 0) s.edit().putInt("style", saver.style()).apply();
+        else s.edit().putInt("turn", saver.style()).apply();
+    }
+
+    /** Листание пультом: следующая или предыдущая заставка, без перезапуска окна. */
+    void step(int delta) {
+        style = (style + delta + NAMES.length) % NAMES.length;
+        started = SystemClock.uptimeMillis();
+        load();
+        invalidate();
     }
 
     /** Какая заставка сейчас: номер из настроек, -1 — по очереди. */
@@ -148,6 +176,8 @@ final class IosSaver extends View {
     // ---------- Данные ----------
 
     private void load() {
+        if (loaded[style]) return;
+        loaded[style] = true;
         if (style == 4) {
             continueInfo = IosFeed.lastOpened(context);
             if (continueInfo != null && !continueInfo[2].isEmpty())
@@ -159,11 +189,13 @@ final class IosSaver extends View {
         if (style == 5) new Thread(() -> {
             List<String> urls = new ArrayList<>(IosFeed.savedPictures(context, IosFeed.KINOPOISK));
             urls.addAll(IosFeed.savedPictures(context, IosFeed.ZONA));
+            List<Bitmap> got = new ArrayList<>();
             for (String u : urls) {
-                if (covers.size() >= 40) break;
+                if (got.size() >= 40) break;
                 Bitmap b = IosFeed.savedPicture(context, u, 200);
-                if (b != null) main.post(() -> covers.add(b));
+                if (b != null) got.add(b);
             }
+            main.post(() -> { covers.addAll(got); coversReady = true; coversAt = SystemClock.uptimeMillis(); });
         }, "saver").start();
         if (style == 6) new Thread(this::loadPhotos, "saver").start();
     }
@@ -232,15 +264,29 @@ final class IosSaver extends View {
         c.restore();
     }
 
-    private Paint fill(int color) {
-        p.reset();
-        p.setAntiAlias(true);
-        p.setColor(color);
-        p.setStyle(Paint.Style.FILL);
-        return p;
+    private static Paint fill(int color) {
+        Paint q = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
+        q.setColor(color);
+        return q;
     }
 
-    private Paint type(Typeface t, float size, int color) {
+    /** Кисть с градиентом: цвет непрозрачный, иначе градиент умножается на нулевую прозрачность и пропадает. */
+    private static Paint shaded(Shader sh) {
+        Paint q = fill(IosPalette.BLACK);
+        q.setShader(sh);
+        return q;
+    }
+
+    /** Текст не шире width: лишнее заменяется на «…». */
+    private static String fit(String text, Paint q, float width) {
+        if (text == null) return "";
+        if (q.measureText(text) <= width) return text;
+        String t = text;
+        while (t.length() > 1 && q.measureText(t + "…") > width) t = t.substring(0, t.length() - 1);
+        return t.trim() + "…";
+    }
+
+    private static Paint type(Typeface t, float size, int color) {
         Paint q = fill(color);
         q.setTypeface(t);
         q.setTextSize(size);
@@ -291,7 +337,7 @@ final class IosSaver extends View {
         c.restore();
         c.drawCircle(cx, cy, w * 3, fill(INK));
         c.drawCircle(cx, cy, w * 1.7f, fill(ORANGE));
-        c.drawCircle(cx, cy, w * 0.7f, fill(0xFF000000));
+        c.drawCircle(cx, cy, w * 0.7f, fill(IosPalette.BLACK));
     }
 
     private static float[] angles(Calendar t) {
@@ -324,7 +370,9 @@ final class IosSaver extends View {
         float cell = 114, width = cell * 7;
         Paint title = type(bold, 60, RED);
         title.setLetterSpacing(0.02f);
-        c.drawText(MONTHS[t.get(Calendar.MONTH)], left + 16, top + 50, title);
+        title.setTextAlign(Paint.Align.LEFT);
+        // Левый край названия месяца — по левому краю сетки дней, как в календаре iOS.
+        c.drawText(MONTHS[t.get(Calendar.MONTH)], left + 22, top + 50, title);
         Paint head = type(semibold, 40, INK);
         head.setTextAlign(Paint.Align.CENTER);
         for (int d = 0; d < 7; d++) {
@@ -356,9 +404,9 @@ final class IosSaver extends View {
             float dx = (float) Math.sin(th), dy = (float) -Math.cos(th);
             float d = Math.min(Math.abs(dx) > 1e-6 ? hw / Math.abs(dx) : 1e9f, Math.abs(dy) > 1e-6 ? hh / Math.abs(dy) : 1e9f);
             float len = 52, w = 6;
-            int col = 0x47F5F5F7;
-            if (m % 5 == 0) { len = d * 0.36f; w = 10; col = 0xB8F5F5F7; }
-            if (m % 15 == 0) { len = (m == 15 || m == 45) ? 128 : 60; col = 0xCCF5F5F7; }
+            int col = IosPalette.alpha(INK, 0.28f);
+            if (m % 5 == 0) { len = d * 0.36f; w = 10; col = IosPalette.alpha(INK, 0.72f); }
+            if (m % 15 == 0) { len = (m == 15 || m == 45) ? 128 : 60; col = IosPalette.alpha(INK, 0.8f); }
             tick(c, cx, cy, hw, hh, m * 6, len, w, col);
         }
         Paint n = type(expanded, 128, INK);
@@ -384,7 +432,7 @@ final class IosSaver extends View {
         String s = hhmm(t);
         char[] d = {s.charAt(0), s.charAt(1), s.charAt(3), s.charAt(4)};
         float[] cxs = {390, 740, 1180, 1530}, base = {-11, 9, -7, 13}, swing = {5, -6, 7, -5}, period = {8, 10, 9, 11};
-        int[] colors = {0xFF0A63C2, 0xFF52A3EE, 0xFF0A63C2, 0xFF52A3EE};
+        int[] colors = {IosPalette.alpha(IosPalette.BLUE, 0.7f), IosPalette.BLUE, IosPalette.alpha(IosPalette.BLUE, 0.7f), IosPalette.BLUE};
         float sec = (SystemClock.uptimeMillis() - started) / 1000f;
         Paint q = type(rounded, 860, 0);
         q.setLetterSpacing(0);
@@ -400,9 +448,8 @@ final class IosSaver extends View {
         }
         float wob = (float) Math.sin(sec / 7 * Math.PI);
         for (float[] dot : new float[][]{{966, 442}, {954, 662}}) {
-            Paint g = fill(0);
-            g.setShader(new LinearGradient(dot[0] - 62, dot[1] - 62, dot[0] + 62, dot[1] + 62,
-                    new int[]{0xFFDDE9F7, 0xFFBFC3C8, 0xFFC9D9EA}, new float[]{0, 0.55f, 1}, Shader.TileMode.CLAMP));
+            Paint g = shaded(new LinearGradient(dot[0] - 62, dot[1] - 62, dot[0] + 62, dot[1] + 62,
+                    new int[]{IosPalette.INK, IosPalette.SECONDARY, IosPalette.INK}, new float[]{0, 0.55f, 1}, Shader.TileMode.CLAMP));
             c.drawCircle(dot[0] + 3 * wob, dot[1] - 4 * wob, 62, g);
         }
     }
@@ -424,7 +471,7 @@ final class IosSaver extends View {
             double lat = lat0 - r * (lat0 - lat1) / (rows - 1), lon = lon0 + col * (lon1 - lon0) / (cols - 1);
             double la = Math.toRadians(lat), h = Math.toRadians(lon - sublon);
             boolean day = Math.sin(la) * Math.sin(dec) + Math.cos(la) * Math.cos(dec) * Math.cos(h) > 0;
-            c.drawCircle(x0 + col * (x1 - x0) / (cols - 1), y0 + r * (y1 - y0) / (rows - 1), 9, fill(day ? 0xE0F5F5F7 : 0x4DF5F5F7));
+            c.drawCircle(x0 + col * (x1 - x0) / (cols - 1), y0 + r * (y1 - y0) / (rows - 1), 9, fill(day ? IosPalette.alpha(INK, 0.88f) : IosPalette.alpha(INK, 0.3f)));
         }
         Path line = new Path();
         for (int i = 0; i <= 120; i++) {
@@ -434,7 +481,7 @@ final class IosSaver extends View {
             float y = (float) Math.max(y0 - 40, Math.min(y1 + 40, y0 + (lat0 - lat) / (lat0 - lat1) * (y1 - y0)));
             if (i == 0) line.moveTo(x, y); else line.lineTo(x, y);
         }
-        Paint q = fill(0x73F5F5F7);
+        Paint q = fill(IosPalette.alpha(INK, 0.45f));
         q.setStyle(Paint.Style.STROKE);
         q.setStrokeWidth(5);
         q.setStrokeCap(Paint.Cap.ROUND);
@@ -445,30 +492,34 @@ final class IosSaver extends View {
         c.drawText(hhmm(t), 88, 1080 - 80, type(semibold, 224, INK));
     }
 
-    // 5. Виджеты
+    // 5. Виджеты: дата и большие часы, внизу три карточки одного вида — погода, продолжить просмотр, VPN.
     private void widgets(Canvas c, Calendar t) {
-        Paint bg = fill(0);
-        bg.setShader(new RadialGradient(1632, 108, 1500, new int[]{0xFF26324A, 0xFF10141D, 0xFF07080B}, new float[]{0, 0.55f, 1}, Shader.TileMode.CLAMP));
-        c.drawRect(0, 0, 1920, 1080, bg);
         c.drawText(dateLine(t), 102, 128, type(semibold, 40, SUB));
         c.drawText(hhmm(t), 96, 128 + 12 + 230, type(semibold, 256, INK));
-        float top = 1080 - 88 - 316, x = 96;
+        float top = 1080 - 88 - 316, x = 96, pad = 36;
         // Погода
         String[] w = IosWeather.details(context);
         RectF box = new RectF(x, top, x + 316, top + 316);
-        Paint g = fill(0);
-        g.setShader(new LinearGradient(0, top, 0, top + 316, 0xFF3A5A8C, 0xFF26406B, Shader.TileMode.CLAMP));
-        c.drawRoundRect(box, 52, 52, g);
-        c.drawText(w[4], x + 32, top + 56, type(semibold, 28, INK));
-        c.drawText(w[0].isEmpty() ? "—" : w[0].replace("+", ""), x + 28, top + 150, type(medium, 88, INK));
-        c.drawText(w[1].isEmpty() ? "" : cap(w[1]), x + 32, top + 236, type(semibold, 26, INK));
-        if (!w[2].isEmpty()) c.drawText("Макс.: " + w[2].replace("+", "") + ", мин.: " + w[3].replace("+", ""), x + 32, top + 276, type(medium, 26, 0xBFF5F5F7));
+        c.drawRoundRect(box, 52, 52, fill(IosPalette.GRAY6));
+        Paint city = type(semibold, 28, SUB);
+        c.drawText(fit(w[4], city, 316 - 2 * pad), x + pad, top + 60, city);
+        int icon = IosWeather.icon(context);
+        if (icon != 0) drawIcon(c, icon, x + 316 - pad - 64, top + 28, 64);
+        Paint deg = type(medium, 96, INK);
+        c.drawText(w[0].isEmpty() ? "—" : w[0], x + pad - 4, top + 172, deg);
+        Paint word = type(semibold, 28, INK);
+        c.drawText(fit(w[1].isEmpty() ? "" : cap(w[1]), word, 316 - 2 * pad), x + pad, top + 228, word);
+        if (!w[2].isEmpty()) {
+            Paint range = type(medium, 26, SUB);
+            c.drawText(fit("↑" + w[2] + "  ↓" + w[3], range, 316 - 2 * pad), x + pad, top + 272, range);
+        }
         // Продолжить просмотр
         x += 316 + 28;
         box = new RectF(x, top, x + 660, top + 316);
-        c.drawRoundRect(box, 52, 52, fill(0x14FFFFFF));
-        c.drawText("Продолжить просмотр", x + 36, top + 56, type(semibold, 26, SUB));
-        RectF cover = new RectF(x + 36, top + 84, x + 336, top + 284);
+        c.drawRoundRect(box, 52, 52, fill(IosPalette.GRAY6));
+        Paint head = type(semibold, 28, SUB);
+        c.drawText("Продолжить просмотр", x + pad, top + 60, head);
+        RectF cover = new RectF(x + pad, top + 88, x + pad + 300, top + 88 + 190);
         if (continueCover != null) {
             c.save();
             Path clip = new Path();
@@ -476,24 +527,42 @@ final class IosSaver extends View {
             c.clipPath(clip);
             drawCover(c, continueCover, cover);
             c.restore();
-        } else c.drawRoundRect(cover, 24, 24, fill(0xFF2B2F38));
+        } else c.drawRoundRect(cover, 24, 24, fill(IosPalette.GRAY5));
+        float tx = cover.right + 28, tw = x + 660 - pad - tx;
         if (continueInfo != null) {
-            List<String> lines = wrap(continueInfo[0], type(semibold, 30, INK), 270, 3);
-            for (int i = 0; i < lines.size(); i++) c.drawText(lines.get(i), x + 364, top + 130 + i * 40, type(semibold, 30, INK));
-            c.drawText(continueInfo[1], x + 364, top + 150 + lines.size() * 40, type(medium, 26, SUB));
-        } else c.drawText("Пока ничего не открывал", x + 364, top + 190, type(medium, 28, SUB));
+            Paint name = type(semibold, 30, INK);
+            List<String> lines = wrap(continueInfo[0], name, tw, 3);
+            for (int i = 0; i < lines.size(); i++) c.drawText(lines.get(i), tx, top + 124 + i * 40, name);
+            Paint when = type(medium, 26, SUB);
+            c.drawText(fit(continueInfo[1], when, tw), tx, top + 144 + lines.size() * 40, when);
+        } else {
+            Paint none = type(medium, 28, SUB);
+            List<String> lines = wrap("Пока ничего не открывал", none, tw, 2);
+            for (int i = 0; i < lines.size(); i++) c.drawText(lines.get(i), tx, top + 170 + i * 38, none);
+        }
         // VPN
         x += 660 + 28;
         box = new RectF(x, top, x + 316, top + 316);
-        c.drawRoundRect(box, 52, 52, fill(0x14FFFFFF));
+        c.drawRoundRect(box, 52, 52, fill(IosPalette.GRAY6));
         boolean vpn = vpnOn();
-        c.drawCircle(x + 66, top + 66, 34, fill(vpn ? 0xFF30D158 : 0xFF3A3A3F));
+        c.drawCircle(x + pad + 30, top + pad + 30, 30, fill(vpn ? IosPalette.GREEN : IosPalette.GRAY4));
         SharedPreferences home = context.getSharedPreferences("ios_home_v4", 0);
-        c.drawText("VPN", x + 32, top + 196, type(semibold, 26, SUB));
+        c.drawText("VPN", x + pad, top + 196, type(semibold, 28, SUB));
         String place = home.getString("vpn_place", "");
-        c.drawText(!vpn ? "Выключен" : place.isEmpty() ? "Включён" : place.split(",")[0], x + 32, top + 236, type(semibold, 34, INK));
+        Paint state = type(semibold, 34, INK);
+        c.drawText(fit(!vpn ? "Выключен" : place.isEmpty() ? "Включён" : place.split(",")[0], state, 316 - 2 * pad), x + pad, top + 238, state);
         String ping = lastPing(home);
-        if (vpn && !ping.isEmpty()) c.drawText(ping, x + 32, top + 276, type(medium, 26, SUB));
+        if (vpn && !ping.isEmpty()) c.drawText(ping, x + pad, top + 278, type(medium, 26, SUB));
+    }
+
+    /** Значок SF Symbols из ресурсов, перекрашенный в основной цвет текста. */
+    private void drawIcon(Canvas c, int res, float x, float y, float size) {
+        android.graphics.drawable.Drawable d = context.getDrawable(res);
+        if (d == null) return;
+        d = d.mutate();
+        d.setTint(INK);
+        d.setBounds(Math.round(x), Math.round(y), Math.round(x + size), Math.round(y + size));
+        d.draw(c);
     }
 
     private static String cap(String s) { return s.substring(0, 1).toUpperCase(new Locale("ru")) + s.substring(1); }
@@ -535,7 +604,7 @@ final class IosSaver extends View {
     private void drawCover(Canvas c, Bitmap b, RectF r) {
         float k = Math.max(r.width() / b.getWidth(), r.height() / b.getHeight());
         float w = b.getWidth() * k, h = b.getHeight() * k;
-        c.drawBitmap(b, null, new RectF(r.centerX() - w / 2, r.centerY() - h / 2, r.centerX() + w / 2, r.centerY() + h / 2), fill(0xFFFFFFFF));
+        c.drawBitmap(b, null, new RectF(r.centerX() - w / 2, r.centerY() - h / 2, r.centerX() + w / 2, r.centerY() + h / 2), fill(IosPalette.INK));
     }
 
     // 6. Афиши кино: наклонная мозаика вертикальных афиш медленно плывёт
@@ -548,7 +617,7 @@ final class IosSaver extends View {
         for (int row = -2; row < 6; row++) for (int col = -1; col < 10; col++) {
             float x = -120 + col * (cw + gap) + (row % 2 == 0 ? 0 : cw / 2), y = -300 + row * (ch + gap) - shift;
             RectF r = new RectF(x, y, x + cw, y + ch);
-            if (covers.isEmpty()) c.drawRoundRect(r, 20, 20, fill(0xFF1C1C1F));
+            if (!coversReady || covers.isEmpty()) c.drawRoundRect(r, 20, 20, fill(IosPalette.GRAY6));
             else {
                 Bitmap b = covers.get(n++ % covers.size());
                 c.save();
@@ -560,9 +629,14 @@ final class IosSaver extends View {
             }
         }
         c.restore();
-        Paint scrim = fill(0);
-        scrim.setShader(new LinearGradient(0, 1080, 0, 0, new int[]{0xD9000000, 0x59000000, 0x26000000}, new float[]{0, 0.45f, 1}, Shader.TileMode.CLAMP));
-        c.drawRect(0, 0, 1920, 1080, scrim);
+        // Афиши проявляются разом, когда загружены все.
+        if (coversReady) {
+            float a = Math.min(1f, (SystemClock.uptimeMillis() - coversAt) / 1200f);
+            if (a < 1f) c.drawRect(0, 0, 1920, 1080, fill(IosPalette.alpha(IosPalette.BLACK, 1f - a)));
+        }
+        c.drawRect(0, 0, 1920, 1080, shaded(new LinearGradient(0, 1080, 0, 0,
+                new int[]{IosPalette.SCRIM_STRONG, IosPalette.alpha(IosPalette.BLACK, 0.35f), IosPalette.alpha(IosPalette.BLACK, 0.15f)},
+                new float[]{0, 0.45f, 1}, Shader.TileMode.CLAMP)));
         c.drawText(dateLine(t), 102, 1080 - 88 - 240 - 12, type(semibold, 40, SUB));
         c.drawText(hhmm(t), 96, 1080 - 88, type(semibold, 240, INK));
         Paint note = type(semibold, 32, SUB);
@@ -581,23 +655,24 @@ final class IosSaver extends View {
             float k = Math.max(1920f / b.getWidth(), 1080f / b.getHeight()) * zoom;
             m.setScale(k, k);
             m.postTranslate((1920 - b.getWidth() * k) / 2, (1080 - b.getHeight() * k) / 2);
-            c.drawBitmap(b, m, fill(0xFFFFFFFF));
+            c.drawBitmap(b, m, fill(IosPalette.INK));
             String place = places.get(i);
-            Paint corner = fill(0);
-            corner.setShader(new RadialGradient(0, 1080, 720, 0x73000000, 0x00000000, Shader.TileMode.CLAMP));
-            c.drawRect(0, 760, 720, 1080, corner);
+            c.drawRect(0, 760, 960, 1080, shaded(new RadialGradient(0, 1080, 900, IosPalette.alpha(IosPalette.BLACK, 0.5f), 0, Shader.TileMode.CLAMP)));
             String[] parts = place.split(",\\s*", 2);
-            c.drawText(parts[0], 80, 1080 - 104, type(semibold, 30, INK));
-            if (parts.length > 1) c.drawText(parts[1], 80, 1080 - 64, type(medium, 26, 0xB3F5F5F7));
-        } else c.drawColor(0xFF2A3540);
-        Paint corner = fill(0);
-        corner.setShader(new RadialGradient(1920, 0, 720, 0x73000000, 0x00000000, Shader.TileMode.CLAMP));
-        c.drawRect(1200, 0, 1920, 320, corner);
+            Paint name = type(semibold, 30, INK);
+            name.setTextAlign(Paint.Align.LEFT);
+            c.drawText(fit(parts[0], name, 840), 80, 1080 - 104, name);
+            if (parts.length > 1) {
+                Paint where = type(medium, 26, IosPalette.alpha(INK, 0.7f));
+                c.drawText(fit(parts[1], where, 840), 80, 1080 - 64, where);
+            }
+        } else c.drawColor(IosPalette.GRAY6);
+        c.drawRect(1100, 0, 1920, 360, shaded(new RadialGradient(1920, 0, 820, IosPalette.alpha(IosPalette.BLACK, 0.5f), 0, Shader.TileMode.CLAMP)));
         Paint clock = type(semibold, 96, INK);
         clock.setTextAlign(Paint.Align.RIGHT);
         c.drawText(hhmm(t), 1920 - 80, 64 + 88, clock);
         String w = IosWeather.details(context)[0];
-        Paint date = type(semibold, 30, 0xCCF5F5F7);
+        Paint date = type(semibold, 30, IosPalette.alpha(INK, 0.8f));
         date.setTextAlign(Paint.Align.RIGHT);
         String d = String.format(new Locale("ru"), "%1$ta, %1$te %1$tB", t);
         c.drawText(cap(d) + (w.isEmpty() ? "" : " · " + w), 1920 - 80, 64 + 88 + 48, date);

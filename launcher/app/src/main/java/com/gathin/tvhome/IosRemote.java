@@ -202,7 +202,7 @@ final class IosRemote {
         out.write(head.getBytes(StandardCharsets.UTF_8));
     }
 
-    private static String localIp() {
+    static String localIp() {
         try {
             for (NetworkInterface n : Collections.list(NetworkInterface.getNetworkInterfaces())) {
                 if (!n.isUp() || n.isLoopback() || n.getName().startsWith("tun")) continue;

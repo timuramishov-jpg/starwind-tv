@@ -5,7 +5,7 @@ import android.os.Bundle;
 import android.view.KeyEvent;
 import android.view.View;
 
-/** Посмотреть заставку прямо сейчас: открывается из шестерёнки, любая кнопка закрывает. */
+/** Заставка как окно: из шестерёнки и после простоя на главном экране. Влево-вправо листают, остальные кнопки закрывают. */
 public class IosSaverActivity extends Activity {
     private IosSaver saver;
 
@@ -21,6 +21,11 @@ public class IosSaverActivity extends Activity {
     @Override protected void onPause() { saver.stop(); super.onPause(); }
 
     @Override public boolean dispatchKeyEvent(KeyEvent e) {
+        int step = IosSaver.stepFor(e.getKeyCode());
+        if (step != 0) {
+            if (e.getAction() == KeyEvent.ACTION_DOWN) IosSaver.remember(this, saver, step);
+            return true;
+        }
         if (e.getAction() == KeyEvent.ACTION_UP) finish();
         return true;
     }

@@ -5,6 +5,11 @@ let map: [(String, String)] = [
     ("top_input", "tv.fill"), ("top_wifi", "wifi"), ("top_settings", "gearshape.fill"),
     ("top_grid", "square.grid.2x2.fill"), ("top_clean", "sparkles"),
     ("top_search", "magnifyingglass"), ("top_remote", "iphone"),
+    // Погода: в шапке, в заставках. Одноцветные, как на экране блокировки iPhone.
+    ("w_sun", "sun.max.fill"), ("w_moon", "moon.stars.fill"), ("w_sun_cloud", "cloud.sun.fill"),
+    ("w_moon_cloud", "cloud.moon.fill"), ("w_cloud", "cloud.fill"), ("w_fog", "cloud.fog.fill"),
+    ("w_drizzle", "cloud.drizzle.fill"), ("w_rain", "cloud.rain.fill"), ("w_snow", "cloud.snow.fill"),
+    ("w_storm", "cloud.bolt.rain.fill"),
 ]
 for (name, symbol) in map {
     let cfg = NSImage.SymbolConfiguration(pointSize: 100, weight: .semibold)

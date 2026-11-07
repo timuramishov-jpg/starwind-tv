@@ -20,7 +20,9 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
@@ -293,6 +295,39 @@ final class IosTools {
         SharedPreferences p = c.getSharedPreferences("ios_tools", 0);
         if (System.currentTimeMillis() - p.getLong("trimmed", 0) < 15L * 24 * 3600_000L) return;
         new Thread(this::trim, "trim").start();
+    }
+
+    // ---------- Wi-Fi ----------
+
+    /** Строки для панели Wi-Fi: сеть, сигнал, скорость, диапазон, адрес. Имя сети знает только оболочка (без разрешения на геолокацию). */
+    List<String> wifi() {
+        List<String> out = new ArrayList<>();
+        String ssid = "", rssi = "", link = "", freq = "";
+        try {
+            String st = adb.shell("cmd wifi status 2>/dev/null; dumpsys wifi | grep -m1 'mWifiInfo'");
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("SSID: \"?([^\",]*)\"?, .*?RSSI: (-?\\d+).*?Link speed: (\\d+)Mbps.*?Frequency: (\\d+)MHz").matcher(st);
+            if (m.find()) { ssid = m.group(1); rssi = m.group(2); link = m.group(3); freq = m.group(4); }
+        } catch (Exception e) {
+            Log.w(TAG, "wifi: " + e);
+        }
+        android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager) c.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
+        android.net.wifi.WifiInfo wi = wm == null ? null : wm.getConnectionInfo();
+        if (wi != null) {
+            if (rssi.isEmpty()) rssi = String.valueOf(wi.getRssi());
+            if (link.isEmpty() && wi.getLinkSpeed() > 0) link = String.valueOf(wi.getLinkSpeed());
+            if (freq.isEmpty() && wi.getFrequency() > 0) freq = String.valueOf(wi.getFrequency());
+        }
+        out.add("Сеть: " + (ssid.isEmpty() || ssid.contains("unknown") ? "подключено" : ssid));
+        if (!rssi.isEmpty()) {
+            int r = Integer.parseInt(rssi);
+            out.add("Сигнал: " + (r >= -55 ? "отличный" : r >= -67 ? "хороший" : r >= -75 ? "средний" : "слабый"));
+        }
+        if (!freq.isEmpty()) out.add("Диапазон: " + (Integer.parseInt(freq) >= 4900 ? "5 ГГц" : "2,4 ГГц"));
+        if (!link.isEmpty()) out.add("Скорость связи: " + link + " Мбит/с");
+        String ip = IosRemote.localIp();
+        if (ip != null) out.add("Адрес: " + ip);
+        out.add("Блокировка рекламы: " + (adsBlocked(c) ? "включена" : "выключена"));
+        return out;
     }
 
     // ---------- Мелочи ----------

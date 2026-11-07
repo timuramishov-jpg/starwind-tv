@@ -18,8 +18,8 @@ import android.graphics.drawable.Drawable;
 
 /** Вырезает логотип из значка и собирает его тёмные версии: серую в покое и цветную в фокусе. */
 final class IosIcons {
-    static final int SURFACE = 0xFF131315, CARD = 0xFF0C0C0E, RIM = 0x1AFFFFFF, MONO_LOW = 118, MONO_HIGH = 244;
-    private static final int SRC = 320, FALLBACK_ACCENT = 0xFF9A9AA2;
+    static final int SURFACE = IosPalette.GRAY6, CARD = IosPalette.GRAY6, RIM = IosPalette.alpha(IosPalette.INK, 0.1f), MONO_LOW = 118, MONO_HIGH = 244;
+    private static final int SRC = 320, FALLBACK_ACCENT = IosPalette.GRAY1;
 
     static final class Art { Bitmap mono, color, ring; int accent; }
     static final class Logo { Bitmap color, mono; int accent; }
@@ -74,7 +74,7 @@ final class IosIcons {
     /** Готовый силуэт логотипа: белая маска становится серой в покое и цветной в фокусе. */
     static Logo fromMask(Bitmap mask, int accent) {
         Logo l = new Logo();
-        l.mono = tinted(mask, 0xFFB0B0B5);
+        l.mono = tinted(mask, IosPalette.SECONDARY);
         l.color = tinted(mask, accent);
         l.accent = accent;
         return l;
@@ -187,9 +187,8 @@ final class IosIcons {
         }
         if (n < 30) return FALLBACK_ACCENT;
         Color.colorToHSV(Color.rgb((int) (r / n), (int) (g / n), (int) (bl / n)), hsv);
-        hsv[1] = Math.max(0.55f, Math.min(0.92f, hsv[1]));
-        hsv[2] = 1f;
-        return Color.HSVToColor(hsv);
+        // Свой оттенок значка — к ближайшему акценту палитры: никаких «почти красных».
+        return IosPalette.snap(Color.rgb((int) (r / n), (int) (g / n), (int) (bl / n)));
     }
 
     private static void drawLogo(Canvas c, Bitmap logo, float box, float cx, float cy) {
@@ -254,14 +253,14 @@ final class IosIcons {
         c.drawRoundRect(box, r, r, fill);
         if (lit) {
             Paint glow = new Paint(Paint.ANTI_ALIAS_FLAG);
-            int a = (l.accent & 0xFFFFFF) | 0x66000000;
+            int a = IosPalette.alpha(l.accent, 0.4f);
             glow.setShader(new RadialGradient(w * 0.72f, h * 0.5f, w * 0.62f, a, l.accent & 0xFFFFFF, Shader.TileMode.CLAMP));
             c.drawRoundRect(box, r, r, glow);
         }
         drawLogo(c, logo, h * 0.56f, w * 0.72f, h * 0.5f);
         Paint t = new Paint(Paint.ANTI_ALIAS_FLAG);
         t.setTypeface(tf);
-        t.setColor(lit ? Color.WHITE : 0xFFB8B8BE);
+        t.setColor(lit ? IosPalette.INK : IosPalette.SECONDARY);
         t.setTextSize(h * 0.115f);
         String shown = name;
         while (t.measureText(shown) > w * 0.46f && shown.length() > 4) shown = shown.substring(0, shown.length() - 2);

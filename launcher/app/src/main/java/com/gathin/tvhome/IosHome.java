@@ -7,8 +7,6 @@ import android.app.ActivityManager;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
-import android.content.ClipData;
-import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -59,7 +57,6 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -79,12 +76,13 @@ import java.util.Set;
  * Серый логотип загорается цветом сервиса, и свет расходится по экрану. Фокус считается здесь, а не системой.
  */
 public class IosHome extends Activity {
-    private static final int INK = 0xFFF5F5F7, INK_2 = 0xFFC7C7CC, ICON_REST = 0xFF8E8E93, GROUND = 0xFF050506,
-            PANEL = 0xFF17171A, PILL = 0xFF1C1C1F, ROW_ON = 0xFFF5F5F7, ROW_ON_TEXT = 0xFF0B0B0D, SCRIM = 0xB3000000;
+    // Все цвета — из IosPalette: одна система на весь телевизор.
+    private static final int INK = IosPalette.INK, INK_2 = IosPalette.SECONDARY, ICON_REST = IosPalette.GRAY1, GROUND = IosPalette.BLACK,
+            PANEL = IosPalette.GRAY6, PILL = IosPalette.GRAY6, ROW_ON = IosPalette.INK, ROW_ON_TEXT = IosPalette.ON_LIGHT, SCRIM = IosPalette.SCRIM;
     private static final float DOCK_CX = 95, DOCK_CELL = 116, DOCK_LOGO = 96, DOCK_REST = 0.875f, MAIN_X = 236,
             TITLE_Y = 170, PILL_Y = 300, CARDS_Y = 300, CARD_W = 880, CARD_H = 495, CARD_GAP = 36, EDGE_X = 57,
-            HEADER_Y = 1180, APPS_Y = 1280, APP_LOGO = 110, APP_CELL = 200, APP_ROW = 190, APPS_SCROLL = 1090;
-    private static final int APPS_PER_ROW = 8, MAX_DOCK = 7;
+            HEADER_Y = 1180, APPS_Y = 1280, APPS_SCROLL = 1090;
+    private static final int MAX_DOCK = 7;
     private static final int DOCK = 0, CARDS = 1, APPS = 2, TOP = 3;
     private static final String[] DEFAULT_DOCK = {"com.yandex.tv.ytplayer", "com.vk.tv", "ru.rutube.app.tv", "ru.kinopoisk.yandex.tv", "su.happ.proxyutility"};
     private static final String[] SKIP = {"com.cvte.", "com.mediatek.", "com.android.", "com.gathin.tvhome",
@@ -93,29 +91,29 @@ public class IosHome extends Activity {
             "com.yandex.devices.", "org.chromium", "com.yandex.tv.live", "com.yandex.tv.input"};
     private static final Map<String, int[]> BRAND = new HashMap<>();
     private static final Map<String, Integer> WORD = new HashMap<>();
-    private static final int ZONA_PINK = 0xFFFF4FA3;
+    private static final int ZONA_PINK = IosPalette.PINK;
     static {
         WORD.put("com.yandex.tv.ytplayer", R.drawable.word_youtube);
         WORD.put("com.vk.tv", R.drawable.word_vk);
         WORD.put("su.happ.proxyutility", R.drawable.word_happ);
         WORD.put("ru.zonaplayer.app", R.drawable.word_zona);
         WORD.put("org.interhive.sota.connect", R.drawable.word_sota);
-        BRAND.put("org.interhive.sota.connect", new int[]{R.drawable.logo_sota, 0xFFF5D020});
+        BRAND.put("org.interhive.sota.connect", new int[]{R.drawable.logo_sota, IosPalette.YELLOW});
         BRAND.put("ru.zonaplayer.app", new int[]{R.drawable.logo_zona, ZONA_PINK});
         WORD.put("ru.rutube.app.tv", R.drawable.word_rutube);
         WORD.put("ru.rutube.app", R.drawable.word_rutube);
         WORD.put("ru.kinopoisk.yandex.tv", R.drawable.word_kino);
-        BRAND.put("com.yandex.tv.ytplayer", new int[]{R.drawable.logo_youtube, 0xFFFF2A2A});
-        BRAND.put("com.vk.tv", new int[]{R.drawable.logo_vk, 0xFF2F8BFF});
-        BRAND.put("ru.rutube.app.tv", new int[]{R.drawable.logo_rutube, 0xFF8B5CF6});
-        BRAND.put("ru.rutube.app", new int[]{R.drawable.logo_rutube, 0xFF8B5CF6});
-        BRAND.put("su.happ.proxyutility", new int[]{R.drawable.logo_happ, 0xFF7FD14F});
-        BRAND.put("me.zhanghai.android.files", new int[]{R.drawable.logo_files, 0xFF2F8BFF});
-        BRAND.put("ru.vk.store.tv", new int[]{R.drawable.logo_rustore, 0xFF8A5CFF});
-        BRAND.put("ru.kinopoisk.yandex.tv", new int[]{R.drawable.logo_kino, 0xFFFF6A00});
-        BRAND.put("com.yandex.browser.tv", new int[]{R.drawable.logo_browser, 0xFFFF2D3A});
-        BRAND.put("cm.aptoidetv.pt", new int[]{R.drawable.logo_aptoide, 0xFFFF7A18});
-        BRAND.put("com.moovi.tv.moovitv", new int[]{R.drawable.logo_moovi, 0xFFFF5A3C});
+        BRAND.put("com.yandex.tv.ytplayer", new int[]{R.drawable.logo_youtube, IosPalette.RED});
+        BRAND.put("com.vk.tv", new int[]{R.drawable.logo_vk, IosPalette.BLUE});
+        BRAND.put("ru.rutube.app.tv", new int[]{R.drawable.logo_rutube, IosPalette.INDIGO});
+        BRAND.put("ru.rutube.app", new int[]{R.drawable.logo_rutube, IosPalette.INDIGO});
+        BRAND.put("su.happ.proxyutility", new int[]{R.drawable.logo_happ, IosPalette.GREEN});
+        BRAND.put("me.zhanghai.android.files", new int[]{R.drawable.logo_files, IosPalette.BLUE});
+        BRAND.put("ru.vk.store.tv", new int[]{R.drawable.logo_rustore, IosPalette.BLUE});
+        BRAND.put("ru.kinopoisk.yandex.tv", new int[]{R.drawable.logo_kino, IosPalette.ORANGE});
+        BRAND.put("com.yandex.browser.tv", new int[]{R.drawable.logo_browser, IosPalette.RED});
+        BRAND.put("cm.aptoidetv.pt", new int[]{R.drawable.logo_aptoide, IosPalette.ORANGE});
+        BRAND.put("com.moovi.tv.moovitv", new int[]{R.drawable.logo_moovi, IosPalette.RED});
     }
 
     /** Один пункт ленты. Источники данных подключаются отдельно; без них лента пустая, а не выдуманная. */
@@ -154,11 +152,12 @@ public class IosHome extends Activity {
 
     private SharedPreferences prefs;
     private FrameLayout root, dockLayer, content, cardsLayer, appsLayer, overlay;
-    private TextView clock, date, title, subtitle, action;
+    private TextView clock, date, temp, title, subtitle, action;
+    private ImageView weatherIcon;
     private static String returnTo;
     /** Три длительности на весь экран, кривая одна: ease. */
     private static final int FAST = 160, NORMAL = 260, SLOW = 420;
-    private static final int CARD_CLIP = 20, CLEAN = 0xFF30D5C8;
+    private static final int CARD_CLIP = 20, CLEAN = IosPalette.TEAL;
     private static final int MENU_W = 620, MENU_ROW = 78, POSTER_W = 330;
     private LinearLayout menuPanel;
     private String vpnShown = "", vpnStats = "", vpnSpeed = "";
@@ -169,7 +168,7 @@ public class IosHome extends Activity {
     private boolean dirty = true, lastVpn, wasAway;
     private int ticks;
     private ImageView wordmark;
-    private TextView caption, captionSub, appLabel;
+    private TextView caption, captionSub;
     private final Map<View, TextView[]> cardLabels = new HashMap<>();
     /** Подписи карточек: в покое, у соседей выбранной. */
     private static final float LABEL_REST = 0.66f, LABEL_DIM = 0.55f;
@@ -189,6 +188,8 @@ public class IosHome extends Activity {
     private final List<Runnable> menuActions = new ArrayList<>();
     private final List<TextView> menuViews = new ArrayList<>();
     private int menuIndex;
+    /** Что открыто в боковой панели: settings, wifi, search или пусто. */
+    private String menuKind = "";
     private IosTools tools;
     private long lastInput = SystemClock.uptimeMillis();
     private boolean dimming;
@@ -228,6 +229,8 @@ public class IosHome extends Activity {
         semibold = font(R.font.sf_semibold);
         pics = new IosArt(s, medium, semibold);
         root = new FrameLayout(this);
+        // Корень берёт фокус, когда он уходит из поля поиска: кнопки пульта считаем сами.
+        root.setFocusable(true);
         root.setBackgroundColor(GROUND);
         root.setClipChildren(false);
         setContentView(root);
@@ -402,7 +405,7 @@ public class IosHome extends Activity {
 
     private ImageView wash() {
         ImageView v = new ImageView(this);
-        v.setImageBitmap(radial(new int[]{0xFFFFFFFF, 0x99FFFFFF, 0x33FFFFFF, 0x00FFFFFF}, new float[]{0f, 0.34f, 0.66f, 1f}));
+        v.setImageBitmap(radial(new int[]{IosPalette.alpha(INK, 1f), IosPalette.alpha(INK, 0.6f), IosPalette.alpha(INK, 0.2f), IosPalette.alpha(INK, 0f)}, new float[]{0f, 0.34f, 0.66f, 1f}));
         v.setScaleType(ImageView.ScaleType.FIT_XY);
         v.setAlpha(0f);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(px(1700), px(1300));
@@ -414,7 +417,7 @@ public class IosHome extends Activity {
 
     private ImageView spotView() {
         ImageView v = new ImageView(this);
-        v.setImageBitmap(radial(new int[]{0xCCFFFFFF, 0x55FFFFFF, 0x00FFFFFF}, new float[]{0f, 0.48f, 1f}));
+        v.setImageBitmap(radial(new int[]{IosPalette.alpha(INK, 0.8f), IosPalette.alpha(INK, 0.33f), IosPalette.alpha(INK, 0f)}, new float[]{0f, 0.48f, 1f}));
         v.setScaleType(ImageView.ScaleType.FIT_XY);
         v.setAlpha(0f);
         root.addView(v, new FrameLayout.LayoutParams(px(300), px(300)));
@@ -424,11 +427,11 @@ public class IosHome extends Activity {
     private void addScrims() {
         View left = new View(this);
         left.setBackground(new GradientDrawable(GradientDrawable.Orientation.LEFT_RIGHT,
-                new int[]{GROUND, 0xD9050506, 0x40050506, 0x00050506}));
+                new int[]{GROUND, IosPalette.alpha(GROUND, 0.85f), IosPalette.alpha(GROUND, 0.25f), IosPalette.alpha(GROUND, 0f)}));
         root.addView(left, new FrameLayout.LayoutParams(px(1540), -1));
         View bottom = new View(this);
         bottom.setBackground(new GradientDrawable(GradientDrawable.Orientation.BOTTOM_TOP,
-                new int[]{GROUND, 0x99050506, 0x00050506}));
+                new int[]{GROUND, IosPalette.alpha(GROUND, 0.6f), IosPalette.alpha(GROUND, 0f)}));
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-1, px(640));
         lp.gravity = Gravity.BOTTOM;
         root.addView(bottom, lp);
@@ -552,7 +555,7 @@ public class IosHome extends Activity {
         section.setOrientation(LinearLayout.HORIZONTAL);
         section.setGravity(Gravity.CENTER_VERTICAL);
         TextView head = text(34, medium, INK);
-        head.setText("Все приложения");
+        head.setText("Приложения");
         section.addView(head);
         content.addView(section, at(MAIN_X, HEADER_Y, 0, 0));
         appsLayer = layer();
@@ -570,11 +573,22 @@ public class IosHome extends Activity {
         lp.leftMargin = px(20);
         status.addView(clock);
         status.addView(date, lp);
+        // Погода: значок SF Symbols и температура, без слов.
+        weatherIcon = new ImageView(this);
+        weatherIcon.setImageTintList(ColorStateList.valueOf(INK_2));
+        weatherIcon.setVisibility(View.GONE);
+        LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(px(30), px(30));
+        ip.leftMargin = px(22);
+        status.addView(weatherIcon, ip);
+        temp = text(26, regular, INK_2);
+        LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-2, -2);
+        tp.leftMargin = px(8);
+        status.addView(temp, tp);
         root.addView(status, at(EDGE_X, 36, 0, 0));
         addButton(1544, R.drawable.top_search, "Поиск", this::askSearch);
         addButton(1612, R.drawable.top_remote, "Пульт в телефоне", this::showRemoteCode);
         addButton(1680, R.drawable.top_input, "Источники", this::showInputs);
-        addButton(1748, R.drawable.top_wifi, "Wi-Fi", () -> open(SystemSettings.intent(this, Settings.ACTION_WIFI_SETTINGS)));
+        addButton(1748, R.drawable.top_wifi, "Wi-Fi", this::showWifi);
         addButton(1816, R.drawable.top_settings, "Настройки", this::showSettings);
 
         overlay = new FrameLayout(this);
@@ -607,8 +621,11 @@ public class IosHome extends Activity {
         clock.setText(new SimpleDateFormat("HH:mm", Locale.getDefault()).format(now));
         String d = new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(now);
         String day = d.isEmpty() ? d : d.substring(0, 1).toUpperCase(Locale.getDefault()) + d.substring(1);
-        String w = weather == null ? "" : weather.last();
-        date.setText(w.isEmpty() ? day : day + "   " + w);
+        date.setText(day);
+        int icon = weather == null ? 0 : weather.icon();
+        weatherIcon.setVisibility(icon == 0 ? View.GONE : View.VISIBLE);
+        if (icon != 0) weatherIcon.setImageResource(icon);
+        temp.setText(weather == null ? "" : weather.temp());
         if (weather != null) weather.refresh(line -> updateClock());
     }
 
@@ -828,8 +845,47 @@ public class IosHome extends Activity {
         return (1080 - (dock.size() + 1) * DOCK_CELL) / 2f + i * DOCK_CELL + (DOCK_CELL - DOCK_LOGO) / 2f;
     }
 
-    private float appX(int i) { return MAIN_X + (i % APPS_PER_ROW) * APP_CELL; }
-    private float appY(int i) { return APPS_Y + (i / APPS_PER_ROW) * APP_ROW; }
+    /** Сетка приложений подстраивается под их число (до 12 и метла): один ряд, если до шести,
+     *  иначе два ряда во всю ширину. Карточки в духе tvOS: тёмная плашка, логотип по центру, подпись под ней. */
+    private int appCols = 6;
+    private float appW = 250, appH = 150;
+    private static final float APP_GAP = 32, APP_LABEL = 64;
+    private final List<TextView> appLabels = new ArrayList<>();
+
+    private void appGrid(int n) {
+        appCols = n <= 6 ? Math.max(4, n) : (n + 1) / 2;
+        float width = 1920 - MAIN_X - EDGE_X;
+        appW = (width - (appCols - 1) * APP_GAP) / appCols;
+        appH = Math.round(appW * 0.6f);
+    }
+
+    private float appX(int i) { return MAIN_X + (i % appCols) * (appW + APP_GAP); }
+    private float appY(int i) { return APPS_Y + (i / appCols) * (appH + APP_LABEL + APP_GAP); }
+
+    /** Плашка приложения: детям 0 и 1 (серый и цветной логотип) даём место в центре. */
+    private View appCard(View logo, String label, int i) {
+        FrameLayout card = (FrameLayout) logo;
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(IosPalette.GRAY6);
+        bg.setCornerRadius(px(24));
+        card.setBackground(bg);
+        float box = Math.min(appH * 0.56f, appW * 0.5f);
+        for (int c = 0; c < card.getChildCount(); c++) {
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(px(box), px(box));
+            lp.gravity = Gravity.CENTER;
+            card.getChildAt(c).setLayoutParams(lp);
+        }
+        appsLayer.addView(card, at(appX(i), appY(i), appW, appH));
+        TextView name = text(26, medium, INK);
+        name.setText(label);
+        name.setSingleLine(true);
+        name.setEllipsize(TextUtils.TruncateAt.END);
+        name.setGravity(Gravity.CENTER);
+        name.setAlpha(LABEL_REST);
+        appsLayer.addView(name, at(appX(i), appY(i) + appH + 18, appW, 0));
+        appLabels.add(name);
+        return card;
+    }
 
     private void render() {
         focused = null;
@@ -858,23 +914,12 @@ public class IosHome extends Activity {
         dockViews.add(grid);
         appsLayer.removeAllViews();
         appViews.clear();
+        appLabels.clear();
         List<App> all = new ArrayList<>(dock);
         all.addAll(others);
-        for (int i = 0; i < all.size(); i++) {
-            View v = logoView(all.get(i));
-            appsLayer.addView(v, at(appX(i), appY(i), APP_LOGO, APP_LOGO));
-            appViews.add(v);
-        }
-        appLabel = text(26, medium, INK);
-        appLabel.setGravity(Gravity.CENTER);
-        appLabel.setSingleLine(true);
-        appLabel.setEllipsize(TextUtils.TruncateAt.END);
-        appLabel.setAlpha(0f);
-        appsLayer.addView(appLabel, at(0, 0, APP_CELL, 0));
-        View clean = iconTile(R.drawable.top_clean, CLEAN, this::cleanUp);
-        int ci = appViews.size();
-        appsLayer.addView(clean, at(appX(ci), appY(ci), APP_LOGO, APP_LOGO));
-        appViews.add(clean);
+        appGrid(all.size() + 1);
+        for (int i = 0; i < all.size(); i++) appViews.add(appCard(logoView(all.get(i)), all.get(i).label, i));
+        appViews.add(appCard(iconTile(R.drawable.top_clean, CLEAN, this::cleanUp), "Очистить память", appViews.size()));
         showSelected();
         if (views(zone).isEmpty()) { zone = !dockViews.isEmpty() ? DOCK : !appViews.isEmpty() ? APPS : TOP; index = 0; }
         moveTo(zone, Math.max(0, Math.min(index, views(zone).size() - 1)));
@@ -904,21 +949,39 @@ public class IosHome extends Activity {
 
     private void refreshVpn() {
         if (dock.isEmpty() || !(HAPP.equals(dock.get(selected).pkg) || SOTA.equals(dock.get(selected).pkg))) return;
-        String state = vpnOn() + "|" + prefs.getString("vpn_place", "") + "|" + vpnStats + "|" + dock.get(selected).pkg;
+        String state = vpnOn() + "|" + prefs.getString("vpn_place", "") + "|" + vpnStats + "|" + vpnSpeed + "|" + dock.get(selected).pkg;
         if (state.equals(vpnShown)) return;
-        boolean keep = zone == CARDS;
-        int at = index;
-        showSelected();
-        if (keep) moveTo(CARDS, Math.min(at, cardViews.size() - 1));
+        // Карточки VPN обновляются на месте: ничего не пересобирается и не прыгает.
+        FeedItem[] fresh = vpnItems(dock.get(selected));
+        if (cardViews.size() != fresh.length) { showSelected(); return; }
+        for (int i = 0; i < fresh.length; i++) {
+            View card = cardViews.get(i);
+            if (!(card.getTag() instanceof FeedItem)) { showSelected(); return; }
+            FeedItem old = (FeedItem) card.getTag();
+            old.title = fresh[i].title;
+            old.subtitle = fresh[i].subtitle;
+            old.image = fresh[i].image;
+            old.action = fresh[i].action;
+            TextView[] l = cardLabels.get(card);
+            if (l != null) { l[0].setText(old.title); l[1].setText(old.subtitle); }
+            if (card instanceof FrameLayout && ((FrameLayout) card).getChildCount() > 0 && ((FrameLayout) card).getChildAt(0) instanceof ImageView)
+                ((ImageView) ((FrameLayout) card).getChildAt(0)).setImageBitmap(old.image);
+        }
     }
 
 
 
     /** Экран VPN: три узкие карточки, как афиши. Тумблер, связь (страна и отклик), смена сервера. */
     private void showVpn(App a) {
+        FeedItem[] all = vpnItems(a);
+        for (int i = 0; i < all.length; i++) addCard(all[i], i);
+        if (vpnOn()) { checkExit(); checkSpeed(); checkDownload(false); }
+    }
+
+    private FeedItem[] vpnItems(App a) {
         boolean on = vpnOn(), own = HAPP.equals(a.pkg);
         int accent = a.logo.accent;
-        vpnShown = on + "|" + prefs.getString("vpn_place", "") + "|" + vpnStats + "|" + a.pkg;
+        vpnShown = on + "|" + prefs.getString("vpn_place", "") + "|" + vpnStats + "|" + vpnSpeed + "|" + a.pkg;
         String iso = prefs.getString("vpn_iso", ""), where = prefs.getString("vpn_place", "");
         String[] parts = vpnStats.split("\\|");
         boolean measured = on && parts.length == 3;
@@ -927,15 +990,15 @@ public class IosHome extends Activity {
         FeedItem toggle = new FeedItem();
         toggle.poster = true;
         toggle.title = on ? "VPN включён" : "VPN выключен";
-        toggle.subtitle = own ? (on ? "ОК, чтобы выключить" : "ОК, чтобы включить") : "Включается в приложении";
+        toggle.subtitle = own ? "Happ" : a.label;
         toggle.image = pics.switchArt(on, accent);
         toggle.action = () -> { if (own) vpnCommand(!on); else launch(a); };
 
         FeedItem link = new FeedItem();
         link.poster = true;
         link.title = !on ? "Нет подключения" : where.isEmpty() ? "Определяю страну" : where;
-        link.subtitle = !on ? "Сначала включи VPN" : (measured ? parts[1] + (vpnSpeed.isEmpty() ? "" : ", " + vpnSpeed) + ". " : "Измеряю. ") + "ОК, обновить";
-        link.image = pics.linkArt(on && !iso.isEmpty() ? flagOf(iso) : "\uD83C\uDF10", grade, measured ? parts[0] : on ? "…" : "—", accent, vpnHistory());
+        link.subtitle = !on ? "Сначала включи VPN" : measured ? parts[1] + (vpnSpeed.isEmpty() ? "" : " · " + vpnSpeed) : "Измеряю";
+        link.image = pics.linkArt(on && !iso.isEmpty() ? flagOf(iso) : "", grade, measured ? parts[0] : on ? "…" : "—", accent, vpnHistory());
         link.action = () -> {
             prefs.edit().remove("vpn_place").remove("vpn_iso").apply();
             feed.resetProbe();
@@ -950,17 +1013,8 @@ public class IosHome extends Activity {
         server.subtitle = own ? "Откроется Happ" : "Откроется приложение";
         server.image = pics.serverArt(accent);
         server.action = () -> launch(a);
-
-        FeedItem[] all = {toggle, link, server};
-        for (int i = 0; i < all.length; i++) addCard(all[i], i);
-        if (on) { checkExit(); checkSpeed(); checkDownload(false); }
+        return new FeedItem[]{toggle, link, server};
     }
-
-
-
-
-
-
 
     /** История отклика VPN за час: «время:мс» через запятую в настройках. */
     private List<long[]> vpnHistory() {
@@ -1012,8 +1066,8 @@ public class IosHome extends Activity {
     /** Страну показывает адрес, с которого виден телевизор через VPN. */
     private void checkExit() {
         feed.exit((iso, city) -> {
-            String country = new Locale("", iso).getDisplayCountry(new Locale("ru"));
-            String place = city.isEmpty() ? country : country + ", " + city;
+            // Только страна: город у VPN-серверов часто неточный и не влезает в подпись.
+            String place = new Locale("", iso).getDisplayCountry(new Locale("ru"));
             if (place.equals(prefs.getString("vpn_place", ""))) return;
             prefs.edit().putString("vpn_iso", iso).putString("vpn_place", place).apply();
             if (!dock.isEmpty() && (HAPP.equals(dock.get(selected).pkg) || SOTA.equals(dock.get(selected).pkg))) refreshVpn();
@@ -1118,7 +1172,7 @@ public class IosHome extends Activity {
             item.onFail = () -> {
                 if (pulse != null) pulse.cancel();
                 card.setAlpha(1f);
-                bg.setColor((accent & 0x00FFFFFF) | 0x55000000);
+                bg.setColor(IosPalette.tint(accent));
                 TextView t = text(item.poster ? 34 : 44, semibold, INK);
                 t.setText(item.title);
                 t.setGravity(Gravity.CENTER);
@@ -1133,7 +1187,7 @@ public class IosHome extends Activity {
             d.setText(item.duration);
             d.setPadding(px(12), px(5), px(12), px(5));
             GradientDrawable g = new GradientDrawable();
-            g.setColor(0xCC000000);
+            g.setColor(IosPalette.SCRIM_STRONG);
             g.setCornerRadius(px(10));
             d.setBackground(g);
             FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2);
@@ -1142,7 +1196,7 @@ public class IosHome extends Activity {
             card.addView(d, lp);
         }
         if (item.fresh) {
-            TextView n = text(22, semibold, 0xFF000000);
+            TextView n = text(22, semibold, IosPalette.ON_LIGHT);
             n.setText("новое");
             n.setPadding(px(12), px(4), px(12), px(4));
             GradientDrawable g = new GradientDrawable();
@@ -1198,7 +1252,7 @@ public class IosHome extends Activity {
         GradientDrawable d = new GradientDrawable();
         d.setColor(0x00000000);
         d.setCornerRadius(px(26));
-        d.setStroke(Math.max(1, px(1.5f)), 0x4DFFFFFF);
+        d.setStroke(Math.max(1, px(1.5f)), IosPalette.HAIRLINE);
         return d;
     }
 
@@ -1323,7 +1377,7 @@ public class IosHome extends Activity {
         box.addView(h);
         FrameLayout plate = new FrameLayout(this);
         GradientDrawable g = new GradientDrawable();
-        g.setColor(0xFFFFFFFF);
+        g.setColor(IosPalette.INK);
         g.setCornerRadius(px(36));
         plate.setBackground(g);
         plate.setPadding(px(28), px(28), px(28), px(28));
@@ -1342,20 +1396,84 @@ public class IosHome extends Activity {
     }
 
     /** Поиск с пульта телевизора: поле ввода, клавиатура Яндекса умеет и голос. */
+    private EditText searchField;
+
+    /** Поиск в боковой панели лаунчера: поле ввода в стиле меню и недавние запросы. Клавиатура — системная, другой нет. */
     private void askSearch() {
+        List<String> recent = stored("searches");
+        List<Runnable> actions = new ArrayList<>();
+        for (String q : recent) actions.add(() -> runSearch(q));
+        showMenu("Поиск", recent, actions);
+        menuKind = "search";
+        LinearLayout panel = (LinearLayout) ((View) menuPanel.getParent()).getParent();
         EditText field = new EditText(this);
         field.setSingleLine(true);
         field.setHint("Фильм, ролик, канал");
+        field.setHintTextColor(IosPalette.TERTIARY);
+        field.setTextColor(INK);
+        field.setTypeface(regular);
+        field.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(30));
+        field.setPadding(px(24), 0, px(24), 0);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setColor(IosPalette.GRAY5);
+        bg.setCornerRadius(px(20));
+        field.setBackground(bg);
         field.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
-        android.app.AlertDialog d = new android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
-                .setTitle("Поиск по YouTube, Рутубу и Кинопоиску")
-                .setView(field)
-                .setPositiveButton("Найти", (x, y) -> runSearch(field.getText().toString().trim()))
-                .setNegativeButton("Отмена", null)
-                .create();
-        field.setOnEditorActionListener((v, action, ev) -> { d.dismiss(); runSearch(field.getText().toString().trim()); return true; });
-        d.show();
+        field.setOnEditorActionListener((v, action, ev) -> {
+            String q = field.getText().toString().trim();
+            if (q.isEmpty()) return true;
+            List<String> h = stored("searches");
+            h.remove(q);
+            h.add(0, q);
+            while (h.size() > 8) h.remove(h.size() - 1);
+            store("searches", h);
+            hideKeyboard(field);
+            runSearch(q);
+            return true;
+        });
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, px(84));
+        lp.bottomMargin = px(24);
+        panel.addView(field, 1, lp);
+        if (!recent.isEmpty()) {
+            TextView head = text(24, medium, IosPalette.SECONDARY);
+            head.setText("Недавние");
+            head.setPadding(px(24), 0, px(24), px(12));
+            panel.addView(head, 2, new LinearLayout.LayoutParams(-1, -2));
+        }
+        searchField = field;
+        menuIndex = -1;
+        paintMenu();
         field.requestFocus();
+        handler.postDelayed(() -> {
+            android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+            if (imm != null && field.isAttachedToWindow()) imm.showSoftInput(field, 0);
+        }, 150);
+    }
+
+    private void hideKeyboard(View v) {
+        android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        if (imm != null) imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
+    }
+
+    /** Пока курсор в поле поиска, кнопки идут полю; вниз — к недавним запросам, назад — закрыть. */
+    private boolean searchKey(KeyEvent e) {
+        if (searchField == null || !overlayOpen() || !"search".equals(menuKind) || !searchField.hasFocus()) return false;
+        int key = e.getKeyCode();
+        if (key == KeyEvent.KEYCODE_BACK) {
+            if (e.getAction() == KeyEvent.ACTION_UP) closeMenu();
+            return true;
+        }
+        if (key == KeyEvent.KEYCODE_DPAD_DOWN && !menuViews.isEmpty()) {
+            if (e.getAction() == KeyEvent.ACTION_DOWN) {
+                hideKeyboard(searchField);
+                searchField.clearFocus();
+                root.requestFocus();
+                menuIndex = 0;
+                paintMenu();
+            }
+            return true;
+        }
+        return super.dispatchKeyEvent(e);
     }
 
     private void runSearch(String q) {
@@ -1368,11 +1486,6 @@ public class IosHome extends Activity {
             for (FeedItem it : found) {
                 labels.add(it.subtitle.split(" · ")[0] + ": " + it.title);
                 actions.add(() -> {
-                    if (it.poster) {
-                        ClipboardManager cb = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-                        if (cb != null) cb.setPrimaryClip(ClipData.newPlainText("Фильм", it.title));
-                        Toast.makeText(this, "«" + it.title + "» скопировано: вставь в поиск Кинопоиска", Toast.LENGTH_LONG).show();
-                    }
                     try { startActivity(it.open); } catch (Exception e) { note("Не открылось"); }
                 });
             }
@@ -1416,7 +1529,7 @@ public class IosHome extends Activity {
             noteView = text(28, semibold, INK);
             noteView.setPadding(px(34), px(18), px(34), px(18));
             GradientDrawable g = new GradientDrawable();
-            g.setColor(0xF21C1C1F);
+            g.setColor(IosPalette.alpha(IosPalette.GRAY6, 0.95f));
             g.setCornerRadius(px(40));
             noteView.setBackground(g);
             noteView.setAlpha(0f);
@@ -1522,7 +1635,7 @@ public class IosHome extends Activity {
     private void paintPill(View v, boolean on) {
         Object[] tag = (Object[]) v.getTag();
         if (tag.length == 5) {
-            ((GradientDrawable) v.getBackground()).setColor(on ? 0xFF2C2C31 : PILL);
+            ((GradientDrawable) v.getBackground()).setColor(on ? IosPalette.GRAY5 : PILL);
             v.animate().scaleX(on ? 1.03f : 1f).scaleY(on ? 1.03f : 1f).setDuration(FAST).start();
             return;
         }
@@ -1581,7 +1694,10 @@ public class IosHome extends Activity {
 
     private void blur(View v, int z) {
         v.animate().scaleX(z == DOCK ? DOCK_REST : 1f).scaleY(z == DOCK ? DOCK_REST : 1f).setDuration(FAST).start();
-        if (z == APPS && appLabel != null) appLabel.animate().alpha(0f).setDuration(FAST).start();
+        if (z == APPS) {
+            int at = appViews.indexOf(v);
+            if (at >= 0 && at < appLabels.size()) appLabels.get(at).animate().alpha(LABEL_REST).setDuration(FAST).start();
+        }
         if (z == APPS) ((FrameLayout) v).getChildAt(1).animate().alpha(0f).setDuration(NORMAL).start();
         if (z == TOP) paintButton(v, false);
         if (z == CARDS) {
@@ -1635,16 +1751,13 @@ public class IosHome extends Activity {
             spotAt(dock.get(i).logo.accent, DOCK_CX, dockY(i) + DOCK_LOGO / 2f, 330);
         } else if (z == APPS) {
             int accent = next.getTag() instanceof App ? ((App) next.getTag()).logo.accent : CLEAN;
-            appLabel.setText(next.getTag() instanceof App ? ((App) next.getTag()).label : "Очистить память");
-            appLabel.setTranslationX(px(appX(i) + APP_LOGO / 2f - APP_CELL / 2f));
-            appLabel.setTranslationY(px(appY(i) + APP_LOGO + 26));
-            appLabel.animate().alpha(1f).setDuration(FAST).start();
+            if (i < appLabels.size()) appLabels.get(i).animate().alpha(1f).setDuration(FAST).start();
             ((FrameLayout) next).getChildAt(1).animate().alpha(1f).setDuration(FAST).start();
-            next.animate().scaleX(1.16f).scaleY(1.16f).setDuration(FAST).setInterpolator(ease).start();
-            int row = i / APPS_PER_ROW;
-            scrollTo(APPS_SCROLL + Math.max(0, row - 2) * APP_ROW);
+            next.animate().scaleX(1.06f).scaleY(1.06f).setDuration(FAST).setInterpolator(ease).start();
+            int row = i / appCols;
+            scrollTo(APPS_SCROLL + Math.max(0, row - 1) * (appH + APP_LABEL + APP_GAP));
             washColor(accent);
-            spotAt(accent, appX(i) + APP_LOGO / 2f, appY(i) - scroll + APP_LOGO / 2f, 300);
+            spotAt(accent, appX(i) + appW / 2f, appY(i) - scroll + appH / 2f, 420);
         } else if (z == CARDS) {
             scrollTo(0);
             if (next.getTag() instanceof FeedItem) {
@@ -1684,6 +1797,7 @@ public class IosHome extends Activity {
     @Override public boolean dispatchKeyEvent(KeyEvent e) {
         int key = e.getKeyCode();
         if (dimming) { wake(); return true; }
+        if (searchKey(e)) return true;
         lastInput = SystemClock.uptimeMillis();
         if (e.getAction() == KeyEvent.ACTION_DOWN) {
             for (ObjectAnimator a : drift) if (a.isRunning()) a.pause();
@@ -1746,9 +1860,9 @@ public class IosHome extends Activity {
 
     private void onOk() {
         if (overlayOpen()) {
-            if (menuIndex < menuActions.size()) {
+            if (menuIndex >= 0 && menuIndex < menuActions.size()) {
                 Runnable r = menuActions.get(menuIndex);
-                closeMenu();
+                if (!(r instanceof Keep)) closeMenu();
                 r.run();
             }
             return;
@@ -1766,13 +1880,7 @@ public class IosHome extends Activity {
         else if (tag instanceof FeedItem) {
             FeedItem item = (FeedItem) tag;
             String pkg = dock.get(selected).pkg;
-            boolean catalog = IosFeed.KINOPOISK.equals(pkg) || IosFeed.ZONA.equals(pkg);
-            if (catalog && item.urls != null && item.urls.length > 0) {
-                // Афиша не умеет открыть сам фильм: кладём название в буфер, чтобы вставить в поиск приложения.
-                ClipboardManager cb = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-                if (cb != null) cb.setPrimaryClip(ClipData.newPlainText("Фильм", item.title));
-                Toast.makeText(this, "«" + item.title + "» скопировано: вставь в поиск", Toast.LENGTH_LONG).show();
-            }
+            // Афиша Кинопоиска и Зоны открывает приложение, как значок: сам фильм по ссылке они не открывают.
             feed.remember(pkg, item);
             try { startActivity(item.open); }
             catch (ActivityNotFoundException | SecurityException e) { launch(dock.get(selected)); }
@@ -1821,7 +1929,7 @@ public class IosHome extends Activity {
         s.cards = cardViews.size();
         s.remembered = remembered();
         s.apps = appViews.size();
-        s.perRow = APPS_PER_ROW;
+        s.perRow = appCols;
         s.top = topViews.size();
         int k = key == KeyEvent.KEYCODE_DPAD_LEFT ? IosNav.LEFT : key == KeyEvent.KEYCODE_DPAD_RIGHT ? IosNav.RIGHT
                 : key == KeyEvent.KEYCODE_DPAD_UP ? IosNav.UP : IosNav.DOWN;
@@ -1846,7 +1954,11 @@ public class IosHome extends Activity {
     // ---------- Меню ----------
 
     /** Все меню выезжают одной панелью справа, как настройки. */
-    private void showMenu(String title, List<String> labels, List<Runnable> actions) {
+    private void showMenu(String title, List<String> labels, List<Runnable> actions) { showMenu(title, labels, actions, true); }
+
+    /** Боковая панель. slide = false — панель уже на экране и только меняет содержимое. */
+    private void showMenu(String title, List<String> labels, List<Runnable> actions, boolean slide) {
+        menuKind = "";
         overlay.removeAllViews();
         menuActions.clear();
         menuActions.addAll(actions);
@@ -1866,7 +1978,8 @@ public class IosHome extends Activity {
         window.setClipChildren(true);
         LinearLayout list = new LinearLayout(this);
         list.setOrientation(LinearLayout.VERTICAL);
-        window.addView(list, new FrameLayout.LayoutParams(-1, -2));
+        // Высота списка — все строки целиком: иначе окно ужимает список до своей высоты и нижние строки обрезаются.
+        window.addView(list, new FrameLayout.LayoutParams(-1, px(labels.size() * MENU_ROW)));
         panel.addView(window, new LinearLayout.LayoutParams(-1, 0, 1f));
         for (String l : labels) {
             TextView r = text(30, regular, INK);
@@ -1881,8 +1994,10 @@ public class IosHome extends Activity {
         overlay.addView(panel, at(1920 - MENU_W, 0, MENU_W, 1080));
         menuPanel = list;
         overlay.setVisibility(View.VISIBLE);
-        panel.setTranslationX(px(MENU_W));
-        panel.animate().translationX(0).setDuration(NORMAL).setInterpolator(ease).start();
+        if (slide) {
+            panel.setTranslationX(px(MENU_W));
+            panel.animate().translationX(0).setDuration(NORMAL).setInterpolator(ease).start();
+        }
         menuIndex = 0;
         paintMenu();
     }
@@ -1891,7 +2006,7 @@ public class IosHome extends Activity {
         if (menuPanel != null) {
             View window = (View) menuPanel.getParent();
             float room = window.getHeight() > 0 ? window.getHeight() : px(1080 - 64 - 40 - 90);
-            float bottom = px((menuIndex + 1) * MENU_ROW + MENU_ROW / 2);
+            float bottom = px((Math.max(0, menuIndex) + 1) * MENU_ROW + MENU_ROW / 2);
             menuPanel.animate().translationY(-Math.max(0, bottom - room)).setDuration(FAST).setInterpolator(ease).start();
         }
         for (int i = 0; i < menuViews.size(); i++) {
@@ -1906,12 +2021,20 @@ public class IosHome extends Activity {
     }
 
     private void menuKey(int key) {
+        if (key == KeyEvent.KEYCODE_DPAD_UP && menuIndex == 0 && "search".equals(menuKind) && searchField != null) {
+            menuIndex = -1;
+            paintMenu();
+            searchField.requestFocus();
+            return;
+        }
         if (key == KeyEvent.KEYCODE_DPAD_UP && menuIndex > 0) menuIndex--;
         else if (key == KeyEvent.KEYCODE_DPAD_DOWN && menuIndex < menuViews.size() - 1) menuIndex++;
         paintMenu();
     }
 
     private void closeMenu() {
+        if (searchField != null) { hideKeyboard(searchField); searchField = null; }
+        menuKind = "";
         feed.stopPolling();
         overlay.setVisibility(View.GONE);
         overlay.removeAllViews();
@@ -1994,64 +2117,68 @@ public class IosHome extends Activity {
         render();
     }
 
-    private void showSettings() {
-        List<String> labels = new ArrayList<>();
-        List<Runnable> actions = new ArrayList<>();
-        String[][] rows = {{"Wi-Fi и сеть", Settings.ACTION_WIFI_SETTINGS}, {"Bluetooth и пульты", Settings.ACTION_BLUETOOTH_SETTINGS},
-                {"Звук", Settings.ACTION_SOUND_SETTINGS}, {"Экран", Settings.ACTION_DISPLAY_SETTINGS}, {"Дата и время", Settings.ACTION_DATE_SETTINGS},
-                {"Приложения", Settings.ACTION_APPLICATION_SETTINGS}, {"Все настройки", Settings.ACTION_SETTINGS}};
-        for (String[] row : rows) {
-            labels.add(row[0]);
-            actions.add(() -> open(SystemSettings.intent(this, row[1])));
-        }
+    /** Пункт меню, после которого меню остаётся открытым: переключатели. Подпись обновляется на месте, без анимации. */
+    private static final class Keep implements Runnable {
+        final Runnable r;
+        Keep(Runnable r) { this.r = r; }
+        @Override public void run() { r.run(); }
+    }
+
+    private Runnable keep(Runnable r) { return new Keep(r); }
+
+    /** Настройки лаунчера. Системные экраны прошивки — только в отдельном пункте «Системные настройки». */
+    private void settingsItems(List<String> labels, List<Runnable> actions) {
+        labels.add("Wi-Fi и интернет");
+        actions.add(this::showWifi);
         long sleepAt = IosSleep.at(this), left = sleepAt == 0 ? 0 : (sleepAt - System.currentTimeMillis() + 59_999) / 60000;
         labels.add(sleepAt == 0 ? "Таймер сна: выключен" : "Таймер сна: через " + left + " мин");
-        actions.add(() -> {
+        actions.add(keep(() -> {
             // Каждое нажатие — следующий шаг: 30, 60, 90 минут, выключить.
             long step = left == 0 ? 30 : left <= 30 ? 60 : left <= 60 ? 90 : 0;
             IosSleep.schedule(this, step);
-            note(step == 0 ? "Таймер сна выключен" : "Телевизор выключится через " + step + " мин");
-            reopenSettings();
-        });
+            refreshSettings();
+        }));
         SharedPreferences saverPrefs = getSharedPreferences("ios_saver", 0);
         int saverPick = saverPrefs.getInt("style", -1);
         labels.add("Заставка: " + (saverPick < 0 ? "по очереди" : IosSaver.NAMES[saverPick]));
-        actions.add(() -> {
+        actions.add(keep(() -> {
             int next = saverPick + 1 >= IosSaver.NAMES.length ? -1 : saverPick + 1;
             saverPrefs.edit().putInt("style", next).apply();
-            reopenSettings();
-        });
+            refreshSettings();
+        }));
+        int idle = saverPrefs.getInt("idle", 5);
+        labels.add("Заставка при простое: " + (idle == 0 ? "никогда" : "через " + idle + " мин"));
+        actions.add(keep(() -> {
+            int next = idle == 2 ? 5 : idle == 5 ? 10 : idle == 10 ? 15 : idle == 15 ? 0 : 2;
+            saverPrefs.edit().putInt("idle", next).apply();
+            refreshSettings();
+        }));
         labels.add("Показать заставку");
         actions.add(() -> startActivity(new Intent(this, IosSaverActivity.class)
                 .putExtra("style", saverPick < 0 ? 0 : saverPick)));
-        int idle = saverPrefs.getInt("idle", 5);
-        labels.add("Заставка при простое: " + (idle == 0 ? "никогда" : "через " + idle + " мин"));
-        actions.add(() -> {
-            int next = idle == 2 ? 5 : idle == 5 ? 10 : idle == 10 ? 15 : idle == 15 ? 0 : 2;
-            saverPrefs.edit().putInt("idle", next).apply();
-            reopenSettings();
-        });
         boolean ads = IosTools.adsBlocked(this), fast = IosTools.fastAnim(this);
         labels.add("Блокировка рекламы: " + (ads ? "включена" : "выключена"));
-        actions.add(() -> tweak("dns", !ads));
+        actions.add(keep(() -> tweak("dns", !ads)));
         labels.add("Быстрые анимации: " + (fast ? "включены" : "выключены"));
-        actions.add(() -> tweak("anim", !fast));
+        actions.add(keep(() -> tweak("anim", !fast)));
         labels.add("Очистить кэш приложений");
-        actions.add(() -> {
+        actions.add(keep(() -> {
             note("Чищу кэш…");
-            new Thread(() -> { boolean ok = tools.trim(); handler.post(() -> note(ok ? "Кэш очищен" : "Нет доступа к отладке: разреши её на экране")); }, "trim").start();
-        });
-        labels.add("Пульт в телефоне (QR-код)");
+            new Thread(() -> { boolean ok = tools.trim(); handler.post(() -> note(ok ? "Кэш очищен" : "Нет доступа к отладке")); }, "trim").start();
+        }));
+        labels.add("Пульт в телефоне");
         actions.add(this::showRemoteCode);
-        labels.add("Обновить лаунчер (версия " + IosUpdate.installed(this) + ")");
-        actions.add(() -> {
+        labels.add("Обновить лаунчер, версия " + IosUpdate.installed(this));
+        actions.add(keep(() -> {
             note("Проверяю обновление…");
             IosUpdate.check(this, m -> note(m));
-        });
+        }));
         // Аккаунт Яндекса всего телевизора: за ним следуют Кинопоиск и другие приложения Яндекса.
         labels.add("Аккаунт Яндекса");
         actions.add(() -> open(new Intent("com.yandex.tv.passport.MANAGE_ACCOUNTS").setPackage("com.yandex.tv.services")
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
+        labels.add("Системные настройки");
+        actions.add(this::showSystemSettings);
         for (final String pkg : stored("hidden")) {
             String name = pkg;
             try {
@@ -2066,15 +2193,67 @@ public class IosHome extends Activity {
                 reload();
             });
         }
-        showMenu("Настройки", labels, actions);
     }
 
-    /** Переоткрыть настройки на той же строке: после переключателя. */
-    private void reopenSettings() {
-        int at = menuIndex;
-        showSettings();
-        menuIndex = Math.min(at, menuViews.size() - 1);
-        paintMenu();
+    private void showSettings() {
+        List<String> labels = new ArrayList<>();
+        List<Runnable> actions = new ArrayList<>();
+        settingsItems(labels, actions);
+        showMenu("Настройки", labels, actions);
+        menuKind = "settings";
+    }
+
+    /** Переключатель сработал: подписи меняются на месте, меню не переоткрывается. */
+    private void refreshSettings() {
+        if (!overlayOpen() || !"settings".equals(menuKind)) return;
+        List<String> labels = new ArrayList<>();
+        List<Runnable> actions = new ArrayList<>();
+        settingsItems(labels, actions);
+        if (labels.size() != menuViews.size()) { int at = menuIndex; showSettings(); menuIndex = Math.min(at, menuViews.size() - 1); paintMenu(); return; }
+        for (int i = 0; i < labels.size(); i++) menuViews.get(i).setText(labels.get(i));
+        menuActions.clear();
+        menuActions.addAll(actions);
+    }
+
+    /** Экраны прошивки собраны в одном месте и так и названы: всё остальное — в стиле лаунчера. */
+    private void showSystemSettings() {
+        List<String> labels = new ArrayList<>();
+        List<Runnable> actions = new ArrayList<>();
+        String[][] rows = {{"Сети Wi-Fi и пароль", Settings.ACTION_WIFI_SETTINGS}, {"Bluetooth и пульты", Settings.ACTION_BLUETOOTH_SETTINGS},
+                {"Звук", Settings.ACTION_SOUND_SETTINGS}, {"Изображение", Settings.ACTION_DISPLAY_SETTINGS},
+                {"Приложения", Settings.ACTION_APPLICATION_SETTINGS}, {"Все настройки телевизора", Settings.ACTION_SETTINGS}};
+        for (String[] row : rows) {
+            labels.add(row[0]);
+            actions.add(() -> open(SystemSettings.intent(this, row[1])));
+        }
+        showMenu("Системные настройки", labels, actions);
+    }
+
+    /** Wi-Fi в стиле лаунчера: сеть, сигнал, скорость, адрес, VPN. Сменить сеть — в системных настройках. */
+    private void showWifi() {
+        List<String> labels = new ArrayList<>();
+        List<Runnable> actions = new ArrayList<>();
+        labels.add("Проверяю сеть…");
+        actions.add(keep(() -> { }));
+        showMenu("Wi-Fi и интернет", labels, actions);
+        menuKind = "wifi";
+        new Thread(() -> {
+            List<String> info = tools.wifi();
+            handler.post(() -> {
+                if (!overlayOpen() || !"wifi".equals(menuKind)) return;
+                List<String> l = new ArrayList<>(info);
+                List<Runnable> a = new ArrayList<>();
+                for (int i = 0; i < l.size(); i++) a.add(keep(() -> { }));
+                l.add("VPN: " + (vpnOn() ? "включён" : "выключен"));
+                a.add(keep(() -> { }));
+                l.add("Сменить сеть");
+                a.add(() -> open(SystemSettings.intent(this, Settings.ACTION_WIFI_SETTINGS)));
+                showMenu("Wi-Fi и интернет", l, a, false);
+                menuKind = "wifi";
+                menuIndex = l.size() - 1;
+                paintMenu();
+            });
+        }, "wifi").start();
     }
 
     private void tweak(String what, boolean on) {
@@ -2082,7 +2261,7 @@ public class IosHome extends Activity {
             String r;
             try { r = tools.tweak(what, on ? "1" : "0"); } catch (Exception e) { r = IosTools.say("Не получилось"); }
             String msg = r.replaceAll("^\\{\"say\":\"|\"\\}$", "");
-            handler.post(() -> { note(msg); if (overlayOpen()) reopenSettings(); });
+            handler.post(() -> { note(msg); refreshSettings(); });
         }, "tweak").start();
     }
 

@@ -77,6 +77,18 @@ final class IosText {
         return "гроза";
     }
 
+    /** Значок погоды по коду WMO: sun, moon, sun_cloud, moon_cloud, cloud, fog, drizzle, rain, snow, storm. */
+    static String weatherIcon(int code, boolean day) {
+        if (code == 0) return day ? "sun" : "moon";
+        if (code <= 2) return day ? "sun_cloud" : "moon_cloud";
+        if (code == 3) return "cloud";
+        if (code <= 48) return "fog";
+        if (code <= 57) return "drizzle";
+        if (code <= 67 || code >= 80 && code <= 82) return "rain";
+        if (code <= 77 || code == 85 || code == 86) return "snow";
+        return "storm";
+    }
+
     /** Температура со знаком: +3°, −2°, 0°. */
     static String degrees(double t) {
         long r = Math.round(t);
