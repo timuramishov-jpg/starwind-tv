@@ -150,9 +150,6 @@ deploy() {
   T "settings put secure screensaver_enabled 1; settings put secure screensaver_components $PKG/.IosDream; settings put secure screensaver_default_component $PKG/.IosDream"
   # Обновление с GitHub ставит APK через системный установщик.
   T "appops set $PKG REQUEST_INSTALL_PACKAGES allow"
-  # Кнопки пульта: наш перехватчик вместо яндексовского — шестерёнка открывает настройки лаунчера.
-  # Вернуть как было: tv keys off.
-  T "settings put secure enabled_accessibility_services $PKG/$PKG.HomeKeyService; settings put secure accessibility_enabled 1" > /dev/null
   # Своя клавиатура: включаем всегда, делаем основной один раз (дальше выбор — в шестерёнке).
   T "ime enable $PKG/.IosKeyboard" > /dev/null
   if [ ! -f "$DIR/.ime_set" ]; then T "ime set $PKG/.IosKeyboard" > /dev/null && touch "$DIR/.ime_set"; fi
@@ -323,15 +320,6 @@ case "${1:-}" in
     online
     [ "${2:-}" = off ] || { say "tv adb off: выключить отладку. Включить обратно: Настройки лаунчера, Отладка по сети"; exit 0; }
     T 'settings put global adb_enabled 0' ; say "Отладка выключена. Включить: Настройки лаунчера, Отладка по сети" ;;
-  keys)
-    online
-    if [ "$2" = off ]; then
-      T "settings put secure enabled_accessibility_services com.yandex.tv.services/com.yandex.tv.services.keyinterceptor.KeyEventInterceptorService"
-      say "Кнопки пульта снова у Яндекса"
-    else
-      T "settings put secure enabled_accessibility_services $PKG/$PKG.HomeKeyService; settings put secure accessibility_enabled 1"
-      say "Шестерёнка открывает настройки лаунчера"
-    fi ;;
   agent)
     if [ "$2" = install ]; then
       # Агент при входе в систему: Терминал открывает agent.command — у Терминала есть доступ к Документам,
