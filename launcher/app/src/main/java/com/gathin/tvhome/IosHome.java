@@ -267,6 +267,7 @@ public class IosHome extends Activity {
         new Thread(() -> IosAdb.get(this).ready(), "adb").start();
         remote = new IosRemote(this, this::remoteCommand);
         remote.start();
+        remote.ensureRelay();
         weather = new IosWeather(this);
         watchInputs();
         // VPN отслеживается событиями системы, а не опросом.
@@ -293,6 +294,7 @@ public class IosHome extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
+        if (remote != null) remote.ensureRelay();
         wake();
         root.setAlpha(1f);
         handler.post(ticker);

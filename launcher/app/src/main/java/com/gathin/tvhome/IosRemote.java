@@ -55,9 +55,34 @@ final class IosRemote {
     }
 
     /** Адрес для QR-кода, null — телевизор не в сети. */
+    /** Порт пересыльщика: его держит оболочка телевизора (как отладку), и её ответы VPN не забирает в туннель.
+     *  Ответы самого лаунчера при включённом Happ уходят в туннель, и телефон их не получает. */
+    static final int RELAY = 8687;
+    private volatile boolean relayUp;
+
     String address() {
         String ip = localIp();
-        return ip == null ? null : "http://" + ip + ":" + PORT + "/?k=" + key;
+        return ip == null ? null : "http://" + ip + ":" + (relayUp ? RELAY : PORT) + "/?k=" + key;
+    }
+
+    /** Запустить пересыльщик, если он не запущен: 8687 → 127.0.0.1:8686. Каждое соединение — свой nc. */
+    void ensureRelay() {
+        new Thread(() -> {
+            try {
+                IosAdb adb = IosAdb.get(context);
+                String listening = adb.shell("netstat -tln 2>/dev/null | grep -c ':" + RELAY + " '");
+                if (listening.trim().equals("0")) {
+                    adb.shell("setsid toybox nc -L -p " + RELAY + " toybox nc 127.0.0.1 " + PORT + " </dev/null >/dev/null 2>&1 &");
+                    Thread.sleep(500);
+                    listening = adb.shell("netstat -tln 2>/dev/null | grep -c ':" + RELAY + " '");
+                }
+                relayUp = !listening.trim().equals("0");
+                Log.i(TAG, "relay " + (relayUp ? "up" : "down"));
+            } catch (Exception e) {
+                relayUp = false;
+                Log.w(TAG, "relay: " + e);
+            }
+        }, "relay").start();
     }
 
     void start() {
