@@ -105,13 +105,14 @@ final class IosRemote {
             try {
                 write(new File(dir(), "key"), key);
                 IosAdb adb = IosAdb.get(context);
-                if (adb.shell("pgrep -f com.gathin.tvhome.IosShell").trim().isEmpty()) {
+                String listening = "netstat -tln 2>/dev/null | grep -c ':" + IosShell.PORT + " '";
+                if (adb.shell(listening).trim().equals("0")) {
+                    // Подоболочка с nohup и setsid переживает конец сеанса adb; пауза — чтобы процесс успел стартовать.
                     adb.shell("pkill -f 'nc -L -p " + IosShell.PORT + "'; sleep 0.3; "
-                            + "CLASSPATH=" + context.getApplicationInfo().sourceDir
-                            + " setsid app_process /system/bin com.gathin.tvhome.IosShell </dev/null >/dev/null 2>&1 &");
-                    Thread.sleep(800);
+                            + "(CLASSPATH=" + context.getApplicationInfo().sourceDir
+                            + " nohup setsid app_process /system/bin com.gathin.tvhome.IosShell </dev/null >/data/local/tmp/iosshell.log 2>&1 &); sleep 1.5");
                 }
-                Log.i(TAG, "shell server " + (adb.shell("pgrep -f com.gathin.tvhome.IosShell").trim().isEmpty() ? "down" : "up"));
+                Log.i(TAG, "shell server " + (adb.shell(listening).trim().equals("0") ? "down" : "up"));
             } catch (Exception e) {
                 Log.w(TAG, "shell: " + e);
             } finally {
