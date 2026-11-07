@@ -519,7 +519,7 @@ public class IosHome extends Activity {
     private void buildChrome() {
         content = layer();
         root.addView(content, new FrameLayout.LayoutParams(-1, -1));
-        title = text(88, semibold, INK);
+        title = text(IosPalette.DISPLAY, semibold, INK);
         title.setSingleLine(true);
         title.setEllipsize(TextUtils.TruncateAt.END);
         title.setLetterSpacing(-0.025f);
@@ -529,13 +529,13 @@ public class IosHome extends Activity {
         wordmark.setAdjustViewBounds(false);
         wordmark.setVisibility(View.GONE);
         content.addView(wordmark, at(MAIN_X, TITLE_Y + 8, 1100, 76));
-        subtitle = text(29, regular, INK_2);
+        subtitle = text(IosPalette.BODY, regular, INK_2);
         content.addView(subtitle, at(MAIN_X, TITLE_Y + 118, 1100, 0));
-        caption = text(36, medium, INK);
+        caption = text(IosPalette.HEADLINE, medium, INK);
         caption.setSingleLine(true);
         caption.setEllipsize(TextUtils.TruncateAt.END);
         content.addView(caption, at(MAIN_X, CARDS_Y + CARD_H + 30, 1180, 0));
-        captionSub = text(26, regular, INK_2);
+        captionSub = text(IosPalette.CALLOUT, regular, INK_2);
         captionSub.setSingleLine(true);
         captionSub.setEllipsize(TextUtils.TruncateAt.END);
         content.addView(captionSub, at(MAIN_X, CARDS_Y + CARD_H + 80, 1180, 0));
@@ -547,14 +547,14 @@ public class IosHome extends Activity {
         cardsLayer = layer();
         // Слой ленты шире всех карточек сразу: 15 широких карточек занимают почти 14 тысяч точек, дальние иначе обрезались.
         cardsClip.addView(cardsLayer, at(-(MAIN_X - CARD_CLIP), 0, MAIN_X + IosFeed.MAX_ITEMS * (CARD_W + CARD_GAP) + 1920, 1080));
-        action = text(30, semibold, ROW_ON_TEXT);
+        action = text(IosPalette.BODY, semibold, ROW_ON_TEXT);
         action.setText("Открыть");
         action.setGravity(Gravity.CENTER);
         action.setVisibility(View.GONE);
         LinearLayout section = new LinearLayout(this);
         section.setOrientation(LinearLayout.HORIZONTAL);
         section.setGravity(Gravity.CENTER_VERTICAL);
-        TextView head = text(34, medium, INK);
+        TextView head = text(IosPalette.HEADLINE, medium, INK);
         head.setText("Приложения");
         section.addView(head);
         content.addView(section, at(MAIN_X, HEADER_Y, 1200, 56));
@@ -567,8 +567,8 @@ public class IosHome extends Activity {
         LinearLayout status = new LinearLayout(this);
         status.setOrientation(LinearLayout.HORIZONTAL);
         status.setGravity(Gravity.CENTER_VERTICAL);
-        clock = text(34, medium, INK);
-        date = text(26, regular, INK_2);
+        clock = text(IosPalette.HEADLINE, medium, INK);
+        date = text(IosPalette.CALLOUT, regular, INK_2);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
         lp.leftMargin = px(20);
         status.addView(clock);
@@ -580,7 +580,7 @@ public class IosHome extends Activity {
         LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(px(30), px(30));
         ip.leftMargin = px(22);
         status.addView(weatherIcon, ip);
-        temp = text(26, regular, INK_2);
+        temp = text(IosPalette.CALLOUT, regular, INK_2);
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-2, -2);
         tp.leftMargin = px(8);
         status.addView(temp, tp);
@@ -867,7 +867,7 @@ public class IosHome extends Activity {
         FrameLayout card = (FrameLayout) logo;
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(IosPalette.GRAY6);
-        bg.setCornerRadius(px(24));
+        bg.setCornerRadius(px(IosPalette.R_CARD));
         card.setBackground(bg);
         float box = Math.min(appH * 0.56f, appW * 0.5f);
         for (int c = 0; c < card.getChildCount(); c++) {
@@ -876,7 +876,7 @@ public class IosHome extends Activity {
             card.getChildAt(c).setLayoutParams(lp);
         }
         appsLayer.addView(card, at(appX(i), appY(i), appW, appH));
-        TextView name = text(26, medium, INK);
+        TextView name = text(IosPalette.CALLOUT, medium, INK);
         name.setText(label);
         name.setSingleLine(true);
         name.setEllipsize(TextUtils.TruncateAt.END);
@@ -1117,7 +1117,7 @@ public class IosHome extends Activity {
         FrameLayout card = new FrameLayout(this);
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(PILL);
-        bg.setCornerRadius(px(26));
+        bg.setCornerRadius(px(IosPalette.R_CARD));
         card.setBackground(bg);
         card.setClipToOutline(true);
         card.setTag(item);
@@ -1125,13 +1125,13 @@ public class IosHome extends Activity {
         cardsLayer.addView(card, at(x, CARDS_Y, w, CARD_H));
         cardViews.add(card);
         // Подпись под каждой карточкой: в покое приглушена, у выбранной яркая и с описанием.
-        TextView name = text(item.poster ? 28 : 34, medium, INK);
+        TextView name = text(item.poster ? IosPalette.CALLOUT : IosPalette.HEADLINE, medium, INK);
         name.setText(item.title == null ? "" : item.title);
         name.setSingleLine(true);
         name.setEllipsize(TextUtils.TruncateAt.END);
         name.setAlpha(LABEL_REST);
         cardsLayer.addView(name, at(x + 4, CARDS_Y + CARD_H + 26, w - 8, 0));
-        TextView sub = text(item.poster ? 22 : 26, regular, INK_2);
+        TextView sub = text(item.poster ? IosPalette.FOOTNOTE : IosPalette.CALLOUT, regular, INK_2);
         sub.setText(item.subtitle == null ? "" : item.subtitle);
         sub.setSingleLine(true);
         sub.setEllipsize(TextUtils.TruncateAt.END);
@@ -1174,7 +1174,7 @@ public class IosHome extends Activity {
                 if (pulse != null) pulse.cancel();
                 card.setAlpha(1f);
                 bg.setColor(IosPalette.tint(accent));
-                TextView t = text(item.poster ? 34 : 44, semibold, INK);
+                TextView t = text(item.poster ? IosPalette.HEADLINE : IosPalette.TITLE, semibold, INK);
                 t.setText(item.title);
                 t.setGravity(Gravity.CENTER);
                 t.setMaxLines(4);
@@ -1184,12 +1184,12 @@ public class IosHome extends Activity {
             };
         }
         if (item.duration != null && !item.duration.isEmpty()) {
-            TextView d = text(24, semibold, INK);
+            TextView d = text(IosPalette.FOOTNOTE, semibold, INK);
             d.setText(item.duration);
             d.setPadding(px(12), px(5), px(12), px(5));
             GradientDrawable g = new GradientDrawable();
             g.setColor(IosPalette.SCRIM_STRONG);
-            g.setCornerRadius(px(10));
+            g.setCornerRadius(px(IosPalette.R_BADGE));
             d.setBackground(g);
             FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2);
             lp.gravity = Gravity.BOTTOM | Gravity.RIGHT;
@@ -1197,12 +1197,12 @@ public class IosHome extends Activity {
             card.addView(d, lp);
         }
         if (item.fresh) {
-            TextView n = text(22, semibold, IosPalette.ON_LIGHT);
+            TextView n = text(IosPalette.FOOTNOTE, semibold, IosPalette.ON_LIGHT);
             n.setText("новое");
             n.setPadding(px(12), px(4), px(12), px(4));
             GradientDrawable g = new GradientDrawable();
             g.setColor(INK);
-            g.setCornerRadius(px(10));
+            g.setCornerRadius(px(IosPalette.R_BADGE));
             n.setBackground(g);
             FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2);
             lp.gravity = Gravity.TOP | Gravity.LEFT;
@@ -1252,7 +1252,7 @@ public class IosHome extends Activity {
     private Drawable hairline() {
         GradientDrawable d = new GradientDrawable();
         d.setColor(0x00000000);
-        d.setCornerRadius(px(26));
+        d.setCornerRadius(px(IosPalette.R_CARD));
         d.setStroke(Math.max(1, px(1.5f)), IosPalette.HAIRLINE);
         return d;
     }
@@ -1369,24 +1369,24 @@ public class IosHome extends Activity {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setGravity(Gravity.CENTER_HORIZONTAL);
-        TextView t = text(44, semibold, INK);
+        TextView t = text(IosPalette.TITLE, semibold, INK);
         t.setText("Пульт в телефоне");
         box.addView(t);
-        TextView h = text(28, regular, INK_2);
+        TextView h = text(IosPalette.CALLOUT, regular, INK_2);
         h.setText("Наведи камеру телефона на код");
         h.setPadding(0, px(10), 0, px(36));
         box.addView(h);
         FrameLayout plate = new FrameLayout(this);
         GradientDrawable g = new GradientDrawable();
         g.setColor(IosPalette.INK);
-        g.setCornerRadius(px(36));
+        g.setCornerRadius(px(IosPalette.R_PILL));
         plate.setBackground(g);
         plate.setPadding(px(28), px(28), px(28), px(28));
         ImageView code = new ImageView(this);
         code.setImageBitmap(qr);
         plate.addView(code, new FrameLayout.LayoutParams(px(440), px(440)));
         box.addView(plate, new LinearLayout.LayoutParams(-2, -2));
-        TextView a = text(24, regular, INK_2);
+        TextView a = text(IosPalette.FOOTNOTE, regular, INK_2);
         a.setText(url.replaceAll("\\?k=.*", ""));
         a.setPadding(0, px(28), 0, 0);
         box.addView(a);
@@ -1413,11 +1413,11 @@ public class IosHome extends Activity {
         field.setHintTextColor(IosPalette.TERTIARY);
         field.setTextColor(INK);
         field.setTypeface(regular);
-        field.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(30));
+        field.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(IosPalette.BODY));
         field.setPadding(px(24), 0, px(24), 0);
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(IosPalette.GRAY5);
-        bg.setCornerRadius(px(20));
+        bg.setCornerRadius(px(IosPalette.R_ROW));
         field.setBackground(bg);
         field.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
         field.setOnEditorActionListener((v, action, ev) -> {
@@ -1436,7 +1436,7 @@ public class IosHome extends Activity {
         lp.bottomMargin = px(24);
         panel.addView(field, 1, lp);
         if (!recent.isEmpty()) {
-            TextView head = text(24, medium, IosPalette.SECONDARY);
+            TextView head = text(IosPalette.FOOTNOTE, medium, IosPalette.SECONDARY);
             head.setText("Недавние");
             head.setPadding(px(24), 0, px(24), px(12));
             panel.addView(head, 2, new LinearLayout.LayoutParams(-1, -2));
@@ -1527,11 +1527,11 @@ public class IosHome extends Activity {
 
     private void note(String text) {
         if (noteView == null) {
-            noteView = text(28, semibold, INK);
+            noteView = text(IosPalette.CALLOUT, semibold, INK);
             noteView.setPadding(px(34), px(18), px(34), px(18));
             GradientDrawable g = new GradientDrawable();
             g.setColor(IosPalette.alpha(IosPalette.GRAY6, 0.95f));
-            g.setCornerRadius(px(40));
+            g.setCornerRadius(px(IosPalette.R_PILL));
             noteView.setBackground(g);
             noteView.setAlpha(0f);
             FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2);
@@ -1556,12 +1556,12 @@ public class IosHome extends Activity {
         panel.setPadding(px(50), px(46), px(50), px(46));
         GradientDrawable g = new GradientDrawable();
         g.setColor(PANEL);
-        g.setCornerRadius(px(34));
+        g.setCornerRadius(px(IosPalette.R_PILL));
         panel.setBackground(g);
-        TextView code = text(84, semibold, INK);
+        TextView code = text(IosPalette.DISPLAY, semibold, INK);
         code.setText("Подождите");
         code.setSingleLine(true);
-        TextView tip = text(30, regular, INK_2);
+        TextView tip = text(IosPalette.BODY, regular, INK_2);
         tip.setText("Получаю код от Google");
         tip.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
@@ -1591,13 +1591,13 @@ public class IosHome extends Activity {
     }
 
     private void addPill(String text, int fill, Action action) {
-        TextView pill = text(30, semibold, INK);
+        TextView pill = text(IosPalette.BODY, semibold, INK);
         pill.setText(text);
         pill.setGravity(Gravity.CENTER);
         pill.setPadding(px(46), 0, px(46), 0);
         GradientDrawable g = new GradientDrawable();
         g.setColor(PILL);
-        g.setCornerRadius(px(40));
+        g.setCornerRadius(px(IosPalette.R_PILL));
         pill.setBackground(g);
         pill.setTag(new Object[]{text, action, fill});
         cardsLayer.addView(pill, at(MAIN_X, PILL_Y, 0, 80));
@@ -1607,7 +1607,7 @@ public class IosHome extends Activity {
     /** Заголовок секции: полный логотип в её цвете, а если логотипа нет, название тем же цветом. */
     private void showBrand(App a) {
         title.setSingleLine(true);
-        title.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(88));
+        title.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(IosPalette.DISPLAY));
         title.setTextColor(a == null ? INK : a.logo.accent);
         Integer mark = a == null ? null : WORD.get(a.pkg);
         if (mark != null) {
@@ -1968,7 +1968,7 @@ public class IosHome extends Activity {
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setPadding(px(24), px(64), px(24), px(40));
         panel.setBackgroundColor(PANEL);
-        TextView t = text(44, semibold, INK);
+        TextView t = text(IosPalette.TITLE, semibold, INK);
         t.setText(title);
         t.setSingleLine(true);
         t.setEllipsize(TextUtils.TruncateAt.END);
@@ -1983,7 +1983,7 @@ public class IosHome extends Activity {
         window.addView(list, new FrameLayout.LayoutParams(-1, px(labels.size() * MENU_ROW)));
         panel.addView(window, new LinearLayout.LayoutParams(-1, 0, 1f));
         for (String l : labels) {
-            TextView r = text(30, regular, INK);
+            TextView r = text(IosPalette.BODY, regular, INK);
             r.setText(l);
             r.setSingleLine(true);
             r.setEllipsize(TextUtils.TruncateAt.END);
@@ -2000,6 +2000,8 @@ public class IosHome extends Activity {
             panel.animate().translationX(0).setDuration(NORMAL).setInterpolator(ease).start();
         }
         menuIndex = 0;
+        while (menuIndex < actions.size() && actions.get(menuIndex) == INFO) menuIndex++;
+        if (menuIndex >= actions.size()) menuIndex = -1;
         paintMenu();
     }
 
@@ -2012,12 +2014,12 @@ public class IosHome extends Activity {
         }
         for (int i = 0; i < menuViews.size(); i++) {
             TextView r = menuViews.get(i);
-            boolean on = i == menuIndex;
+            boolean on = i == menuIndex, info = i < menuActions.size() && menuActions.get(i) == INFO;
             GradientDrawable g = new GradientDrawable();
-            g.setCornerRadius(px(20));
+            g.setCornerRadius(px(IosPalette.R_ROW));
             g.setColor(on ? ROW_ON : 0x00000000);
             r.setBackground(g);
-            r.setTextColor(on ? ROW_ON_TEXT : INK);
+            r.setTextColor(on ? ROW_ON_TEXT : info ? INK_2 : INK);
         }
     }
 
@@ -2028,10 +2030,18 @@ public class IosHome extends Activity {
             searchField.requestFocus();
             return;
         }
-        if (key == KeyEvent.KEYCODE_DPAD_UP && menuIndex > 0) menuIndex--;
-        else if (key == KeyEvent.KEYCODE_DPAD_DOWN && menuIndex < menuViews.size() - 1) menuIndex++;
+        // Строки-сведения (INFO) не выбираются: курсор их перескакивает.
+        int step = key == KeyEvent.KEYCODE_DPAD_UP ? -1 : key == KeyEvent.KEYCODE_DPAD_DOWN ? 1 : 0;
+        for (int i = menuIndex + step; step != 0 && i >= 0 && i < menuViews.size(); i += step) {
+            if (i < menuActions.size() && menuActions.get(i) == INFO) continue;
+            menuIndex = i;
+            break;
+        }
         paintMenu();
     }
+
+    /** Строка-сведение в меню: показывает значение, но не выбирается. */
+    private final Runnable INFO = new Keep(() -> { });
 
     private void closeMenu() {
         if (searchField != null) { hideKeyboard(searchField); searchField = null; }
@@ -2235,7 +2245,7 @@ public class IosHome extends Activity {
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
         labels.add("Проверяю сеть…");
-        actions.add(keep(() -> { }));
+        actions.add(INFO);
         showMenu("Wi-Fi и интернет", labels, actions);
         menuKind = "wifi";
         new Thread(() -> {
@@ -2244,9 +2254,9 @@ public class IosHome extends Activity {
                 if (!overlayOpen() || !"wifi".equals(menuKind)) return;
                 List<String> l = new ArrayList<>(info);
                 List<Runnable> a = new ArrayList<>();
-                for (int i = 0; i < l.size(); i++) a.add(keep(() -> { }));
+                for (int i = 0; i < l.size(); i++) a.add(INFO);
                 l.add("VPN: " + (vpnOn() ? "включён" : "выключен"));
-                a.add(keep(() -> { }));
+                a.add(INFO);
                 l.add("Сменить сеть");
                 a.add(() -> open(SystemSettings.intent(this, Settings.ACTION_WIFI_SETTINGS)));
                 showMenu("Wi-Fi и интернет", l, a, false);

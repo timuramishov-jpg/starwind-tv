@@ -53,6 +53,11 @@ final class IosPalette {
     /** Стеклянная карточка поверх фото или фона. */
     static final int GLASS = 0x1FFFFFFF;
 
+    // Шрифт: SF Pro, шесть размеров на весь экран (в точках макета 1920×1080). Других размеров нет.
+    static final float DISPLAY = 88, TITLE = 44, HEADLINE = 34, BODY = 30, CALLOUT = 26, FOOTNOTE = 22;
+    // Скругления: значок-бейдж, строка и поле, карточка, плашка-пилюля и крупные панели.
+    static final float R_BADGE = 10, R_ROW = 20, R_CARD = 26, R_PILL = 40;
+
     /** Акцент с прозрачностью: свечение (GLOW) и подложка (TINT). */
     static int glow(int accent) { return (accent & 0x00FFFFFF) | 0x77000000; }
     static int tint(int accent) { return (accent & 0x00FFFFFF) | 0x55000000; }
