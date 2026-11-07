@@ -1,46 +1,43 @@
 package com.gathin.tvhome;
 
 import android.content.Context;
-import android.os.Handler;
-import android.os.Looper;
+import android.graphics.Bitmap;
 import android.util.Log;
 
-import java.io.InputStream;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.util.Collections;
-import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
-/** Пульт в телефоне: маленький сервер в домашней сети. Телефон сканирует QR-код с телевизора и
- *  попадает на страницу: кнопки для любого приложения, ввод текста, приложения, монитор, файлы, снимок экрана.
- *  Каждый запрос несёт ключ из QR-кода: без него сервер отвечает 403. */
+/**
+ * Пульт в телефоне со стороны лаунчера. Сам сервер — IosShell: он работает от имени оболочки телевизора и не
+ * умирает, когда система выгружает лаунчер ради тяжёлого приложения. Лаунчер только запускает его и кладёт
+ * для него в files/remote ключ, список приложений с логотипами, названия всех приложений и своё состояние.
+ */
 final class IosRemote {
-    interface Commands {
-        /** Выполняется в главном потоке; возвращает текст ответа (JSON или пустую строку). */
-        String run(String what, Map<String, String> args);
+    /** Одно приложение для страницы пульта. */
+    static final class Entry {
+        String pkg, label, component;
+        int accent;
+        Bitmap logo;
     }
 
-    static final int PORT = 8686;
     private static final String TAG = "IosRemote";
-    private final Commands commands;
-    private final Handler main = new Handler(Looper.getMainLooper());
     private final String key;
     private final Context context;
-    private final IosTools tools;
-    private ServerSocket server;
-    private Thread thread;
+    private volatile boolean checking;
 
-    IosRemote(Context c, Commands commands) {
-        this.commands = commands;
+    IosRemote(Context c) {
         context = c.getApplicationContext();
-        tools = new IosTools(c);
         android.content.SharedPreferences p = c.getSharedPreferences("ios_remote", 0);
         String k = p.getString("key", "");
         if (k.isEmpty()) {
@@ -54,193 +51,79 @@ final class IosRemote {
         key = k;
     }
 
-    /** Адрес для QR-кода, null — телевизор не в сети. */
-    /** Порт пересыльщика: его держит оболочка телевизора (как отладку), и её ответы VPN не забирает в туннель.
-     *  Ответы самого лаунчера при включённом Happ уходят в туннель, и телефон их не получает. */
-    static final int RELAY = 8687;
-    private volatile boolean relayUp;
+    String key() { return key; }
 
+    /** Адрес для QR-кода, null — телевизор не в сети. */
     String address() {
         String ip = localIp();
-        return ip == null ? null : "http://" + ip + ":" + (relayUp ? RELAY : PORT) + "/?k=" + key;
+        return ip == null ? null : "http://" + ip + ":" + IosShell.PORT + "/?k=" + key;
     }
 
-    /** Запустить пересыльщик, если он не запущен: 8687 → 127.0.0.1:8686. Каждое соединение — свой nc. */
-    private volatile boolean relayChecking;
+    private File dir() {
+        File d = new File(context.getExternalFilesDir(null), "remote");
+        d.mkdirs();
+        return d;
+    }
 
-    void ensureRelay() {
-        if (relayChecking) return;
-        relayChecking = true;
+    /** Список приложений с логотипами и названия всех пакетов — для страницы пульта. В фоне. */
+    void publish(List<Entry> apps, Map<String, String> labels) {
         new Thread(() -> {
             try {
+                File d = dir(), logos = new File(d, "logos");
+                logos.mkdirs();
+                write(new File(d, "key"), key);
+                JSONArray a = new JSONArray();
+                for (Entry e : apps) {
+                    a.put(new JSONObject().put("pkg", e.pkg).put("label", e.label).put("component", e.component == null ? "" : e.component)
+                            .put("accent", String.format("#%06X", e.accent & 0xFFFFFF)));
+                    File png = new File(logos, e.pkg + ".png");
+                    if (e.logo != null && !png.exists()) {
+                        try (OutputStream o = new FileOutputStream(png)) { e.logo.compress(Bitmap.CompressFormat.PNG, 100, o); }
+                    }
+                }
+                write(new File(d, "apps.json"), a.toString());
+                write(new File(d, "labels.json"), new JSONObject(labels).toString());
+            } catch (Exception e) {
+                Log.w(TAG, "publish: " + e);
+            }
+        }, "remote-publish").start();
+    }
+
+    /** Состояние для страницы: страна VPN и время таймера сна. */
+    void state(String place, long sleepAt) {
+        new Thread(() -> {
+            try { write(new File(dir(), "state.json"), new JSONObject().put("place", place).put("sleepAt", sleepAt).toString()); }
+            catch (Exception e) { Log.w(TAG, "state: " + e); }
+        }, "remote-state").start();
+    }
+
+    /** Запустить сервер пульта от имени оболочки, если он не запущен; заодно убрать старый пересыльщик. */
+    void ensureShell() {
+        if (checking) return;
+        checking = true;
+        new Thread(() -> {
+            try {
+                write(new File(dir(), "key"), key);
                 IosAdb adb = IosAdb.get(context);
-                String listening = adb.shell("netstat -tln 2>/dev/null | grep -c ':" + RELAY + " '");
-                if (listening.trim().equals("0")) {
-                    adb.shell("setsid toybox nc -L -p " + RELAY + " toybox nc 127.0.0.1 " + PORT + " </dev/null >/dev/null 2>&1 &");
-                    Thread.sleep(500);
-                    listening = adb.shell("netstat -tln 2>/dev/null | grep -c ':" + RELAY + " '");
+                if (adb.shell("pgrep -f com.gathin.tvhome.IosShell").trim().isEmpty()) {
+                    adb.shell("pkill -f 'nc -L -p " + IosShell.PORT + "'; sleep 0.3; "
+                            + "CLASSPATH=" + context.getApplicationInfo().sourceDir
+                            + " setsid app_process /system/bin com.gathin.tvhome.IosShell </dev/null >/dev/null 2>&1 &");
+                    Thread.sleep(800);
                 }
-                relayUp = !listening.trim().equals("0");
-                Log.i(TAG, "relay " + (relayUp ? "up" : "down"));
+                Log.i(TAG, "shell server " + (adb.shell("pgrep -f com.gathin.tvhome.IosShell").trim().isEmpty() ? "down" : "up"));
             } catch (Exception e) {
-                relayUp = false;
-                Log.w(TAG, "relay: " + e);
+                Log.w(TAG, "shell: " + e);
             } finally {
-                relayChecking = false;
+                checking = false;
             }
-        }, "relay").start();
+        }, "remote-shell").start();
     }
 
-    void start() {
-        if (thread != null) return;
-        thread = new Thread(() -> {
-            try (ServerSocket s = new ServerSocket(PORT, 8)) {
-                server = s;
-                while (!Thread.currentThread().isInterrupted()) {
-                    Socket client = s.accept();
-                    new Thread(() -> serve(client), "remote-client").start();
-                }
-            } catch (Exception e) {
-                Log.w(TAG, "server: " + e);
-            }
-        }, "remote");
-        thread.setPriority(Thread.MIN_PRIORITY);
-        thread.start();
-    }
-
-    void stop() {
-        try { if (server != null) server.close(); } catch (Exception ignored) { }
-        if (thread != null) thread.interrupt();
-        thread = null;
-    }
-
-    private void serve(Socket client) {
-        try (Socket c = client) {
-            c.setSoTimeout(60000);
-            InputStream in = new java.io.BufferedInputStream(c.getInputStream());
-            String head = headers(in);
-            if (head == null) return;
-            String[] lines = head.split("\r\n");
-            String[] parts = lines[0].split(" ");
-            if (parts.length < 2) return;
-            long length = 0;
-            for (String h : lines) if (h.toLowerCase(java.util.Locale.ROOT).startsWith("content-length:")) {
-                try { length = Long.parseLong(h.substring(15).trim()); } catch (NumberFormatException ignored) { }
-            }
-            String target = parts[1], path = target, query = "";
-            int q = target.indexOf('?');
-            if (q >= 0) { path = target.substring(0, q); query = target.substring(q + 1); }
-            Map<String, String> args = parse(query);
-            OutputStream out = c.getOutputStream();
-            // Значок для экрана «Домой» на iPhone — без ключа: телефон берёт его отдельным запросом.
-            if (path.equals("/icon.png")) { asset(out, "remote-icon.png", "image/png"); return; }
-            if (!key.equals(args.get("k"))) { reply(out, 403, "text/plain", "Отсканируй QR-код на телевизоре"); return; }
-            if (path.equals("/")) { reply(out, 200, "text/html", page()); return; }
-            String what = path.substring(1);
-            if (tool(what, args, in, length, out)) return;
-            final String[] result = {""};
-            final Object lock = new Object();
-            final boolean[] done = {false};
-            main.post(() -> {
-                String r;
-                try { r = commands.run(what, args); } catch (Exception e) { r = IosTools.say("Ошибка: " + e.getMessage()); }
-                synchronized (lock) { result[0] = r == null ? "" : r; done[0] = true; lock.notifyAll(); }
-            });
-            synchronized (lock) { if (!done[0]) lock.wait(4000); }
-            reply(out, 200, "application/json", result[0].isEmpty() ? "{}" : result[0]);
-        } catch (Exception e) {
-            Log.w(TAG, "client: " + e);
-        }
-    }
-
-    /** Заголовки запроса до пустой строки; тело остаётся в потоке. */
-    private static String headers(InputStream in) throws Exception {
-        java.io.ByteArrayOutputStream b = new java.io.ByteArrayOutputStream();
-        int last4 = 0, ch;
-        while ((ch = in.read()) >= 0) {
-            b.write(ch);
-            last4 = (last4 << 8) | ch;
-            if (last4 == 0x0d0a0d0a) return new String(b.toByteArray(), StandardCharsets.UTF_8);
-            if (b.size() > 16384) return null;
-        }
-        return null;
-    }
-
-    /** То, что делается в потоке сервера: команды через adb и файлы. false — не наше. */
-    private boolean tool(String what, Map<String, String> a, InputStream body, long length, OutputStream out) throws Exception {
-        try {
-            String json;
-            switch (what) {
-                case "key": json = tools.key(a.get("c")); break;
-                case "text": json = tools.text(a.get("t")); break;
-                case "stats": json = tools.stats(); break;
-                case "top": json = tools.top(); break;
-                case "state": json = tools.state().toString(); break;
-                case "pkgs": json = tools.packages(); break;
-                case "pkg": json = tools.packageAction(a.get("p"), a.get("a")); break;
-                case "install": json = tools.install(body, length); break;
-                case "files": json = tools.files(a.get("d")); break;
-                case "upload": json = tools.upload(a.get("d"), a.get("n"), body, length); break;
-                case "rm": json = tools.remove(a.get("d"), a.get("n")); break;
-                case "tweak": json = tools.tweak(a.get("w"), a.get("v")); break;
-                case "logo": {
-                    byte[] png = logo(a.get("p"), "1".equals(a.get("c")));
-                    if (png == null) { reply(out, 200, "application/json", IosTools.say("Нет логотипа")); return true; }
-                    send(out, 200, "image/png", png.length, "Cache-Control: max-age=86400\r\n");
-                    out.write(png);
-                    out.flush();
-                    return true;
-                }
-                case "shot": {
-                    byte[] png = tools.screenshot();
-                    send(out, 200, "image/png", png.length, null);
-                    out.write(png);
-                    out.flush();
-                    return true;
-                }
-                case "get": {
-                    String name = a.get("n");
-                    long size = tools.size(a.get("d"), name);
-                    send(out, 200, "application/octet-stream", size,
-                            "Content-Disposition: attachment; filename*=UTF-8''" + java.net.URLEncoder.encode(name, "UTF-8").replace("+", "%20") + "\r\n");
-                    tools.download(a.get("d"), name, out);
-                    out.flush();
-                    return true;
-                }
-                default: return false;
-            }
-            reply(out, 200, "application/json", json);
-        } catch (Exception e) {
-            Log.w(TAG, what + ": " + e);
-            String why = IosAdb.get(context).asking ? "На телевизоре нажми «Разрешить отладку»"
-                    : e instanceof java.net.ConnectException ? "Отладка на телевизоре выключена" : "Не получилось: " + e.getMessage();
-            try { reply(out, 200, "application/json", IosTools.say(why)); } catch (Exception ignored) { }
-        }
-        return true;
-    }
-
-    private static Map<String, String> parse(String query) {
-        Map<String, String> m = new HashMap<>();
-        for (String kv : query.split("&")) {
-            int e = kv.indexOf('=');
-            if (e <= 0) continue;
-            try { m.put(kv.substring(0, e), URLDecoder.decode(kv.substring(e + 1), "UTF-8")); } catch (Exception ignored) { }
-        }
-        return m;
-    }
-
-    private static void reply(OutputStream out, int code, String type, String body) throws Exception {
-        byte[] b = body.getBytes(StandardCharsets.UTF_8);
-        send(out, code, type + "; charset=utf-8", b.length, null);
-        out.write(b);
-        out.flush();
-    }
-
-    private static void send(OutputStream out, int code, String type, long length, String extra) throws Exception {
-        String head = "HTTP/1.1 " + code + (code == 200 ? " OK" : " Forbidden") + "\r\nContent-Type: " + type
-                + "\r\nContent-Length: " + length + "\r\n" + (extra == null ? "" : extra)
-                + "Cache-Control: no-store\r\nConnection: close\r\n\r\n";
-        out.write(head.getBytes(StandardCharsets.UTF_8));
+    private static void write(File f, String s) throws Exception {
+        File tmp = new File(f.getPath() + ".tmp");
+        try (OutputStream o = new FileOutputStream(tmp)) { o.write(s.getBytes(StandardCharsets.UTF_8)); }
+        if (!tmp.renameTo(f)) throw new Exception("rename " + f);
     }
 
     static String localIp() {
@@ -252,50 +135,5 @@ final class IosRemote {
             }
         } catch (Exception ignored) { }
         return null;
-    }
-
-    /** Логотипы приложений для страницы пульта: те же серые и цветные, что в доке телевизора. Даёт IosHome. */
-    interface Logos { android.graphics.Bitmap get(String pkg, boolean color); }
-    static volatile Logos logos;
-    private final Map<String, byte[]> logoCache = new java.util.concurrent.ConcurrentHashMap<>();
-
-    private byte[] logo(String pkg, boolean color) {
-        if (pkg == null || logos == null) return null;
-        String id = pkg + (color ? ":c" : ":m");
-        byte[] png = logoCache.get(id);
-        if (png != null) return png;
-        android.graphics.Bitmap b = logos.get(pkg, color);
-        if (b == null) return null;
-        java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
-        b.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, o);
-        png = o.toByteArray();
-        logoCache.put(id, png);
-        return png;
-    }
-
-    private void asset(OutputStream out, String name, String type) throws Exception {
-        try (InputStream in = context.getAssets().open(name)) {
-            java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
-            byte[] b = new byte[16384];
-            int n;
-            while ((n = in.read(b)) > 0) o.write(b, 0, n);
-            byte[] data = o.toByteArray();
-            send(out, 200, type, data.length, "Cache-Control: max-age=86400\r\n");
-            out.write(data);
-            out.flush();
-        }
-    }
-
-    /** Страница пульта лежит в assets/remote.html: тёмная, в духе iOS, работает в любом браузере телефона. */
-    private String page() {
-        try (InputStream in = context.getAssets().open("remote.html")) {
-            java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
-            byte[] b = new byte[16384];
-            int n;
-            while ((n = in.read(b)) > 0) o.write(b, 0, n);
-            return new String(o.toByteArray(), StandardCharsets.UTF_8);
-        } catch (Exception e) {
-            return "Страница пульта не нашлась";
-        }
     }
 }

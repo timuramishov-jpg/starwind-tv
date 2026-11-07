@@ -57,6 +57,8 @@ final class IosTools {
         adb = IosAdb.get(c);
     }
 
+    static boolean bloat(String pkg) { return BLOAT.contains(pkg); }
+
     static boolean keep(String pkg) {
         return KEEP.contains(pkg) || pkg.startsWith("com.android.providers.") || pkg.startsWith("com.android.inputmethod")
                 || pkg.startsWith("com.google.android.inputmethod") || pkg.contains("tvserver") || pkg.startsWith("com.cvte.tv.api");

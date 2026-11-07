@@ -265,13 +265,7 @@ public class IosHome extends Activity {
         tools = new IosTools(this);
         // Свой adb: один раз телевизор спросит «Разрешить отладку?» — пусть спросит сразу, пока человек у экрана.
         new Thread(() -> IosAdb.get(this).ready(), "adb").start();
-        IosRemote.logos = (pkg, color) -> {
-            App a = apps.get(pkg);
-            return a == null || a.logo == null ? null : color ? a.logo.color : a.logo.mono;
-        };
-        remote = new IosRemote(this, this::remoteCommand);
-        remote.start();
-        remote.ensureRelay();
+        remote = new IosRemote(this);
         weather = new IosWeather(this);
         watchInputs();
         // VPN отслеживается событиями системы, а не опросом.
@@ -288,7 +282,7 @@ public class IosHome extends Activity {
 
     @Override protected void onDestroy() {
         unregisterReceiver(packages);
-        if (remote != null) remote.stop();
+
         TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
         if (tim != null && inputWatch != null) tim.unregisterCallback(inputWatch);
         ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
@@ -298,7 +292,8 @@ public class IosHome extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
-        if (remote != null) remote.ensureRelay();
+        // Сервер пульта живёт отдельно от лаунчера; проверяем, что он запущен, и обновляем для него данные.
+        if (remote != null) { remote.ensureShell(); publishRemote(); }
         wake();
         root.setAlpha(1f);
         handler.post(ticker);
@@ -381,6 +376,9 @@ public class IosHome extends Activity {
 
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        // Поиск с телефона: сервер пульта открывает лаунчер с запросом.
+        String q = intent.getStringExtra("search");
+        if (q != null && !q.trim().isEmpty()) { handler.postDelayed(() -> runSearch(q.trim()), 300); return; }
         closeMenu();
         moving = false;
         if (dirty || returnTo != null || dock.isEmpty()) {
@@ -895,6 +893,7 @@ public class IosHome extends Activity {
     }
 
     private void render() {
+        handler.post(this::publishRemote);
         focused = null;
         dockLayer.removeAllViews();
         dockViews.clear();
@@ -1298,68 +1297,37 @@ public class IosHome extends Activity {
     // ---------- Пульт в телефоне, поиск, входы HDMI ----------
 
     private IosRemote remote;
+
+    /** Данные для страницы пульта: приложения дока и сетки с цветными логотипами, названия всех пакетов, состояние. */
+    private void publishRemote() {
+        if (remote == null || dock.isEmpty()) return;
+        List<IosRemote.Entry> list = new ArrayList<>();
+        List<App> all = new ArrayList<>(dock);
+        all.addAll(others);
+        for (App a : all) {
+            IosRemote.Entry e = new IosRemote.Entry();
+            e.pkg = a.pkg;
+            e.label = a.label;
+            e.component = a.component == null ? null : a.component.flattenToShortString();
+            e.accent = a.logo == null ? IosPalette.GRAY1 : a.logo.accent;
+            e.logo = a.logo == null ? null : a.logo.color;
+            list.add(e);
+        }
+        Map<String, String> labels = new HashMap<>();
+        try {
+            PackageManager pm = getPackageManager();
+            for (android.content.pm.ApplicationInfo ai : pm.getInstalledApplications(PackageManager.MATCH_DISABLED_COMPONENTS))
+                labels.put(ai.packageName, String.valueOf(pm.getApplicationLabel(ai)));
+        } catch (Exception ignored) { }
+        remote.publish(list, labels);
+        remote.state(prefs.getString("vpn_place", ""), IosSleep.at(this));
+    }
     private IosWeather weather;
     private TvInputManager.TvInputCallback inputWatch;
     private String hdmiPending;
     private long hdmiUntil;
 
     /** Команды со страницы пульта в телефоне (главный поток). */
-    private String remoteCommand(String what, Map<String, String> args) {
-        AudioManager audio = (AudioManager) getSystemService(AUDIO_SERVICE);
-        switch (what) {
-            case "open": {
-                String u = args.get("u");
-                if (u == null || u.isEmpty()) return say("Вставь ссылку");
-                if (!u.startsWith("http")) u = "https://" + u;
-                Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(u)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-                String host = Uri.parse(u).getHost() == null ? "" : Uri.parse(u).getHost();
-                if (host.contains("youtu")) i.setPackage(IosFeed.YOUTUBE);
-                else if (host.contains("rutube")) i.setPackage(IosFeed.RUTUBE);
-                else if (host.contains("vk.com") || host.contains("vkvideo")) i.setPackage(IosFeed.VK);
-                try { startActivity(i); return say("Открываю на телевизоре"); }
-                catch (Exception e) { return say("Телевизор не знает, чем открыть эту ссылку"); }
-            }
-            case "search": {
-                String q = args.get("q");
-                if (q == null || q.trim().isEmpty()) return say("Напиши, что искать");
-                bringHome();
-                runSearch(q.trim());
-                return say("Ищу на телевизоре");
-            }
-            case "vol": {
-                if (audio == null) return say("Нет звука");
-                String d = args.get("d");
-                int dir = "up".equals(d) ? AudioManager.ADJUST_RAISE : "down".equals(d) ? AudioManager.ADJUST_LOWER : AudioManager.ADJUST_TOGGLE_MUTE;
-                audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, dir, AudioManager.FLAG_SHOW_UI);
-                return say("Громкость " + audio.getStreamVolume(AudioManager.STREAM_MUSIC));
-            }
-            case "vpn": vpnCommand("1".equals(args.get("on"))); return say("1".equals(args.get("on")) ? "Включаю VPN" : "Выключаю VPN");
-            case "sleep": {
-                long m = 0;
-                try { m = Long.parseLong(args.get("m")); } catch (Exception ignored) { }
-                IosSleep.schedule(this, m);
-                return say(m == 0 ? "Таймер сна выключен" : "Выключу через " + m + " мин");
-            }
-            case "home": bringHome(); return say("Домашний экран");
-            case "apps": {
-                StringBuilder b = new StringBuilder("[");
-                List<App> all = new ArrayList<>(dock);
-                all.addAll(others);
-                for (App a : all) {
-                    if (b.length() > 1) b.append(',');
-                    b.append("{\"label\":").append(org.json.JSONObject.quote(a.label)).append(",\"pkg\":").append(org.json.JSONObject.quote(a.pkg))
-                            .append(",\"accent\":\"").append(String.format("#%06X", a.logo.accent & 0xFFFFFF)).append("\"}");
-                }
-                return b.append(']').toString();
-            }
-            case "app": {
-                for (App a : dock) if (a.pkg.equals(args.get("p"))) { launch(a); return say("Открываю " + a.label); }
-                for (App a : others) if (a.pkg.equals(args.get("p"))) { launch(a); return say("Открываю " + a.label); }
-                return say("Нет такого приложения");
-            }
-            default: return say("Не понял");
-        }
-    }
 
     private static String say(String s) { return "{\"say\":" + org.json.JSONObject.quote(s) + "}"; }
 

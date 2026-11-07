@@ -22,7 +22,7 @@ public final class PaletteTest {
             String name = p.getFileName().toString();
             // Палитра сама; QR — строго чёрно-белый; остальное — не цвета (протокол, флаги).
             if (name.equals("IosPalette.java") || name.equals("IosQr.java") || name.equals("IosAdb.java")
-                    || name.equals("IosRemote.java") || name.equals("IosUpdate.java")) continue;
+                    || name.equals("IosRemote.java") || name.equals("IosUpdate.java") || name.equals("IosShell.java")) continue;
             List<String> lines = Files.readAllLines(p);
             for (int i = 0; i < lines.size(); i++) {
                 Matcher m = color.matcher(lines.get(i));
