@@ -132,6 +132,8 @@ final class IosRemote {
             if (q >= 0) { path = target.substring(0, q); query = target.substring(q + 1); }
             Map<String, String> args = parse(query);
             OutputStream out = c.getOutputStream();
+            // Значок для экрана «Домой» на iPhone — без ключа: телефон берёт его отдельным запросом.
+            if (path.equals("/icon.png")) { asset(out, "remote-icon.png", "image/png"); return; }
             if (!key.equals(args.get("k"))) { reply(out, 403, "text/plain", "Отсканируй QR-код на телевизоре"); return; }
             if (path.equals("/")) { reply(out, 200, "text/html", page()); return; }
             String what = path.substring(1);
@@ -181,6 +183,14 @@ final class IosRemote {
                 case "upload": json = tools.upload(a.get("d"), a.get("n"), body, length); break;
                 case "rm": json = tools.remove(a.get("d"), a.get("n")); break;
                 case "tweak": json = tools.tweak(a.get("w"), a.get("v")); break;
+                case "logo": {
+                    byte[] png = logo(a.get("p"), "1".equals(a.get("c")));
+                    if (png == null) { reply(out, 200, "application/json", IosTools.say("Нет логотипа")); return true; }
+                    send(out, 200, "image/png", png.length, "Cache-Control: max-age=86400\r\n");
+                    out.write(png);
+                    out.flush();
+                    return true;
+                }
                 case "shot": {
                     byte[] png = tools.screenshot();
                     send(out, 200, "image/png", png.length, null);
@@ -242,6 +252,38 @@ final class IosRemote {
             }
         } catch (Exception ignored) { }
         return null;
+    }
+
+    /** Логотипы приложений для страницы пульта: те же серые и цветные, что в доке телевизора. Даёт IosHome. */
+    interface Logos { android.graphics.Bitmap get(String pkg, boolean color); }
+    static volatile Logos logos;
+    private final Map<String, byte[]> logoCache = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private byte[] logo(String pkg, boolean color) {
+        if (pkg == null || logos == null) return null;
+        String id = pkg + (color ? ":c" : ":m");
+        byte[] png = logoCache.get(id);
+        if (png != null) return png;
+        android.graphics.Bitmap b = logos.get(pkg, color);
+        if (b == null) return null;
+        java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
+        b.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, o);
+        png = o.toByteArray();
+        logoCache.put(id, png);
+        return png;
+    }
+
+    private void asset(OutputStream out, String name, String type) throws Exception {
+        try (InputStream in = context.getAssets().open(name)) {
+            java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
+            byte[] b = new byte[16384];
+            int n;
+            while ((n = in.read(b)) > 0) o.write(b, 0, n);
+            byte[] data = o.toByteArray();
+            send(out, 200, type, data.length, "Cache-Control: max-age=86400\r\n");
+            out.write(data);
+            out.flush();
+        }
     }
 
     /** Страница пульта лежит в assets/remote.html: тёмная, в духе iOS, работает в любом браузере телефона. */

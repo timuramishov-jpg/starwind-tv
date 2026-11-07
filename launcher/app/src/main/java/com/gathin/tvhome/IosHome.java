@@ -265,6 +265,10 @@ public class IosHome extends Activity {
         tools = new IosTools(this);
         // Свой adb: один раз телевизор спросит «Разрешить отладку?» — пусть спросит сразу, пока человек у экрана.
         new Thread(() -> IosAdb.get(this).ready(), "adb").start();
+        IosRemote.logos = (pkg, color) -> {
+            App a = apps.get(pkg);
+            return a == null || a.logo == null ? null : color ? a.logo.color : a.logo.mono;
+        };
         remote = new IosRemote(this, this::remoteCommand);
         remote.start();
         remote.ensureRelay();
@@ -1343,7 +1347,8 @@ public class IosHome extends Activity {
                 all.addAll(others);
                 for (App a : all) {
                     if (b.length() > 1) b.append(',');
-                    b.append("{\"label\":").append(org.json.JSONObject.quote(a.label)).append(",\"pkg\":").append(org.json.JSONObject.quote(a.pkg)).append('}');
+                    b.append("{\"label\":").append(org.json.JSONObject.quote(a.label)).append(",\"pkg\":").append(org.json.JSONObject.quote(a.pkg))
+                            .append(",\"accent\":\"").append(String.format("#%06X", a.logo.accent & 0xFFFFFF)).append("\"}");
                 }
                 return b.append(']').toString();
             }

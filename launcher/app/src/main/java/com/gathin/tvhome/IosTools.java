@@ -260,8 +260,17 @@ final class IosTools {
         String anim = Settings.Global.getString(c.getContentResolver(), Settings.Global.ANIMATOR_DURATION_SCALE);
         String dns = Settings.Global.getString(c.getContentResolver(), "private_dns_specifier");
         String mode = Settings.Global.getString(c.getContentResolver(), "private_dns_mode");
+        long sleepAt = IosSleep.at(c);
+        boolean vpn = false;
+        android.net.ConnectivityManager cm = (android.net.ConnectivityManager) c.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm != null) for (android.net.Network n : cm.getAllNetworks()) {
+            android.net.NetworkCapabilities nc = cm.getNetworkCapabilities(n);
+            if (nc != null && nc.hasTransport(android.net.NetworkCapabilities.TRANSPORT_VPN)) vpn = true;
+        }
         return new JSONObject().put("anim", "0.5".equals(anim)).put("dns", "hostname".equals(mode) && DNS_HOST.equals(dns))
-                .put("asking", adb.asking);
+                .put("asking", adb.asking).put("vpn", vpn)
+                .put("place", c.getSharedPreferences("ios_home_v4", 0).getString("vpn_place", ""))
+                .put("sleep", sleepAt == 0 ? 0 : Math.max(1, (sleepAt - System.currentTimeMillis() + 59_999) / 60000));
     }
 
     static boolean adsBlocked(Context c) {
