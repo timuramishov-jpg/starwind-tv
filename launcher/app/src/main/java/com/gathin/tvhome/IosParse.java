@@ -25,6 +25,31 @@ final class IosParse {
     private IosParse() { }
 
     /** Строка или пусто: JSON null и строка "null" — тоже пусто. */
+    /** Поиск YouTube отдаёт названия с HTML-сущностями: I&#39;ll, Tom &amp; Jerry. */
+    static String html(String s) {
+        if (s.indexOf('&') < 0) return s;
+        StringBuilder out = new StringBuilder();
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("&(#x[0-9a-fA-F]+|#\\d+|amp|lt|gt|quot|apos|nbsp);").matcher(s);
+        int at = 0;
+        while (m.find()) {
+            out.append(s, at, m.start());
+            String e = m.group(1);
+            switch (e) {
+                case "amp": out.append('&'); break;
+                case "lt": out.append('<'); break;
+                case "gt": out.append('>'); break;
+                case "quot": out.append('"'); break;
+                case "apos": out.append('\''); break;
+                case "nbsp": out.append(' '); break;
+                default:
+                    int cp = e.charAt(1) == 'x' ? Integer.parseInt(e.substring(2), 16) : Integer.parseInt(e.substring(1));
+                    out.appendCodePoint(cp);
+            }
+            at = m.end();
+        }
+        return out.append(s.substring(at)).toString();
+    }
+
     static String str(JSONObject o, String key) {
         if (o == null || o.isNull(key)) return "";
         String s = o.optString(key, "");
@@ -44,8 +69,8 @@ final class IosParse {
     static Entry youtube(JSONObject snippet, String id) {
         Entry e = new Entry();
         e.id = id;
-        e.title = str(snippet, "title");
-        e.sub = str(snippet, "channelTitle");
+        e.title = html(str(snippet, "title"));
+        e.sub = html(str(snippet, "channelTitle"));
         e.urls = sizes(snippet == null ? null : snippet.optJSONObject("thumbnails"));
         e.published = IosText.when(str(snippet, "publishedAt"));
         return e;
@@ -95,7 +120,7 @@ final class IosParse {
     static Entry rutube(String id, JSONObject v) {
         Entry e = new Entry();
         e.id = id;
-        e.title = str(v, "title");
+        e.title = html(str(v, "title"));
         JSONObject author = v.optJSONObject("author");
         e.sub = author == null ? "" : str(author, "name");
         String thumb = str(v, "thumbnail_url").replaceAll("\\?.*$", "");

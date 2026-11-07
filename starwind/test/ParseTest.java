@@ -28,6 +28,7 @@ public final class ParseTest {
         List<IosParse.Entry> pop = IosParse.youtubeVideos(sample("youtube-popular.json"));
         check("YouTube: битый ролик пропущен", pop.size(), 2);
         check("YouTube: название", pop.get(0).title, "Обзор телевизора");
+        check("HTML-сущности в названиях", IosParse.html("I&#39;ll be back &amp; Tom &quot;Jerry&quot; &#x41;"), "I'll be back & Tom \"Jerry\" A");
         check("YouTube: канал", pop.get(0).sub, "Канал Тест");
         check("YouTube: длительность", IosText.iso(pop.get(0).duration), "12:05");
         check("YouTube: лучшая обложка первой", pop.get(0).urls[0], "https://i.ytimg.com/vi/dQw4w9WgXcQ/sddefault.jpg");
