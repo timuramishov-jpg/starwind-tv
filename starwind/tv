@@ -160,7 +160,9 @@ deploy() {
   if [ "${QUIET:-0}" = 1 ]; then
     T "cmd package set-home-activity --user 0 $PKG/.IosHome" > /dev/null
     # Сервер пульта в телефоне — сразу из нового APK, не дожидаясь главного экрана.
-    T "pkill -f 'com.gathin.tvhome.IosShel[l]'; sleep 0.5; A=\$(pm path $PKG | cut -d: -f2); (CLASSPATH=\$A nohup setsid app_process /system/bin com.gathin.tvhome.IosShell </dev/null >/data/local/tmp/iosshell.log 2>&1 &); sleep 1.5" > /dev/null
+    # pkill — отдельной командой: иначе он находит своё имя в этой же строке и убивает её оболочку.
+    T "pkill -f 'com.gathin.tvhome.IosShel[l]'" > /dev/null; sleep 0.5
+    T "A=\$(pm path $PKG | cut -d: -f2); (CLASSPATH=\$A nohup setsid app_process /system/bin com.gathin.tvhome.IosShell </dev/null >/data/local/tmp/iosshell.log 2>&1 &); sleep 1.5" > /dev/null
     say "РЕЗУЛЬТАТ: готово (тихо, без перехода на главный экран)"
     return 0
   fi
