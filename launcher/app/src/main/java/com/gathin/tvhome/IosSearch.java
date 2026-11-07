@@ -25,9 +25,9 @@ final class IosSearch {
         List<String> recent = h.stored("searches");
         List<Runnable> actions = new ArrayList<>();
         for (String q : recent) actions.add(() -> run(q));
-        h.showMenu("Поиск", recent, actions);
-        h.menuKind = "search";
-        LinearLayout panel = (LinearLayout) ((View) h.menuPanel.getParent()).getParent();
+        h.menu.show("Поиск", recent, actions);
+        h.menu.kind = "search";
+        LinearLayout panel = (LinearLayout) ((View) h.menu.listView.getParent()).getParent();
         EditText field = new EditText(h);
         field.setSingleLine(true);
         field.setHint("Фильм, ролик, канал");
@@ -63,8 +63,8 @@ final class IosSearch {
             panel.addView(head, 2, new LinearLayout.LayoutParams(-1, -2));
         }
         this.field = field;
-        h.menuIndex = -1;
-        h.paintMenu();
+        h.menu.index = -1;
+        h.menu.paint();
         field.requestFocus();
         h.handler.postDelayed(() -> {
             android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) h.getSystemService(android.content.Context.INPUT_METHOD_SERVICE);
@@ -79,19 +79,19 @@ final class IosSearch {
 
     /** Пока курсор в поле поиска, кнопки идут полю; вниз — к недавним запросам, назад — закрыть. */
     boolean key(KeyEvent e) {
-        if (field == null || !h.overlayOpen() || !"search".equals(h.menuKind) || !field.hasFocus()) return false;
+        if (field == null || !h.overlayOpen() || !"search".equals(h.menu.kind) || !field.hasFocus()) return false;
         int key = e.getKeyCode();
         if (key == KeyEvent.KEYCODE_BACK) {
-            if (e.getAction() == KeyEvent.ACTION_UP) h.closeMenu();
+            if (e.getAction() == KeyEvent.ACTION_UP) h.menu.close();
             return true;
         }
-        if (key == KeyEvent.KEYCODE_DPAD_DOWN && !h.menuViews.isEmpty()) {
+        if (key == KeyEvent.KEYCODE_DPAD_DOWN && !h.menu.views.isEmpty()) {
             if (e.getAction() == KeyEvent.ACTION_DOWN) {
                 hideKeyboard(field);
                 field.clearFocus();
                 h.root.requestFocus();
-                h.menuIndex = 0;
-                h.paintMenu();
+                h.menu.index = 0;
+                h.menu.paint();
             }
             return true;
         }
@@ -111,7 +111,7 @@ final class IosSearch {
                     try { h.startActivity(it.open); } catch (Exception e) { h.note("Не открылось"); }
                 });
             }
-            h.showMenu("Поиск: " + q, labels, actions);
+            h.menu.show("Поиск: " + q, labels, actions);
         });
     }
 }

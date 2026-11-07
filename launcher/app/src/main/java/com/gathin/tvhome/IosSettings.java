@@ -101,20 +101,20 @@ final class IosSettings {
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
         settingsItems(labels, actions);
-        h.showMenu("Настройки", labels, actions);
-        h.menuKind = "settings";
+        h.menu.show("Настройки", labels, actions);
+        h.menu.kind = "settings";
     }
 
     /** Переключатель сработал: подписи меняются на месте, меню не переоткрывается. */
     private void refreshSettings() {
-        if (!h.overlayOpen() || !"settings".equals(h.menuKind)) return;
+        if (!h.overlayOpen() || !"settings".equals(h.menu.kind)) return;
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
         settingsItems(labels, actions);
-        if (labels.size() != h.menuViews.size()) { int at = h.menuIndex; show(); h.menuIndex = Math.min(at, h.menuViews.size() - 1); h.paintMenu(); return; }
-        for (int i = 0; i < labels.size(); i++) h.menuViews.get(i).setText(labels.get(i));
-        h.menuActions.clear();
-        h.menuActions.addAll(actions);
+        if (labels.size() != h.menu.views.size()) { int at = h.menu.index; show(); h.menu.index = Math.min(at, h.menu.views.size() - 1); h.menu.paint(); return; }
+        for (int i = 0; i < labels.size(); i++) h.menu.views.get(i).setText(labels.get(i));
+        h.menu.acts.clear();
+        h.menu.acts.addAll(actions);
     }
 
     /** Экраны прошивки собраны в одном месте и так и названы: всё остальное — в стиле лаунчера. */
@@ -128,7 +128,7 @@ final class IosSettings {
             labels.add(row[0]);
             actions.add(() -> h.open(SystemSettings.intent(h, row[1])));
         }
-        h.showMenu("Системные настройки", labels, actions);
+        h.menu.show("Системные настройки", labels, actions);
     }
 
     /** Wi-Fi в стиле лаунчера: сеть, сигнал, скорость, адрес, VPN. Сменить сеть — в системных настройках. */
@@ -136,24 +136,24 @@ final class IosSettings {
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
         labels.add("Проверяю сеть…");
-        actions.add(h.INFO);
-        h.showMenu("Wi-Fi и интернет", labels, actions);
-        h.menuKind = "wifi";
+        actions.add(IosMenu.INFO);
+        h.menu.show("Wi-Fi и интернет", labels, actions);
+        h.menu.kind = "wifi";
         new Thread(() -> {
             List<String> info = h.tools.wifi();
             h.handler.post(() -> {
-                if (!h.overlayOpen() || !"wifi".equals(h.menuKind)) return;
+                if (!h.overlayOpen() || !"wifi".equals(h.menu.kind)) return;
                 List<String> l = new ArrayList<>(info);
                 List<Runnable> a = new ArrayList<>();
-                for (int i = 0; i < l.size(); i++) a.add(h.INFO);
+                for (int i = 0; i < l.size(); i++) a.add(IosMenu.INFO);
                 l.add("VPN: " + (h.vpnOn() ? "включён" : "выключен"));
-                a.add(h.INFO);
+                a.add(IosMenu.INFO);
                 l.add("Сменить сеть");
                 a.add(() -> h.open(SystemSettings.intent(h, Settings.ACTION_WIFI_SETTINGS)));
-                h.showMenu("Wi-Fi и интернет", l, a, false);
-                h.menuKind = "wifi";
-                h.menuIndex = l.size() - 1;
-                h.paintMenu();
+                h.menu.show("Wi-Fi и интернет", l, a, false);
+                h.menu.kind = "wifi";
+                h.menu.index = l.size() - 1;
+                h.menu.paint();
             });
         }, "wifi").start();
     }

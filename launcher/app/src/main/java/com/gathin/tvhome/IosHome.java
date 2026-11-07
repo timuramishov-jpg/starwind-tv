@@ -82,7 +82,7 @@ public class IosHome extends Activity {
     static final float DOCK_CX = 95, DOCK_CELL = 116, DOCK_LOGO = 96, DOCK_REST = 0.875f, MAIN_X = 236,
             TITLE_Y = 170, PILL_Y = 300, CARDS_Y = 300, CARD_W = 880, CARD_H = 495, CARD_GAP = IosPalette.S4, EDGE_X = IosPalette.EDGE,
             HEADER_Y = 1180, APPS_Y = 1280, APPS_SCROLL = 1090;
-    private static final int MAX_DOCK = 7;
+    static final int MAX_DOCK = 7;
     static final int DOCK = 0, CARDS = 1, APPS = 2, TOP = 3;
     private static final String[] DEFAULT_DOCK = {"com.yandex.tv.ytplayer", "com.vk.tv", "ru.rutube.app.tv", "ru.kinopoisk.yandex.tv", "su.happ.proxyutility"};
     private static final String[] SKIP = {"com.cvte.", "com.mediatek.", "com.android.", "com.gathin.tvhome",
@@ -159,7 +159,6 @@ public class IosHome extends Activity {
     static final int FAST = 160, NORMAL = 260, SLOW = 420;
     private static final int CARD_CLIP = 20, CLEAN = IosPalette.TEAL;
     static final int MENU_W = 620, MENU_ROW = 78, POSTER_W = 330;
-    LinearLayout menuPanel;
     private final Map<String, Integer> cardMemory = new HashMap<>();
     private final List<ObjectAnimator> drift = new ArrayList<>();
     private ImageView glow;
@@ -172,7 +171,7 @@ public class IosHome extends Activity {
     /** Подписи карточек: в покое, у соседей выбранной. */
     static final float LABEL_REST = 0.66f, LABEL_DIM = 0.55f;
     IosFeed feed;
-    private final Map<String, String> feedShown = new HashMap<>();
+    final Map<String, String> feedShown = new HashMap<>();
     private ImageView washA, washB, spot;
     private int washNow;
     private float s;
@@ -184,11 +183,7 @@ public class IosHome extends Activity {
     private boolean moving, washOnA, okDown, okLong;
     private long okDownAt;
     View focused;
-    final List<Runnable> menuActions = new ArrayList<>();
-    final List<TextView> menuViews = new ArrayList<>();
-    int menuIndex;
     /** Что открыто в боковой панели: settings, wifi, search или пусто. */
-    String menuKind = "";
     IosTools tools;
     private long lastInput = SystemClock.uptimeMillis();
     private boolean dimming;
@@ -216,6 +211,7 @@ public class IosHome extends Activity {
     boolean superDispatch(KeyEvent e) { return super.dispatchKeyEvent(e); }
     final IosInputs inputs = new IosInputs(this);
     final IosCards cards = new IosCards(this);
+    final IosMenu menu = new IosMenu(this);
     final IosSettings settings = new IosSettings(this);
     int px(float v) { return Math.round(v * s); }
     boolean overlayOpen() { return overlay.getVisibility() == View.VISIBLE; }
@@ -328,10 +324,10 @@ public class IosHome extends Activity {
                 "Метла: освободить память",
                 "Понятно");
         List<Runnable> close = new ArrayList<>();
-        for (int k = 0; k < lines.size(); k++) close.add(this::closeMenu);
-        showMenu("Подсказки", lines, close);
-        menuIndex = lines.size() - 1;
-        paintMenu();
+        for (int k = 0; k < lines.size(); k++) close.add(menu::close);
+        menu.show("Подсказки", lines, close);
+        menu.index = lines.size() - 1;
+        menu.paint();
     }
 
     private void rotateFeeds() {
@@ -403,12 +399,12 @@ public class IosHome extends Activity {
         super.onNewIntent(intent);
         // Поиск с телефона: сервер пульта открывает лаунчер с запросом.
         if (intent.getBooleanExtra("settings", false)) {
-            handler.postDelayed(() -> { if (!overlayOpen() || !"settings".equals(menuKind)) settings.show(); }, 250);
+            handler.postDelayed(() -> { if (!overlayOpen() || !"settings".equals(menu.kind)) settings.show(); }, 250);
             return;
         }
         String q = intent.getStringExtra("search");
         if (q != null && !q.trim().isEmpty()) { handler.postDelayed(() -> search.run(q.trim()), 300); return; }
-        closeMenu();
+        menu.close();
         moving = false;
         if (dirty || dock.isEmpty()) {
             zone = DOCK;
@@ -758,7 +754,7 @@ public class IosHome extends Activity {
         });
     }
 
-    private void saveLayout() {
+    void saveLayout() {
         List<String> d = new ArrayList<>(), g = new ArrayList<>();
         for (App a : dock) d.add(a.pkg);
         for (App a : others) g.add(a.pkg);
@@ -819,7 +815,7 @@ public class IosHome extends Activity {
 
     /** Очистка: закрывает фоновые процессы всех приложений, кроме VPN и системных служб, и показывает, сколько памяти вернулось. */
     private void cleanUp() {
-        showMenu("Очистка памяти", Collections.singletonList("Закрываю фоновые приложения"), Collections.singletonList(this::closeMenu));
+        menu.show("Очистка памяти", Collections.singletonList("Закрываю фоновые приложения"), Collections.singletonList(menu::close));
         ActivityManager am = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
         ActivityManager.MemoryInfo before = new ActivityManager.MemoryInfo();
         am.getMemoryInfo(before);
@@ -839,10 +835,10 @@ public class IosHome extends Activity {
             lines.add("Свободно " + after.availMem / (1024 * 1024) + " из " + after.totalMem / (1024 * 1024) + " МБ");
             lines.add("Готово");
             List<Runnable> close = new ArrayList<>();
-            for (int k = 0; k < lines.size(); k++) close.add(this::closeMenu);
-            showMenu("Очистка памяти", lines, close);
-            menuIndex = lines.size() - 1;
-            paintMenu();
+            for (int k = 0; k < lines.size(); k++) close.add(menu::close);
+            menu.show("Очистка памяти", lines, close);
+            menu.index = lines.size() - 1;
+            menu.paint();
         }, 1800);
     }
 
@@ -1098,7 +1094,7 @@ public class IosHome extends Activity {
         handler.postDelayed(noteOff, Math.max(2500, text.length() * 70));
     }
 
-    private void startYouTubeSignIn() {
+    void startYouTubeSignIn() {
         final TextView[] hint = new TextView[1];
         overlay.removeAllViews();
         float w = 820, x = (1920 - w) / 2f, y = 310;
@@ -1122,8 +1118,8 @@ public class IosHome extends Activity {
         panel.addView(tip, lp);
         overlay.addView(panel, at(x, y, w, 0));
         overlay.setVisibility(View.VISIBLE);
-        menuActions.clear();
-        menuViews.clear();
+        menu.acts.clear();
+        menu.views.clear();
         hint[0] = tip;
         feed.startSignIn(new IosFeed.CodeSink() {
             @Override public void code(String c, String url) {
@@ -1131,7 +1127,7 @@ public class IosHome extends Activity {
                 hint[0].setText("На телефоне открой " + url.replace("https://", "") + ", выбери аккаунт и введи этот код");
             }
             @Override public void signedIn() {
-                closeMenu();
+                menu.close();
                 feed.forget(IosFeed.YOUTUBE);
                 reload();
             }
@@ -1366,7 +1362,7 @@ public class IosHome extends Activity {
                 if (e.getRepeatCount() == 0) { okDown = true; okLong = false; okDownAt = e.getEventTime(); }
                 else if (okDown && !okLong && !overlayOpen() && !moving && e.getEventTime() - okDownAt > 550) {
                     okLong = true;
-                    showAppMenu();
+                    menu.appMenu();
                 }
             } else if (e.getAction() == KeyEvent.ACTION_UP) {
                 boolean click = okDown && !okLong;
@@ -1387,22 +1383,22 @@ public class IosHome extends Activity {
             holding = e.getRepeatCount() > 0;
             if (holding && zone == CARDS && e.getEventTime() - lastStep < 110) return true;
             lastStep = e.getEventTime();
-            if (overlayOpen()) menuKey(key);
+            if (overlayOpen()) menu.key(key);
             else if (moving) moveKey(key);
             else navigate(key);
             return true;
         }
         switch (key) {
             case KeyEvent.KEYCODE_BACK:
-                if (overlayOpen()) closeMenu();
+                if (overlayOpen()) menu.close();
                 else if (moving) stopMoving();
                 else if (!dockViews.isEmpty()) moveTo(DOCK, selected);
                 return true;
             case KeyEvent.KEYCODE_MENU:
-                if (overlayOpen()) closeMenu(); else showAppMenu();
+                if (overlayOpen()) menu.close(); else menu.appMenu();
                 return true;
             case KeyEvent.KEYCODE_SETTINGS:
-                if (overlayOpen()) closeMenu(); else settings.show();
+                if (overlayOpen()) menu.close(); else settings.show();
                 return true;
             case KeyEvent.KEYCODE_TV_INPUT:
                 inputs.show();
@@ -1414,9 +1410,9 @@ public class IosHome extends Activity {
 
     private void onOk() {
         if (overlayOpen()) {
-            if (menuIndex >= 0 && menuIndex < menuActions.size()) {
-                Runnable r = menuActions.get(menuIndex);
-                if (!(r instanceof Keep)) closeMenu();
+            if (menu.index >= 0 && menu.index < menu.acts.size()) {
+                Runnable r = menu.acts.get(menu.index);
+                if (!(r instanceof Keep)) menu.close();
                 r.run();
             }
             return;
@@ -1500,163 +1496,7 @@ public class IosHome extends Activity {
         }
     }
 
-    // ---------- Меню ----------
-
-    /** Все меню выезжают одной панелью справа, как настройки. */
-    void showMenu(String title, List<String> labels, List<Runnable> actions) { showMenu(title, labels, actions, true); }
-
-    /** Боковая панель. slide = false — панель уже на экране и только меняет содержимое. */
-    void showMenu(String title, List<String> labels, List<Runnable> actions, boolean slide) {
-        menuKind = "";
-        overlay.removeAllViews();
-        menuActions.clear();
-        menuActions.addAll(actions);
-        menuViews.clear();
-        LinearLayout panel = new LinearLayout(this);
-        panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(px(IosPalette.S3), px(IosPalette.S6), px(IosPalette.S3), px(40));
-        panel.setBackgroundColor(PANEL);
-        TextView t = text(IosPalette.TITLE, semibold, INK);
-        t.setText(title);
-        t.setSingleLine(true);
-        t.setEllipsize(TextUtils.TruncateAt.END);
-        t.setPadding(px(IosPalette.S3), 0, px(IosPalette.S3), px(IosPalette.S4));
-        panel.addView(t, new LinearLayout.LayoutParams(-1, -2));
-        // Пункты лежат в отдельном окне: панель стоит на месте, листается только список.
-        FrameLayout window = new FrameLayout(this);
-        window.setClipChildren(true);
-        LinearLayout list = new LinearLayout(this);
-        list.setOrientation(LinearLayout.VERTICAL);
-        // Высота списка — все строки целиком: иначе окно ужимает список до своей высоты и нижние строки обрезаются.
-        window.addView(list, new FrameLayout.LayoutParams(-1, px(labels.size() * MENU_ROW)));
-        panel.addView(window, new LinearLayout.LayoutParams(-1, 0, 1f));
-        for (String l : labels) {
-            TextView r = text(IosPalette.BODY, regular, INK);
-            r.setText(l);
-            r.setSingleLine(true);
-            r.setEllipsize(TextUtils.TruncateAt.END);
-            r.setGravity(Gravity.CENTER_VERTICAL);
-            r.setPadding(px(IosPalette.S3), 0, px(IosPalette.S3), 0);
-            list.addView(r, new LinearLayout.LayoutParams(-1, px(MENU_ROW)));
-            menuViews.add(r);
-        }
-        overlay.addView(panel, at(1920 - MENU_W, 0, MENU_W, 1080));
-        menuPanel = list;
-        overlay.setVisibility(View.VISIBLE);
-        if (slide) {
-            panel.setTranslationX(px(MENU_W));
-            panel.animate().translationX(0).setDuration(NORMAL).setInterpolator(ease).start();
-        }
-        menuIndex = 0;
-        while (menuIndex < actions.size() && actions.get(menuIndex) == INFO) menuIndex++;
-        if (menuIndex >= actions.size()) menuIndex = -1;
-        paintMenu();
-    }
-
-    void paintMenu() {
-        if (menuPanel != null) {
-            View window = (View) menuPanel.getParent();
-            float room = window.getHeight() > 0 ? window.getHeight() : px(1080 - 64 - 40 - 90);
-            float bottom = px((Math.max(0, menuIndex) + 1) * MENU_ROW + MENU_ROW / 2);
-            menuPanel.animate().translationY(-Math.max(0, bottom - room)).setDuration(FAST).setInterpolator(ease).start();
-        }
-        for (int i = 0; i < menuViews.size(); i++) {
-            TextView r = menuViews.get(i);
-            boolean on = i == menuIndex, info = i < menuActions.size() && menuActions.get(i) == INFO;
-            GradientDrawable g = new GradientDrawable();
-            g.setCornerRadius(px(IosPalette.R_ROW));
-            g.setColor(on ? ROW_ON : 0x00000000);
-            r.setBackground(g);
-            r.setTextColor(on ? ROW_ON_TEXT : info ? INK_2 : INK);
-        }
-    }
-
-    private void menuKey(int key) {
-        if (key == KeyEvent.KEYCODE_DPAD_UP && menuIndex == 0 && "search".equals(menuKind) && search.field != null) {
-            menuIndex = -1;
-            paintMenu();
-            search.field.requestFocus();
-            return;
-        }
-        // Строки-сведения (INFO) не выбираются: курсор их перескакивает.
-        int step = key == KeyEvent.KEYCODE_DPAD_UP ? -1 : key == KeyEvent.KEYCODE_DPAD_DOWN ? 1 : 0;
-        for (int i = menuIndex + step; step != 0 && i >= 0 && i < menuViews.size(); i += step) {
-            if (i < menuActions.size() && menuActions.get(i) == INFO) continue;
-            menuIndex = i;
-            break;
-        }
-        paintMenu();
-    }
-
-    /** Строка-сведение в меню: показывает значение, но не выбирается. */
-    final Runnable INFO = new Keep(() -> { });
-
-    void closeMenu() {
-        if (search.field != null) { search.hideKeyboard(search.field); search.field = null; }
-        menuKind = "";
-        feed.stopPolling();
-        overlay.setVisibility(View.GONE);
-        overlay.removeAllViews();
-    }
-
-    private void showAppMenu() {
-        if (focused == null || !(focused.getTag() instanceof App)) return;
-        final App a = (App) focused.getTag();
-        final boolean inDock = dock.contains(a);
-        List<String> labels = new ArrayList<>();
-        List<Runnable> actions = new ArrayList<>();
-        labels.add("Открыть");
-        actions.add(() -> launch(a));
-        if (IosFeed.YOUTUBE.equals(a.pkg)) {
-            labels.add(feed.signedIn() ? "Выйти из аккаунта YouTube" : "Войти в YouTube: лента подписок");
-            actions.add(() -> { if (feed.signedIn()) { feed.signOut(); reload(); } else startYouTubeSignIn(); });
-        }
-        if (Arrays.asList(IosFeed.YOUTUBE, IosFeed.VK, IosFeed.RUTUBE, IosFeed.KINOPOISK, IosFeed.ZONA).contains(a.pkg)) {
-            String m = feed.mode(a.pkg);
-            boolean yt = IosFeed.YOUTUBE.equals(a.pkg);
-            String now = m.equals("off") ? "выключена" : yt && (m.equals("popular") || !feed.signedIn()) ? "популярное" : yt ? "подписки" : "включена";
-            String next = m.equals("off") ? "" : yt && m.isEmpty() && feed.signedIn() ? "popular" : "off";
-            labels.add("Лента: " + now + " (ОК, сменить)");
-            actions.add(() -> {
-                feed.setMode(a.pkg, next);
-                feedShown.remove(a.pkg);
-                showSelected();
-            });
-        }
-        labels.add("Переместить");
-        actions.add(this::startMoving);
-        labels.add(inDock ? "Убрать из дока" : "Добавить в док");
-        actions.add(() -> {
-            if (inDock) { dock.remove(a); others.add(0, a); }
-            else if (dock.size() < MAX_DOCK) { others.remove(a); dock.add(a); }
-            else note("В доке не больше " + MAX_DOCK + " приложений");
-            saveLayout();
-            reload();
-        });
-        labels.add("Скрыть с экрана");
-        actions.add(() -> {
-            dock.remove(a);
-            others.remove(a);
-            List<String> h = stored("hidden");
-            h.add(a.pkg);
-            store("hidden", h);
-            saveLayout();
-            reload();
-        });
-        final Intent info = SystemSettings.appInfo(this, a.pkg);
-        if (info != null) {
-            labels.add("О приложении");
-            actions.add(() -> open(info));
-        }
-        if (!a.system) {
-            labels.add("Удалить");
-            actions.add(() -> open(new Intent(Intent.ACTION_DELETE, Uri.parse("package:" + a.pkg))
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
-        }
-        showMenu(a.label, labels, actions);
-    }
-
-    private void startMoving() { moving = true; }
+    void startMoving() { moving = true; }
 
     private void stopMoving() {
         moving = false;

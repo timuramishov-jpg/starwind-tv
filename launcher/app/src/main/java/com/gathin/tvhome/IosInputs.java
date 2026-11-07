@@ -88,6 +88,6 @@ final class IosInputs {
             h.note("Источники не найдены");
             return;
         }
-        h.showMenu("Источники", labels, actions);
+        h.menu.show("Источники", labels, actions);
     }
 }

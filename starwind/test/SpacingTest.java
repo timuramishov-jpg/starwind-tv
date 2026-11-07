@@ -13,7 +13,7 @@ public final class SpacingTest {
         Pattern call = Pattern.compile("(setPadding|Margin\\s*=|setMargins)[^;]*;");
         Pattern num = Pattern.compile("px\\((\\d+(?:\\.\\d+)?)f?\\)");
         int bad = 0;
-        String[] files = {"IosHome.java"};
+        String[] files = {"IosHome.java", "IosMenu.java", "IosCards.java", "IosSearch.java", "IosSettings.java", "IosVpn.java", "IosInputs.java"};
         for (String f : files) {
             List<String> lines = Files.readAllLines(Paths.get("launcher/app/src/main/java/com/gathin/tvhome", f));
             for (int i = 0; i < lines.size(); i++) {
