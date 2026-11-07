@@ -157,11 +157,83 @@ final class IosFeed {
             Collections.shuffle(mixed);
             fresh.addAll(mixed.subList(0, Math.min(MAX_ITEMS, mixed.size())));
         }
+        // Первыми — то, что ты недавно открывал из этой ленты: «Продолжить».
+        List<IosHome.FeedItem> recent = recent(pkg);
+        if (!recent.isEmpty()) {
+            Set<String> seen = new HashSet<>();
+            for (IosHome.FeedItem r : recent) seen.add(r.title);
+            List<IosHome.FeedItem> rest = new ArrayList<>();
+            for (IosHome.FeedItem it : fresh) if (!seen.contains(it.title)) rest.add(it);
+            recent.addAll(rest);
+            fresh = recent;
+        }
         items.put(pkg, fresh);
+    }
+
+    /** Открыл карточку — запоминаем её для ряда «Продолжить» (две последние на сервис). */
+    void remember(String pkg, IosHome.FeedItem it) {
+        if (it.open == null || it.title == null) return;
+        try {
+            JSONArray old = new JSONArray(prefs.getString("recent_" + pkg, "[]")), now = new JSONArray();
+            JSONObject j = new JSONObject();
+            j.put("title", it.title).put("subtitle", it.subtitle == null ? "" : it.subtitle).put("poster", it.poster)
+                    .put("open", it.open.toUri(Intent.URI_INTENT_SCHEME)).put("at", System.currentTimeMillis())
+                    .put("duration", it.duration == null ? "" : it.duration)
+                    .put("urls", new JSONArray(Arrays.asList(it.urls == null ? new String[0] : it.urls)));
+            now.put(j);
+            for (int i = 0; i < old.length() && now.length() < 2; i++)
+                if (!it.title.equals(old.getJSONObject(i).optString("title"))) now.put(old.getJSONObject(i));
+            prefs.edit().putString("recent_" + pkg, now.toString()).apply();
+            if (pools.containsKey(pkg)) window(pkg);
+        } catch (Exception e) {
+            Log.w(TAG, "remember: " + e);
+        }
+    }
+
+    private List<IosHome.FeedItem> recent(String pkg) {
+        List<IosHome.FeedItem> out = new ArrayList<>();
+        try {
+            JSONArray a = new JSONArray(prefs.getString("recent_" + pkg, "[]"));
+            long week = System.currentTimeMillis() - 7 * 24 * 3600_000L;
+            for (int i = 0; i < a.length(); i++) {
+                JSONObject j = a.getJSONObject(i);
+                if (j.optLong("at") < week) continue;
+                IosHome.FeedItem it = new IosHome.FeedItem();
+                it.title = j.getString("title");
+                it.subtitle = "Продолжить · " + ago(j.optLong("at"));
+                it.poster = j.optBoolean("poster");
+                it.duration = j.optString("duration");
+                it.open = Intent.parseUri(j.getString("open"), Intent.URI_INTENT_SCHEME);
+                JSONArray u = j.getJSONArray("urls");
+                it.urls = new String[u.length()];
+                for (int k = 0; k < u.length(); k++) it.urls[k] = u.getString(k);
+                for (List<IosHome.FeedItem> pool : pools.values())
+                    for (IosHome.FeedItem p : pool) if (p.title.equals(it.title) && p.image != null) it.image = p.image;
+                out.add(it);
+            }
+        } catch (Exception ignored) { }
+        return out;
+    }
+
+    static String ago(long at) {
+        long m = (System.currentTimeMillis() - at) / 60000;
+        if (m < 60) return Math.max(1, m) + " мин назад";
+        if (m < 24 * 60) return (m / 60) + " ч назад";
+        return m / (24 * 60) == 1 ? "вчера" : (m / (24 * 60)) + " дн назад";
+    }
+
+    /** Режим ленты сервиса: "" — как обычно, "popular" — популярное вместо подписок, "off" — ленты нет. */
+    String mode(String pkg) { return prefs.getString("mode_" + pkg, ""); }
+
+    void setMode(String pkg, String mode) {
+        prefs.edit().putString("mode_" + pkg, mode).apply();
+        forget(pkg);
     }
 
     /** Свежий список с сервера: на экран идут невиденные ролики, уже показанные отодвигаются. */
     private void publish(String pkg, List<IosHome.FeedItem> list) {
+        long day = System.currentTimeMillis() - 24 * 3600_000L;
+        for (IosHome.FeedItem it : list) it.fresh = it.published > day;
         pools.put(pkg, list);
         window(pkg);
     }
@@ -352,7 +424,8 @@ final class IosFeed {
             JSONArray a = new JSONArray();
             for (IosHome.FeedItem it : list) {
                 JSONObject j = new JSONObject();
-                j.put("title", it.title).put("subtitle", it.subtitle).put("poster", it.poster);
+                j.put("title", it.title).put("subtitle", it.subtitle).put("poster", it.poster)
+                        .put("duration", it.duration == null ? "" : it.duration).put("published", it.published);
                 j.put("open", it.open.toUri(Intent.URI_INTENT_SCHEME));
                 j.put("urls", new JSONArray(Arrays.asList(it.urls == null ? new String[0] : it.urls)));
                 a.put(j);
@@ -373,6 +446,8 @@ final class IosFeed {
                 it.title = j.getString("title");
                 it.subtitle = j.optString("subtitle");
                 it.poster = j.optBoolean("poster");
+                it.duration = j.optString("duration");
+                it.published = j.optLong("published");
                 it.open = Intent.parseUri(j.getString("open"), Intent.URI_INTENT_SCHEME);
                 JSONArray u = j.getJSONArray("urls");
                 it.urls = new String[u.length()];
@@ -530,7 +605,7 @@ final class IosFeed {
     }
 
     private List<IosHome.FeedItem> youtube() throws Exception {
-        if (signedIn()) {
+        if (signedIn() && !"popular".equals(mode(YOUTUBE))) {
             try {
                 return subscriptions();
             } catch (Exception e) {
@@ -547,12 +622,18 @@ final class IosFeed {
                 if (out.isEmpty()) throw new Exception(r.has("error") ? r.getJSONObject("error").optString("message") : "Пустой ответ");
                 break;
             }
+            Map<String, String> len = new HashMap<>(), names = new HashMap<>();
             for (int i = 0; i < list.length(); i++) {
                 JSONObject v = list.getJSONObject(i);
-                String d = v.optJSONObject("contentDetails") == null ? "" : v.getJSONObject("contentDetails").optString("duration");
-                if (isShort(v.getJSONObject("snippet").optString("title"), d)) continue;
+                len.put(v.getString("id"), v.optJSONObject("contentDetails") == null ? "" : v.getJSONObject("contentDetails").optString("duration"));
+                names.put(v.getString("id"), v.getJSONObject("snippet").optString("title"));
+            }
+            Set<String> shorts = shortsAmong(len, names);
+            for (int i = 0; i < list.length(); i++) {
+                JSONObject v = list.getJSONObject(i);
+                if (shorts.contains(v.getString("id"))) continue;
                 IosHome.FeedItem it = youtubeItem(v.getJSONObject("snippet"), v.getString("id"));
-                it.duration = iso(d);
+                it.duration = iso(len.get(v.getString("id")));
                 out.add(it);
             }
             if (popularPage.isEmpty()) break;
@@ -567,12 +648,55 @@ final class IosFeed {
         }
     }
 
-    /** Шортсы на телевизоре не нужны: вертикальные ролики до трёх минут и всё, что помечено #shorts. */
-    static boolean isShort(String title, String isoDuration) {
+    /** Помечен как шортс прямо в названии. */
+    static boolean taggedShort(String title) {
         String t = title == null ? "" : title.toLowerCase(java.util.Locale.ROOT);
-        if (t.contains("#short") || t.contains("#шортс") || t.contains("#шорт")) return true;
-        int s = seconds(isoDuration);
-        return s > 0 && s <= 180;
+        return t.contains("#short") || t.contains("#шортс") || t.contains("#шорт");
+    }
+
+    /** Что из роликов шортсы. Длиннее 3 минут шортсов не бывает. Короче — спрашиваем YouTube:
+     *  адрес youtube.com/shorts/ID у шортса открывается, у обычного ролика перенаправляет на watch.
+     *  Ответ запоминается; если спросить не вышло, шортсом считаем то, что короче минуты. */
+    private Set<String> shortsAmong(Map<String, String> durations, Map<String, String> titles) {
+        Set<String> out = new HashSet<>();
+        List<String> ask = new ArrayList<>();
+        for (Map.Entry<String, String> e : durations.entrySet()) {
+            String id = e.getKey();
+            int sec = seconds(e.getValue());
+            if (taggedShort(titles.get(id))) out.add(id);
+            else if (sec > 0 && sec <= 180) {
+                String known = prefs.getString("short_" + id, "");
+                if (known.equals("1")) out.add(id);
+                else if (known.isEmpty()) ask.add(id);
+            }
+        }
+        if (ask.isEmpty()) return out;
+        List<Callable<Integer>> jobs = new ArrayList<>();
+        for (String id : ask) jobs.add(() -> {
+            HttpURLConnection c = (HttpURLConnection) new URL("https://www.youtube.com/shorts/" + id).openConnection();
+            c.setInstanceFollowRedirects(false);
+            c.setRequestMethod("HEAD");
+            c.setConnectTimeout(4000);
+            c.setReadTimeout(4000);
+            c.setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 11) AppleWebKit/537.36 Chrome/120.0 Safari/537.36");
+            try { return c.getResponseCode(); } finally { c.disconnect(); }
+        });
+        SharedPreferences.Editor ed = prefs.edit();
+        try {
+            List<Future<Integer>> done = requests.invokeAll(jobs);
+            for (int i = 0; i < ask.size(); i++) {
+                String id = ask.get(i);
+                int code;
+                try { code = done.get(i).get(); } catch (ExecutionException e) { code = -1; }
+                if (code == 200) { out.add(id); ed.putString("short_" + id, "1"); }
+                else if (code >= 300 && code < 400) ed.putString("short_" + id, "0");
+                else if (seconds(durations.get(id)) <= 60) out.add(id);
+            }
+        } catch (InterruptedException e) {
+            for (String id : ask) if (seconds(durations.get(id)) <= 60) out.add(id);
+        }
+        ed.apply();
+        return out;
     }
 
     static int seconds(String d) {
@@ -605,7 +729,20 @@ final class IosFeed {
         it.open = new Intent(Intent.ACTION_VIEW, Uri.parse("https://www.youtube.com/watch?v=" + id))
                 .setPackage(YOUTUBE).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         it.urls = sizes(s.getJSONObject("thumbnails"));
+        it.published = when(s.optString("publishedAt"));
         return it;
+    }
+
+    /** 2026-11-06T18:00:00Z в миллисекунды, 0 если не разобрать. */
+    static long when(String iso) {
+        if (iso == null || iso.length() < 19) return 0;
+        try {
+            java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.ROOT);
+            f.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
+            return f.parse(iso.substring(0, 19)).getTime();
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
     private List<IosHome.FeedItem> subscriptions() throws Exception {
@@ -642,12 +779,14 @@ final class IosFeed {
             StringBuilder ids = new StringBuilder();
             for (IosHome.FeedItem it : out) ids.append(ids.length() == 0 ? "" : ",").append(Uri.parse(Uri.decode(it.open.getDataString())).getQueryParameter("v"));
             JSONArray d = call("https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=" + ids + "&key=" + apiKey, null, null).optJSONArray("items");
-            Map<String, String> len = new HashMap<>();
+            Map<String, String> len = new HashMap<>(), names = new HashMap<>();
             for (int i = 0; d != null && i < d.length(); i++) len.put(d.getJSONObject(i).getString("id"), d.getJSONObject(i).getJSONObject("contentDetails").optString("duration"));
+            for (IosHome.FeedItem it : out) names.put(it.open.getData().getQueryParameter("v"), it.title);
+            Set<String> shorts = shortsAmong(len, names);
             List<IosHome.FeedItem> keep = new ArrayList<>();
             for (IosHome.FeedItem it : out) {
-                String raw = len.get(it.open.getData().getQueryParameter("v"));
-                if (isShort(it.title, raw)) continue;
+                String id = it.open.getData().getQueryParameter("v"), raw = len.get(id);
+                if (shorts.contains(id)) continue;
                 it.duration = iso(raw);
                 keep.add(it);
             }
@@ -785,7 +924,8 @@ final class IosFeed {
             it.title = f.optString("nameRu", f.optString("nameOriginal"));
             if (it.title.isEmpty() || "null".equals(it.title)) it.title = f.optString("nameOriginal");
             String rating = f.optString("ratingKinopoisk"), year = f.optString("year");
-            it.subtitle = (year.equals("null") ? "" : year) + (rating.isEmpty() || rating.equals("null") ? "" : ", рейтинг " + rating);
+            it.subtitle = (year.equals("null") ? "" : year) + (rating.isEmpty() || rating.equals("null") ? "" : ", рейтинг " + rating)
+                    + (inZona ? " · ОК: найти в Зоне" : " · ОК: найти в Кинопоиске");
             it.poster = true;
             it.urls = new String[]{f.optString("posterUrlPreview"), f.optString("posterUrl")};
             // У Zona нет ссылок на отдельные фильмы, поэтому карточка открывает приложение.

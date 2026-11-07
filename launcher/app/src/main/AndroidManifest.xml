@@ -104,6 +104,14 @@
         </activity>
         <!-- Ключи сервисов приходят только из adb (shell держит DUMP), в приложении их нет. -->
         <receiver android:name=".IosConfig" android:exported="true" android:permission="android.permission.DUMP" />
+        <receiver android:name=".IosSleep" android:exported="false" />
+        <!-- Таймер сна: право только гасить экран. Включается из adb: dpm set-active-admin. -->
+        <receiver android:name=".IosAdmin" android:exported="true" android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <meta-data android:name="android.app.device_admin" android:resource="@xml/ios_admin" />
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+        </receiver>
 
         <activity
             android:name=".MainActivity"

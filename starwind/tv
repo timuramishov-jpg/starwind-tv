@@ -63,6 +63,8 @@ deploy() {
   OUT=$(T 'pm install -r /data/local/tmp/tvhome.apk; rm -f /data/local/tmp/tvhome.apk'); say "$OUT"
   case "$OUT" in *Success*) ;; *) die "установка" ;; esac
   T "pm grant $PKG android.permission.READ_TV_LISTINGS; pm grant $PKG android.permission.WRITE_SECURE_SETTINGS" 2>&1 | grep -v '^$'
+  # Таймер сна гасит экран правом администратора «только блокировка».
+  T "dpm set-active-admin --user 0 $PKG/.IosAdmin" 2>&1 | grep -iv "success\|already" | grep -v '^$'
   T "am force-stop $PKG; cmd package set-home-activity --user 0 $PKG/.IosHome" > /dev/null
   keys
   home; sleep 12

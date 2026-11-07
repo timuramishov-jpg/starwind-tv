@@ -7,6 +7,8 @@ import android.app.ActivityManager;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.ComponentName;
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -123,6 +125,8 @@ public class IosHome extends Activity {
         boolean poster;
         /** Вышло меньше суток назад: в ленте метка «новое». */
         boolean fresh;
+        /** Когда вышло (мс), 0 — неизвестно. */
+        long published;
         Intent open;
         Runnable action, onFail;
         String duration;
@@ -747,7 +751,8 @@ public class IosHome extends Activity {
         ActivityManager am = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
         ActivityManager.MemoryInfo before = new ActivityManager.MemoryInfo();
         am.getMemoryInfo(before);
-        Set<String> keep = new HashSet<>(Arrays.asList(getPackageName(), HAPP, SOTA, "com.android.systemui",
+        // Кинопоиск после выгрузки спрашивает «кто смотрит»: метла его не трогает.
+        Set<String> keep = new HashSet<>(Arrays.asList(getPackageName(), HAPP, SOTA, IosFeed.KINOPOISK, "com.android.systemui",
                 "com.android.providers.tv", "com.android.bluetooth", "ru.yandex.androidkeyboard.tv", "com.mediatek.tvinput",
                 "com.mediatek.tv.service", "com.cvte.tv.api.impl", "com.cvte.tv.globalui", "com.yandex.tv.services.platform"));
         int n = 0;
@@ -1099,6 +1104,11 @@ public class IosHome extends Activity {
     }
 
     private void showFeed(App a) {
+        if ("off".equals(feed.mode(a.pkg))) {
+            subtitle.setText("Лента выключена: долгое ОК на значке, чтобы включить");
+            addPill("Открыть", a.logo.accent, () -> launch(a));
+            return;
+        }
         List<FeedItem> items = feed.cached(a.pkg);
         subtitle.setText("");
         for (int i = 0; i < items.size(); i++) addCard(items.get(i), i);
@@ -1604,7 +1614,17 @@ public class IosHome extends Activity {
         Object tag = focused.getTag();
         if (tag instanceof FeedItem && ((FeedItem) tag).action != null) ((FeedItem) tag).action.run();
         else if (tag instanceof FeedItem) {
-            try { startActivity(((FeedItem) tag).open); }
+            FeedItem item = (FeedItem) tag;
+            String pkg = dock.get(selected).pkg;
+            boolean catalog = IosFeed.KINOPOISK.equals(pkg) || IosFeed.ZONA.equals(pkg);
+            if (catalog && item.urls != null && item.urls.length > 0) {
+                // Афиша не умеет открыть сам фильм: кладём название в буфер, чтобы вставить в поиск приложения.
+                ClipboardManager cb = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                if (cb != null) cb.setPrimaryClip(ClipData.newPlainText("Фильм", item.title));
+                Toast.makeText(this, "«" + item.title + "» скопировано: вставь в поиск", Toast.LENGTH_LONG).show();
+            }
+            feed.remember(pkg, item);
+            try { startActivity(item.open); }
             catch (ActivityNotFoundException | SecurityException e) { launch(dock.get(selected)); }
         } else if (tag instanceof App) launch((App) tag);
         else ((Action) ((Object[]) tag)[1]).run();
@@ -1752,6 +1772,18 @@ public class IosHome extends Activity {
             labels.add(feed.signedIn() ? "Выйти из аккаунта YouTube" : "Войти в YouTube: лента подписок");
             actions.add(() -> { if (feed.signedIn()) { feed.signOut(); reload(); } else startYouTubeSignIn(); });
         }
+        if (Arrays.asList(IosFeed.YOUTUBE, IosFeed.VK, IosFeed.RUTUBE, IosFeed.KINOPOISK, IosFeed.ZONA).contains(a.pkg)) {
+            String m = feed.mode(a.pkg);
+            boolean yt = IosFeed.YOUTUBE.equals(a.pkg);
+            String now = m.equals("off") ? "выключена" : yt && (m.equals("popular") || !feed.signedIn()) ? "популярное" : yt ? "подписки" : "включена";
+            String next = m.equals("off") ? "" : yt && m.isEmpty() && feed.signedIn() ? "popular" : "off";
+            labels.add("Лента: " + now + " (ОК, сменить)");
+            actions.add(() -> {
+                feed.setMode(a.pkg, next);
+                feedShown.remove(a.pkg);
+                showSelected();
+            });
+        }
         labels.add("Переместить");
         actions.add(this::startMoving);
         labels.add(inDock ? "Убрать из дока" : "Добавить в док");
@@ -1815,6 +1847,15 @@ public class IosHome extends Activity {
             labels.add(row[0]);
             actions.add(() -> open(SystemSettings.intent(this, row[1])));
         }
+        long sleepAt = IosSleep.at(this), left = sleepAt == 0 ? 0 : (sleepAt - System.currentTimeMillis() + 59_999) / 60000;
+        labels.add(sleepAt == 0 ? "Таймер сна: выключен" : "Таймер сна: через " + left + " мин");
+        actions.add(() -> {
+            // Каждое нажатие — следующий шаг: 30, 60, 90 минут, выключить.
+            long step = left == 0 ? 30 : left <= 30 ? 60 : left <= 60 ? 90 : 0;
+            IosSleep.schedule(this, step);
+            Toast.makeText(this, step == 0 ? "Таймер сна выключен" : "Телевизор выключится через " + step + " мин", Toast.LENGTH_SHORT).show();
+            showSettings();
+        });
         // Аккаунт Яндекса всего телевизора: за ним следуют Кинопоиск и другие приложения Яндекса.
         labels.add("Аккаунт Яндекса");
         actions.add(() -> open(new Intent("com.yandex.tv.passport.MANAGE_ACCOUNTS").setPackage("com.yandex.tv.services")
