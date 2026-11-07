@@ -803,7 +803,7 @@ final class IosFeed {
                 it.subtitle = firstOf(c.getString(7), c.getString(9), c.getString(2), c.getString(8));
                 if (it.subtitle.isEmpty() && c.getLong(11) > 0 && c.getInt(12) == TvContract.PreviewPrograms.INTERACTION_TYPE_VIEWS)
                     it.subtitle = views(c.getLong(11));
-                if (it.subtitle.isEmpty() && rows.containsKey(c.getLong(13))) it.subtitle = rows.get(c.getLong(13));
+                // Название ряда («Главное») подписью не ставим: оно одинаковое у всех роликов и ничего не говорит.
                 if (out.size() < 3) Log.i(TAG, "preview row " + pkg + ": intent=" + c.getString(5) + " author=" + c.getString(7) + " short=" + c.getString(2) + " long=" + c.getString(8)
                         + " episode=" + c.getString(9) + " date=" + c.getString(10) + " count=" + c.getLong(11) + "/" + c.getInt(12) + " rows=" + rows);
                 List<String> urls = new ArrayList<>();

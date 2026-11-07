@@ -463,7 +463,8 @@ final class IosSaver extends View {
         double hours = utc.get(Calendar.HOUR_OF_DAY) + utc.get(Calendar.MINUTE) / 60.0;
         double dec = Math.toRadians(-23.44 * Math.cos(Math.toRadians(360.0 / 365 * (doy + 10))));
         double sublon = (12 - hours) * 15;
-        float x0 = 80, x1 = 1840, y0 = 80, y1 = 880;
+        // Карта занимает верх, часы и дата — свою полосу снизу, без наложения.
+        float x0 = 80, x1 = 1840, y0 = 70, y1 = 700;
         double lat0 = 78, lat1 = -56, lon0 = -170, lon1 = 190;
         int rows = LAND.length, cols = LAND[0].length();
         for (int r = 0; r < rows; r++) for (int col = 0; col < cols; col++) {
@@ -478,7 +479,7 @@ final class IosSaver extends View {
             double lon = lon0 + i * (lon1 - lon0) / 120, h = Math.toRadians(lon - sublon);
             double lat = Math.toDegrees(Math.atan(-Math.cos(dec) * Math.cos(h) / Math.sin(dec)));
             float x = (float) (x0 + (lon - lon0) / (lon1 - lon0) * (x1 - x0));
-            float y = (float) Math.max(y0 - 40, Math.min(y1 + 40, y0 + (lat0 - lat) / (lat0 - lat1) * (y1 - y0)));
+            float y = (float) Math.max(y0 - 20, Math.min(y1 + 20, y0 + (lat0 - lat) / (lat0 - lat1) * (y1 - y0)));
             if (i == 0) line.moveTo(x, y); else line.lineTo(x, y);
         }
         Paint q = fill(IosPalette.alpha(INK, 0.45f));
@@ -488,8 +489,8 @@ final class IosSaver extends View {
         c.drawPath(line, q);
         float mx = (float) (x0 + (37.6 - lon0) / (lon1 - lon0) * (x1 - x0)), my = (float) (y0 + (lat0 - 55.75) / (lat0 - lat1) * (y1 - y0));
         c.drawCircle(mx, my, 15, fill(ORANGE));
-        c.drawText("Москва, " + dateLine(t).toLowerCase(new Locale("ru")), 92, 1080 - 80 - 224 - 12, type(semibold, 40, SUB));
-        c.drawText(hhmm(t), 88, 1080 - 80, type(semibold, 224, INK));
+        c.drawText("Москва, " + dateLine(t).toLowerCase(new Locale("ru")), 92, 1080 - 72 - 190 - 16, type(semibold, 36, SUB));
+        c.drawText(hhmm(t), 88, 1080 - 72, type(semibold, 190, INK));
     }
 
     // 5. Виджеты: дата и большие часы, внизу три карточки одного вида — погода, продолжить просмотр, VPN.
@@ -515,7 +516,9 @@ final class IosSaver extends View {
         }
         // Продолжить просмотр
         x += 316 + 28;
-        box = new RectF(x, top, x + 660, top + 316);
+        // Средняя карточка тянется: три карточки занимают всю ширину между полями.
+        float wide = 1920 - 96 - 316 - 28 - x;
+        box = new RectF(x, top, x + wide, top + 316);
         c.drawRoundRect(box, 52, 52, fill(IosPalette.GRAY6));
         Paint head = type(semibold, 28, SUB);
         c.drawText("Продолжить просмотр", x + pad, top + 60, head);
@@ -528,7 +531,7 @@ final class IosSaver extends View {
             drawCover(c, continueCover, cover);
             c.restore();
         } else c.drawRoundRect(cover, 24, 24, fill(IosPalette.GRAY5));
-        float tx = cover.right + 28, tw = x + 660 - pad - tx;
+        float tx = cover.right + 28, tw = x + wide - pad - tx;
         if (continueInfo != null) {
             Paint name = type(semibold, 30, INK);
             List<String> lines = wrap(continueInfo[0], name, tw, 3);
@@ -541,7 +544,7 @@ final class IosSaver extends View {
             for (int i = 0; i < lines.size(); i++) c.drawText(lines.get(i), tx, top + 170 + i * 38, none);
         }
         // VPN
-        x += 660 + 28;
+        x += wide + 28;
         box = new RectF(x, top, x + 316, top + 316);
         c.drawRoundRect(box, 52, 52, fill(IosPalette.GRAY6));
         boolean vpn = vpnOn();

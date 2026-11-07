@@ -66,7 +66,11 @@ final class IosRemote {
     }
 
     /** Запустить пересыльщик, если он не запущен: 8687 → 127.0.0.1:8686. Каждое соединение — свой nc. */
+    private volatile boolean relayChecking;
+
     void ensureRelay() {
+        if (relayChecking) return;
+        relayChecking = true;
         new Thread(() -> {
             try {
                 IosAdb adb = IosAdb.get(context);
@@ -81,6 +85,8 @@ final class IosRemote {
             } catch (Exception e) {
                 relayUp = false;
                 Log.w(TAG, "relay: " + e);
+            } finally {
+                relayChecking = false;
             }
         }, "relay").start();
     }
