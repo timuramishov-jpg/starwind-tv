@@ -62,6 +62,8 @@ public final class IosShell {
         input = im.getDeclaredMethod("getInstance").invoke(null);
         inject = im.getMethod("injectInputEvent", InputEvent.class, int.class);
         ServerSocket server = new ServerSocket(PORT);
+        // Из какого APK запущен: лаунчер после обновления сверяет и перезапускает старый сервер.
+        try (OutputStream o = new FileOutputStream("/data/local/tmp/iosshell.apk")) { o.write(String.valueOf(apk).getBytes(StandardCharsets.UTF_8)); }
         // Лаунчер обновили: старый APK исчез — уходим, лаунчер запустит сервер из нового.
         Thread watch = new Thread(() -> {
             while (true) {

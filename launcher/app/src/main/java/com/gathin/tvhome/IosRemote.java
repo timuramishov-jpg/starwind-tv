@@ -106,6 +106,11 @@ final class IosRemote {
                 write(new File(dir(), "key"), key);
                 IosAdb adb = IosAdb.get(context);
                 String listening = "netstat -tln 2>/dev/null | grep -c ':" + IosShell.PORT + " '";
+                String apk = context.getApplicationInfo().sourceDir;
+                // Сервер из старого APK (лаунчер обновили) — останавливаем, запустим новый.
+                if (!adb.shell("cat /data/local/tmp/iosshell.apk 2>/dev/null").trim().equals(apk)) {
+                    adb.shell("pkill -f com.gathin.tvhome.IosShell; sleep 0.5");
+                }
                 if (adb.shell(listening).trim().equals("0")) {
                     // Подоболочка с nohup и setsid переживает конец сеанса adb; пауза — чтобы процесс успел стартовать.
                     adb.shell("pkill -f 'nc -L -p " + IosShell.PORT + "'; sleep 0.3; "
