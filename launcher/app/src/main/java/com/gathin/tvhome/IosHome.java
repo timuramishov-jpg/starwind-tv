@@ -241,19 +241,18 @@ public class IosHome extends Activity {
         glow = wash();
         glow.setTranslationX(px(120));
         glow.setTranslationY(px(180));
+        // Без аппаратных слоёв: каждый — полноэкранная текстура на 8–9 МБ видеопамяти, а рисовать 256-точечный
+        // градиент заново дешевле. Четыре слоя стоили лаунчеру треть его памяти.
         for (ImageView v : new ImageView[]{washA, washB}) {
-            v.setLayerType(View.LAYER_TYPE_HARDWARE, null);
             swing(v, "translationX", v.getTranslationX(), 110, 23000);
             swing(v, "translationY", v.getTranslationY(), 70, 17000);
             swing(v, "scaleX", 1f, 0.08f, 29000);
             swing(v, "scaleY", 1f, 0.06f, 37000);
         }
-        glow.setLayerType(View.LAYER_TYPE_HARDWARE, null);
         swing(glow, "translationX", glow.getTranslationX(), 240, 31000);
         swing(glow, "translationY", glow.getTranslationY(), 130, 26000);
         View grain = new View(this);
         grain.setBackground(grain());
-        grain.setLayerType(View.LAYER_TYPE_HARDWARE, null);
         root.addView(grain, new FrameLayout.LayoutParams(-1, -1));
         buildChrome();
         IntentFilter f = new IntentFilter();
@@ -296,6 +295,7 @@ public class IosHome extends Activity {
         if (remote != null) { remote.ensureShell(); publishRemote(); }
         wake();
         root.setAlpha(1f);
+        untrim();
         handler.post(ticker);
         for (ObjectAnimator a : drift) { if (a.isPaused()) a.resume(); else if (!a.isStarted()) a.start(); }
         if (wasAway) {
@@ -374,9 +374,32 @@ public class IosHome extends Activity {
         super.onPause();
     }
 
+    /** Лаунчер ушёл с экрана: отдаём обложки и кэш картинок, чтобы системе не пришлось выгружать нас целиком.
+     *  При возврате карточки рядом с выбранной заполняются с диска за доли секунды. */
+    private boolean trimmed;
+
+    @Override public void onTrimMemory(int level) {
+        super.onTrimMemory(level);
+        if (level < TRIM_MEMORY_UI_HIDDEN || trimmed) return;
+        trimmed = true;
+        for (View c : cardViews) if (c instanceof FrameLayout && c.getTag() instanceof FeedItem) emptyCard((FrameLayout) c, (FeedItem) c.getTag());
+        feed.trim();
+        Log.i("IosHome", "trim " + level);
+    }
+
+    private void untrim() {
+        if (!trimmed) return;
+        trimmed = false;
+        if (zone == CARDS || !cardViews.isEmpty()) lazyCards(zone == CARDS ? index : 0);
+    }
+
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         // Поиск с телефона: сервер пульта открывает лаунчер с запросом.
+        if (intent.getBooleanExtra("settings", false)) {
+            handler.postDelayed(() -> { if (!overlayOpen() || !"settings".equals(menuKind)) showSettings(); }, 250);
+            return;
+        }
         String q = intent.getStringExtra("search");
         if (q != null && !q.trim().isEmpty()) { handler.postDelayed(() -> runSearch(q.trim()), 300); return; }
         closeMenu();
@@ -2147,6 +2170,15 @@ public class IosHome extends Activity {
         actions.add(keep(() -> tweak("dns", !ads)));
         labels.add("Быстрые анимации: " + (fast ? "включены" : "выключены"));
         actions.add(keep(() -> tweak("anim", !fast)));
+        boolean ownKeys = String.valueOf(Settings.Secure.getString(getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD)).startsWith(getPackageName());
+        labels.add("Клавиатура: " + (ownKeys ? "Starwind" : "Яндекс"));
+        actions.add(keep(() -> new Thread(() -> {
+            try {
+                IosAdb.get(this).shell("ime enable " + getPackageName() + "/.IosKeyboard; ime set "
+                        + (ownKeys ? "ru.yandex.androidkeyboard.tv/ru.yandex.androidkeyboard.TvYandexKeyboardService" : getPackageName() + "/.IosKeyboard"));
+            } catch (Exception e) { Log.w("IosHome", "ime: " + e); }
+            handler.post(this::refreshSettings);
+        }, "ime").start()));
         labels.add("Очистить кэш приложений");
         actions.add(keep(() -> {
             note("Чищу кэш…");

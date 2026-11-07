@@ -115,6 +115,13 @@ public final class IosShell {
         switch (what) {
             case "key": json = key(a.get("c")); break;
             case "text": json = type(a.get("t")); break;
+            case "type": {
+                // Открыта наша клавиатура: текст уходит прямо в поле, с кириллицей.
+                sh("am broadcast -a " + IosKeyboard.TYPE + " -p " + PKG + " --es k " + quote(read(DIR + "/key").trim())
+                        + " --es t " + quote(a.get("t") == null ? "" : a.get("t")) + ("1".equals(a.get("done")) ? " --ez done true" : ""));
+                json = "{}";
+                break;
+            }
             case "home": press(KeyEvent.KEYCODE_HOME); json = "{}"; break;
             case "vol": {
                 String d = a.get("d");
@@ -318,6 +325,7 @@ public final class IosShell {
         long sleepAt = s.optLong("sleepAt");
         return new JSONObject().put("anim", "0.5".equals(anim)).put("dns", "hostname".equals(mode) && IosTools.DNS_HOST.equals(host))
                 .put("vpn", new File("/sys/class/net/tun0").exists()).put("place", s.optString("place"))
+                .put("typing", "1".equals(read(DIR + "/typing").trim()))
                 .put("sleep", sleepAt <= System.currentTimeMillis() ? 0 : (sleepAt - System.currentTimeMillis() + 59_999) / 60000).toString();
     }
 

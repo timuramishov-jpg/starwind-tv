@@ -150,6 +150,12 @@ deploy() {
   T "settings put secure screensaver_enabled 1; settings put secure screensaver_components $PKG/.IosDream; settings put secure screensaver_default_component $PKG/.IosDream"
   # Обновление с GitHub ставит APK через системный установщик.
   T "appops set $PKG REQUEST_INSTALL_PACKAGES allow"
+  # Кнопки пульта: наш перехватчик вместо яндексовского — шестерёнка открывает настройки лаунчера.
+  # Вернуть как было: tv keys off.
+  T "settings put secure enabled_accessibility_services $PKG/$PKG.HomeKeyService; settings put secure accessibility_enabled 1" > /dev/null
+  # Своя клавиатура: включаем всегда, делаем основной один раз (дальше выбор — в шестерёнке).
+  T "ime enable $PKG/.IosKeyboard" > /dev/null
+  if [ ! -f "$DIR/.ime_set" ]; then T "ime set $PKG/.IosKeyboard" > /dev/null && touch "$DIR/.ime_set"; fi
   # Системные анимации вдвое быстрее (переключается в шестерёнке и в пульте телефона).
   T "settings put global window_animation_scale 0.5; settings put global transition_animation_scale 0.5; settings put global animator_duration_scale 0.5"
   T "am force-stop $PKG; cmd package set-home-activity --user 0 $PKG/.IosHome" > /dev/null
@@ -317,7 +323,34 @@ case "${1:-}" in
     online
     [ "${2:-}" = off ] || { say "tv adb off: выключить отладку. Включить обратно: Настройки лаунчера, Отладка по сети"; exit 0; }
     T 'settings put global adb_enabled 0' ; say "Отладка выключена. Включить: Настройки лаунчера, Отладка по сети" ;;
+  keys)
+    online
+    if [ "$2" = off ]; then
+      T "settings put secure enabled_accessibility_services com.yandex.tv.services/com.yandex.tv.services.keyinterceptor.KeyEventInterceptorService"
+      say "Кнопки пульта снова у Яндекса"
+    else
+      T "settings put secure enabled_accessibility_services $PKG/$PKG.HomeKeyService; settings put secure accessibility_enabled 1"
+      say "Шестерёнка открывает настройки лаунчера"
+    fi ;;
   agent)
+    if [ "$2" = install ]; then
+      # Агент при входе в систему: Терминал открывает agent.command — у Терминала есть доступ к Документам,
+      # у фоновой службы macOS его бы не было.
+      printf '#!/bin/bash\n"$HOME/Documents/Claude/tv" agent\n' > "$DIR/agent.command"; chmod +x "$DIR/agent.command"
+      PL="$HOME/Library/LaunchAgents/com.starwind.agent.plist"; mkdir -p "$HOME/Library/LaunchAgents"
+      cat > "$PL" <<PLEOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0"><dict>
+  <key>Label</key><string>com.starwind.agent</string>
+  <key>ProgramArguments</key><array><string>/usr/bin/open</string><string>-g</string><string>-a</string><string>Terminal</string><string>$DIR/agent.command</string></array>
+  <key>RunAtLoad</key><true/>
+</dict></plist>
+PLEOF
+      # Сейчас не запускаем: агент уже работает; служба подхватится при следующем входе в систему.
+      say "Агент будет запускаться сам при входе в систему"
+      exit 0
+    fi
     # Копия скрипта: агент не сломается, когда tv pull обновит файлы под ним.
     A=$(mktemp -t starwind-agent); cp "$R/starwind/agent.sh" "$A"; exec bash "$A" ;;
   backup) online; backup && say "Настройки лаунчера в $DIR/backup" || die "копии на телевизоре пока нет: лаунчер делает её, когда уходишь с главного экрана" ;;

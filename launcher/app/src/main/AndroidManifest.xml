@@ -108,6 +108,12 @@
         <!-- Ключи сервисов приходят только из adb (shell держит DUMP), в приложении их нет. -->
         <receiver android:name=".IosConfig" android:exported="true" android:permission="android.permission.DUMP" />
         <!-- Поручения от сервера пульта: он работает от имени оболочки, у которой есть DUMP; плюс ключ из QR-кода. -->
+        <!-- Своя экранная клавиатура в стиле лаунчера; отдельный процесс, чтобы не будить весь лаунчер. -->
+        <service android:name=".IosKeyboard" android:label="Starwind" android:exported="true"
+            android:permission="android.permission.BIND_INPUT_METHOD" android:process=":ime">
+            <intent-filter><action android:name="android.view.InputMethod" /></intent-filter>
+            <meta-data android:name="android.view.im" android:resource="@xml/ios_ime" />
+        </service>
         <receiver android:name=".IosCommand" android:exported="true" android:permission="android.permission.DUMP" />
         <receiver android:name=".IosSleep" android:exported="false" />
         <!-- Заставки по макетам: выбор в шестерёнке, включает tv deploy (settings screensaver_components). -->

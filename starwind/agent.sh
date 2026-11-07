@@ -4,6 +4,11 @@
 DIR="$HOME/Documents/Claude"
 Q="$DIR/agent"
 mkdir -p "$Q/in" "$Q/out" "$Q/done"
+# Двое агентов на одну очередь не нужны: второй запуск (например, при входе в систему) тихо выходит.
+if [ -f "$Q/pid" ] && kill -0 "$(cat "$Q/pid")" 2>/dev/null; then echo "Агент уже работает"; exit 0; fi
+echo $$ > "$Q/pid"
+# Пока Мак на зарядке, он не засыпает, и Claude не теряет телевизор (на батарее Мак спит как обычно).
+caffeinate -s -w $$ &
 echo "Агент запущен $(date '+%H:%M'). Окно не закрывай; остановить — Ctrl+C."
 date '+%s' > "$Q/alive"
 while true; do

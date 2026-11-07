@@ -94,6 +94,9 @@ nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:re
 nav button{background:none;color:var(--gray1);font-size:10px;font-weight:500;padding:4px 0;display:flex;flex-direction:column;align-items:center;gap:3px;border-radius:0}
 nav button.on{color:var(--ink)}
 nav button:active{transform:none}
+/* Поле ввода появляется, когда на телевизоре ждут текст: сверху, со свечением, как фокус на экране. */
+.typebar{display:none;position:sticky;top:calc(env(safe-area-inset-top) + 8px);z-index:4;margin:0 0 16px;box-shadow:0 0 0 1px var(--hairline),0 12px 40px rgba(0,0,0,.6)}
+.typebar.on{display:block}
 #t{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 84px);transform:translateX(-50%);background:rgba(28,28,30,.95);padding:11px 20px;border-radius:var(--r-pill);font-size:15px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:88vw;text-align:center;z-index:6}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -101,6 +104,8 @@ nav button:active{transform:none}
 <body>
 <div id="glow"></div>
 <h1 id="title">Пульт</h1>
+<!-- На телевизоре открыта клавиатура: печатаем здесь, текст уходит в поле на экране. -->
+<div class="card typebar" id="typebar"><div class="row"><input type="text" id="tv-in" placeholder="Печатай — текст появится на телевизоре" enterkeyhint="done" autocomplete="off"><button onclick="sendType(true)">Готово</button></div></div>
 
 <section class="tab on" id="remote">
   <div class="dock" id="dock"></div>
@@ -282,11 +287,17 @@ async function topApps(){
 async function tweak(w,on){await go('tweak',{w,v:on?1:0});state()}
 async function state(){try{const s=await call('state');$('anim').checked=!!s.anim;$('dns').checked=!!s.dns;
   if(s.vpn!=null){$('vpn').checked=!!s.vpn;$('vpnl').textContent=s.vpn?(s.place||'Включён'):'Выключен'}
+  const tb=$('typebar');if(!!s.typing!==typingShown){typingShown=!!s.typing;tb.classList.toggle('on',typingShown);if(typingShown){$('tv-in').focus();if(navigator.vibrate)navigator.vibrate(20)}}
   if(s.sleep!=null){sleepLeft=s.sleep;$('sleepl').textContent=s.sleep?'Через '+s.sleep+' мин':'Выключен'}}catch(e){}}
 function shot(){toast('Снимаю экран');const img=new Image();img.className='shot';img.alt='Снимок экрана телевизора';
   img.onload=()=>{$('shotbox').innerHTML='';const a=document.createElement('a');a.href=img.src;a.download='tv.png';a.appendChild(img);$('shotbox').appendChild(a)};
   img.onerror=()=>toast('Не получилось снять экран');img.src=url('shot',{t:Date.now()})}
-state();setInterval(state,5000);
+let typingShown=false;
+async function sendType(done){const t=$('tv-in').value;$('tv-in').value='';await call('type',{t,done:done?1:0})}
+$('tv-in').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendType(true)}});
+// Каждое слово уходит сразу: после пробела отправляем набранное.
+$('tv-in').addEventListener('input',e=>{const v=$('tv-in').value;if(v.endsWith(' '))sendType(false)});
+state();setInterval(state,2000);
 </script>
 </body>
 </html>
