@@ -150,6 +150,24 @@ case "${1:-}" in
   deploy) deploy ;;
   release) release ;;
   report) report ;;
+  lighten)
+    # Разгрузить телевизор: запретить фон приложениям, которым он не нужен, и отключить лишнее.
+    # Всё обратимо: tv lighten off. ВК и Рутуб не трогаем — их фон кормит наши ленты.
+    online
+    # Happ не трогаем: VPN должен жить в фоне.
+    BG="ru.vk.store.tv com.yandex.launcher.updaterapp ru.zonaplayer.app com.yandex.devices.appstore"
+    OFF="com.cvte.tv.burn com.yandex.tv.bugreportsender"
+    if [ "${2:-}" = off ]; then
+      T "for p in $BG; do cmd appops set \$p RUN_ANY_IN_BACKGROUND allow; done; for p in $OFF; do pm enable \$p; done" | grep -v '^$'
+      say "Вернул как было"; exit 0
+    fi
+    say "== Память до"; T 'dumpsys meminfo | grep -E "Free RAM|Used RAM"'
+    T "for p in $BG; do cmd appops set \$p RUN_ANY_IN_BACKGROUND ignore 2>&1; am force-stop \$p; done" | grep -v '^$'
+    T "for p in $OFF; do pm disable-user --user 0 \$p 2>&1 | tail -1; done"
+    sleep 5
+    say "== Память после"; T 'dumpsys meminfo | grep -E "Free RAM|Used RAM"'
+    say "== Кто занимает больше всего"; T 'dumpsys meminfo | sed -n "/Total PSS by process/,/Total PSS by OOM/p" | head -18' | tee "$DIR/lighten.txt"
+    say "Откатить: tv lighten off" ;;
   uninstall) online; T "pm uninstall ${2:?tv uninstall пакет}" | tail -1 ;;
   install) online
     # tv install файл.apk: поставить приложение на телевизор.
@@ -272,6 +290,7 @@ tv deploy        собрать текущую версию, поставить,
 tv check         что сейчас на телевизоре: домашний экран, VPN, память, падения
 tv pull          забрать новую версию от Claude (starwind.bundle)
 tv release       выложить собранный лаунчер на GitHub: телек обновится сам
+tv lighten       разгрузить телек: запрет фона лишним приложениям (off — вернуть)
 tv report        то же и журнал лаунчера, в report.txt для Claude
 tv trace         записать журнал, пока ты что-то делаешь на телеке, в trace.txt
 tv keys          заново передать ключи сервисов из secrets.json

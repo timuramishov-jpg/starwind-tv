@@ -1185,18 +1185,35 @@ public class IosHome extends Activity {
         return d;
     }
 
+    private final android.view.animation.LinearInterpolator linear = new android.view.animation.LinearInterpolator();
+    private final Runnable settle = () -> {
+        if (zone != CARDS || focused == null || !(focused.getTag() instanceof FeedItem) || dock.isEmpty()) return;
+        FeedItem item = (FeedItem) focused.getTag();
+        int tone = IosArt.coverTone(item.image), color = tone != 0 ? tone : dock.get(selected).logo.accent;
+        washColor(color);
+        spotAt(color, MAIN_X + (item.poster ? POSTER_W : CARD_W) / 2f, CARDS_Y + CARD_H / 2f, item.poster ? 900 : 1500);
+    };
+    private View litCard;
+    private Drawable line;
+
     /** Пока лента в фокусе, остальные карточки притушены, а уехавшие влево прячутся за доком. */
     private void dimCards(View on, int position) {
-        for (int k = 0; k < cardViews.size(); k++) {
-            View c = cardViews.get(k);
-            boolean lit = c == on;
-            c.animate().alpha(on == null || lit ? 1f : 0.5f).setDuration(FAST).start();
-            if (c instanceof FrameLayout) c.setForeground(lit ? hairline() : null);
-            TextView[] l = cardLabels.get(c);
-            if (l != null) {
-                l[0].animate().alpha(lit ? 1f : on == null ? LABEL_REST : LABEL_DIM).setDuration(FAST).start();
-                l[1].animate().alpha(lit ? 1f : 0f).setDuration(FAST).start();
-            }
+        if (line == null) line = hairline();
+        if (on != null && litCard != null && cardViews.contains(litCard)) {
+            // Внутри ленты меняются только две карточки: прежняя гаснет, новая загорается.
+            paintCard(litCard, false, true);
+            paintCard(on, true, true);
+        } else for (View c : cardViews) paintCard(c, c == on, on != null);
+        litCard = on;
+    }
+
+    private void paintCard(View c, boolean lit, boolean inFeed) {
+        c.animate().alpha(!inFeed || lit ? 1f : 0.5f).setDuration(FAST).start();
+        if (c instanceof FrameLayout) c.setForeground(lit ? line : null);
+        TextView[] l = cardLabels.get(c);
+        if (l != null) {
+            l[0].animate().alpha(lit ? 1f : inFeed ? LABEL_DIM : LABEL_REST).setDuration(FAST).start();
+            l[1].animate().alpha(lit ? 1f : 0f).setDuration(FAST).start();
         }
     }
 
@@ -1274,7 +1291,7 @@ public class IosHome extends Activity {
     /** Большой QR-код: навёл камеру телефона — открылся пульт. */
     private void showRemoteCode() {
         String url = remote == null ? null : remote.address();
-        if (url == null) { Toast.makeText(this, "Телевизор не в сети", Toast.LENGTH_SHORT).show(); return; }
+        if (url == null) { note("Телевизор не в сети"); return; }
         Bitmap qr = IosQr.make(url, px(440));
         overlay.removeAllViews();
         LinearLayout box = new LinearLayout(this);
@@ -1326,9 +1343,9 @@ public class IosHome extends Activity {
 
     private void runSearch(String q) {
         if (q.isEmpty()) return;
-        Toast.makeText(this, "Ищу «" + q + "»", Toast.LENGTH_SHORT).show();
+        note("Ищу «" + q + "»");
         feed.search(q, found -> {
-            if (found.isEmpty()) { Toast.makeText(this, "Ничего не нашлось", Toast.LENGTH_SHORT).show(); return; }
+            if (found.isEmpty()) { note("Ничего не нашлось"); return; }
             List<String> labels = new ArrayList<>();
             List<Runnable> actions = new ArrayList<>();
             for (FeedItem it : found) {
@@ -1339,7 +1356,7 @@ public class IosHome extends Activity {
                         if (cb != null) cb.setPrimaryClip(ClipData.newPlainText("Фильм", it.title));
                         Toast.makeText(this, "«" + it.title + "» скопировано: вставь в поиск Кинопоиска", Toast.LENGTH_LONG).show();
                     }
-                    try { startActivity(it.open); } catch (Exception e) { Toast.makeText(this, "Не открылось", Toast.LENGTH_SHORT).show(); }
+                    try { startActivity(it.open); } catch (Exception e) { note("Не открылось"); }
                 });
             }
             showMenu("Поиск: " + q, labels, actions);
@@ -1362,7 +1379,7 @@ public class IosHome extends Activity {
                 try { name = String.valueOf(tim.getTvInputInfo(id).loadLabel(IosHome.this)); } catch (Exception ignored) { }
                 hdmiPending = id;
                 hdmiUntil = SystemClock.elapsedRealtime() + 15000;
-                Toast.makeText(IosHome.this, "Подключено: " + name + ". ОК — перейти", Toast.LENGTH_LONG).show();
+                note("Подключено: " + name + ". ОК — перейти");
             }
         };
         tim.registerCallback(inputWatch, handler);
@@ -1371,6 +1388,31 @@ public class IosHome extends Activity {
     private void openInput(String id) {
         open(new Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput(id).buildUpon().scheme("live-tv").build())
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+    }
+
+    /** Сообщение лаунчера: тёмная плашка сверху по центру в общем стиле (вместо системного тоста). */
+    private TextView noteView;
+    private final Runnable noteOff = () -> { if (noteView != null) noteView.animate().alpha(0f).setDuration(NORMAL).start(); };
+
+    private void note(String text) {
+        if (noteView == null) {
+            noteView = text(28, semibold, INK);
+            noteView.setPadding(px(34), px(18), px(34), px(18));
+            GradientDrawable g = new GradientDrawable();
+            g.setColor(0xF21C1C1F);
+            g.setCornerRadius(px(40));
+            noteView.setBackground(g);
+            noteView.setAlpha(0f);
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2);
+            lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
+            lp.topMargin = px(36);
+            root.addView(noteView, lp);
+        }
+        noteView.bringToFront();
+        noteView.setText(text);
+        noteView.animate().alpha(1f).setDuration(FAST).start();
+        handler.removeCallbacks(noteOff);
+        handler.postDelayed(noteOff, Math.max(2500, text.length() * 70));
     }
 
     private void startYouTubeSignIn() {
@@ -1478,6 +1520,7 @@ public class IosHome extends Activity {
         cardsLayer.removeAllViews();
         cardViews.clear();
         cardLabels.clear();
+        litCard = null;
         cardsLayer.setTranslationX(0);
         cardsLayer.animate().cancel();
         cardsLayer.setTranslationY(0);
@@ -1535,11 +1578,16 @@ public class IosHome extends Activity {
 
     private void moveTo(int z, int i) {
         View next = i >= 0 && i < views(z).size() ? views(z).get(i) : null;
-        if (focused != null && focused != next) blur(focused, zone);
+        boolean withinFeed = zone == CARDS && z == CARDS && focused != null && focused.getTag() instanceof FeedItem
+                && next != null && next.getTag() instanceof FeedItem;
+        if (focused != null && focused != next) {
+            if (withinFeed) focused.animate().scaleX(1f).scaleY(1f).setDuration(FAST).start();
+            else blur(focused, zone);
+        }
         zone = z;
         index = i;
         focused = next;
-        Log.i("IosHome", "focus " + z + " " + i);
+        if (!holding) Log.i("IosHome", "focus " + z + " " + i);
         if (z == CARDS && !dock.isEmpty() && next != null) cardMemory.put(dock.get(selected).pkg, i);
         if (z != CARDS) {
             cardsLayer.animate().translationX(0).setDuration(NORMAL).setInterpolator(ease).start();
@@ -1553,7 +1601,18 @@ public class IosHome extends Activity {
             spotAt(INK, DOCK_CX, dockY(i) + DOCK_LOGO / 2f, 280);
         } else if (z == DOCK) {
             scrollTo(0);
-            if (i != selected) { selected = i; showSelected(); }
+            if (i != selected) {
+                selected = i;
+                // Зажатая стрелка по доку: ленту строим, когда остановились, а пока только логотип и цвет.
+                handler.removeCallbacks(showLater);
+                if (holding) {
+                    showBrand(dock.get(i));
+                    washColor(dock.get(i).logo.accent);
+                    cardsLayer.animate().alpha(0.25f).setDuration(FAST).start();
+                    showPending = true;
+                    handler.postDelayed(showLater, 220);
+                } else showSelected();
+            }
             else washColor(dock.get(i).logo.accent);
             next.animate().scaleX(1f).scaleY(1f).setDuration(FAST).setInterpolator(ease).start();
             spotAt(dock.get(i).logo.accent, DOCK_CX, dockY(i) + DOCK_LOGO / 2f, 330);
@@ -1575,12 +1634,14 @@ public class IosHome extends Activity {
                 FeedItem item = (FeedItem) next.getTag();
                 float w = item.poster ? POSTER_W : CARD_W;
                 lazyCards(i);
-                cardsLayer.animate().translationX(-px(i * (w + CARD_GAP))).setDuration(NORMAL).setInterpolator(ease).start();
+                // Зажатая стрелка: ровное линейное скольжение, шаг в шаг с повтором кнопки.
+                cardsLayer.animate().translationX(-px(i * (w + CARD_GAP))).setDuration(holding ? 120 : NORMAL)
+                        .setInterpolator(holding ? linear : ease).start();
                 next.animate().scaleX(1.04f).scaleY(1.04f).setDuration(FAST).setInterpolator(ease).start();
                 dimCards(next, i);
-                int tone = IosArt.coverTone(item.image);
-                washColor(tone != 0 ? tone : dock.get(selected).logo.accent);
-                spotAt(tone != 0 ? tone : dock.get(selected).logo.accent, MAIN_X + w / 2f, CARDS_Y + CARD_H / 2f, item.poster ? 900 : 1500);
+                // Цвет фона по обложке — когда лента остановилась, а не на каждом шаге.
+                handler.removeCallbacks(settle);
+                handler.postDelayed(settle, holding ? 180 : 0);
             } else {
                 paintPill(next, true);
                 Object[] tag = (Object[]) next.getTag();
@@ -1635,6 +1696,10 @@ public class IosHome extends Activity {
         }
         if (e.getAction() != KeyEvent.ACTION_DOWN) return super.dispatchKeyEvent(e);
         if (arrow) {
+            // Зажатая стрелка в ленте: шаг не чаще раза в 110 мс, иначе анимации не успевают и лента дёргается.
+            holding = e.getRepeatCount() > 0;
+            if (holding && zone == CARDS && e.getEventTime() - lastStep < 110) return true;
+            lastStep = e.getEventTime();
             if (overlayOpen()) menuKey(key);
             else if (moving) moveKey(key);
             else navigate(key);
@@ -1721,7 +1786,14 @@ public class IosHome extends Activity {
         moveTo(CARDS, at);
     }
 
+    private boolean holding;
+    private boolean showPending;
+    private final Runnable showLater = () -> { showPending = false; showSelected(); };
+    private long lastStep;
+
     private void navigate(int key) {
+        // Лента нового сервиса ещё не построена (листали док зажатой стрелкой) — строим сейчас.
+        if (showPending && !holding) { handler.removeCallbacks(showLater); showPending = false; showSelected(); }
         IosNav.Screen s = new IosNav.Screen();
         s.zone = zone;
         s.index = index;
@@ -1748,7 +1820,7 @@ public class IosHome extends Activity {
         try {
             startActivity(i);
         } catch (ActivityNotFoundException | SecurityException e) {
-            Toast.makeText(this, "Не удалось открыть", Toast.LENGTH_SHORT).show();
+            note("Не удалось открыть");
         }
     }
 
@@ -1856,7 +1928,7 @@ public class IosHome extends Activity {
         actions.add(() -> {
             if (inDock) { dock.remove(a); others.add(0, a); }
             else if (dock.size() < MAX_DOCK) { others.remove(a); dock.add(a); }
-            else Toast.makeText(this, "В доке не больше " + MAX_DOCK + " приложений", Toast.LENGTH_SHORT).show();
+            else note("В доке не больше " + MAX_DOCK + " приложений");
             saveLayout();
             reload();
         });
@@ -1919,7 +1991,7 @@ public class IosHome extends Activity {
             // Каждое нажатие — следующий шаг: 30, 60, 90 минут, выключить.
             long step = left == 0 ? 30 : left <= 30 ? 60 : left <= 60 ? 90 : 0;
             IosSleep.schedule(this, step);
-            Toast.makeText(this, step == 0 ? "Таймер сна выключен" : "Телевизор выключится через " + step + " мин", Toast.LENGTH_SHORT).show();
+            note(step == 0 ? "Таймер сна выключен" : "Телевизор выключится через " + step + " мин");
             showSettings();
         });
         SharedPreferences saverPrefs = getSharedPreferences("ios_saver", 0);
@@ -1937,8 +2009,8 @@ public class IosHome extends Activity {
         actions.add(this::showRemoteCode);
         labels.add("Обновить лаунчер (версия " + IosUpdate.installed(this) + ")");
         actions.add(() -> {
-            Toast.makeText(this, "Проверяю обновление…", Toast.LENGTH_SHORT).show();
-            IosUpdate.check(this, m -> Toast.makeText(this, m, Toast.LENGTH_LONG).show());
+            note("Проверяю обновление…");
+            IosUpdate.check(this, m -> note(m));
         });
         // Аккаунт Яндекса всего телевизора: за ним следуют Кинопоиск и другие приложения Яндекса.
         labels.add("Аккаунт Яндекса");
@@ -1984,7 +2056,7 @@ public class IosHome extends Activity {
             actions.add(() -> open(live));
         }
         if (labels.isEmpty()) {
-            Toast.makeText(this, "Источники не найдены", Toast.LENGTH_SHORT).show();
+            note("Источники не найдены");
             return;
         }
         showMenu("Источники", labels, actions);

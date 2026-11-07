@@ -516,7 +516,11 @@ final class IosSaver extends View {
             else { out.add(line); line = w; if (out.size() == max) break; }
         }
         if (out.size() < max && !line.isEmpty()) out.add(line);
-        if (out.size() == max && q.measureText(out.get(max - 1)) > width) out.set(max - 1, out.get(max - 1).substring(0, 12) + "…");
+        if (out.size() == max) {
+            String last = out.get(max - 1);
+            while (last.length() > 1 && q.measureText(last + "…") > width) last = last.substring(0, last.length() - 1);
+            out.set(max - 1, last + "…");
+        }
         return out;
     }
 

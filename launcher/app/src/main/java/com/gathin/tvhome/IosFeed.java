@@ -707,6 +707,12 @@ final class IosFeed {
             }
         }
         if (ask.isEmpty()) return out;
+        // Память о шортсах не растёт бесконечно: после 3000 записей начинаем заново.
+        if (prefs.getAll().size() > 3000) {
+            SharedPreferences.Editor clean = prefs.edit();
+            for (String k : prefs.getAll().keySet()) if (k.startsWith("short_")) clean.remove(k);
+            clean.apply();
+        }
         List<Callable<Integer>> jobs = new ArrayList<>();
         for (String id : ask) jobs.add(() -> {
             HttpURLConnection c = (HttpURLConnection) new URL("https://www.youtube.com/shorts/" + id).openConnection();
