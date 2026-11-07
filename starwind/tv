@@ -155,6 +155,13 @@ deploy() {
   if [ ! -f "$DIR/.ime_set" ]; then T "ime set $PKG/.IosKeyboard" > /dev/null && touch "$DIR/.ime_set"; fi
   # Системные анимации вдвое быстрее (переключается в шестерёнке и в пульте телефона).
   T "settings put global window_animation_scale 0.5; settings put global transition_animation_scale 0.5; settings put global animator_duration_scale 0.5"
+  # Тихий деплой (QUIET=1): телевизор не трогаем — кто смотрит видео, смотрит дальше; новая версия
+  # подхватится, когда вернутся на главный экран.
+  if [ "${QUIET:-0}" = 1 ]; then
+    T "cmd package set-home-activity --user 0 $PKG/.IosHome" > /dev/null
+    say "РЕЗУЛЬТАТ: готово (тихо, без перехода на главный экран)"
+    return 0
+  fi
   T "am force-stop $PKG; cmd package set-home-activity --user 0 $PKG/.IosHome" > /dev/null
   keys
   home; sleep 12
