@@ -55,6 +55,8 @@ final class IosSettings {
         boolean ownKeys = String.valueOf(Settings.Secure.getString(h.getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD)).startsWith(h.getPackageName());
         labels.add("Клавиатура: " + (ownKeys ? "Starwind" : "Яндекс"));
         actions.add(keep(() -> new Thread(() -> {
+            // Выбор запоминаем: обновление лаунчера сбрасывает клавиатуру на Яндекс, лаунчер вернёт выбранную.
+            h.prefs.edit().putBoolean("own_keyboard", !ownKeys).apply();
             try {
                 IosAdb.get(h).shell("ime enable " + h.getPackageName() + "/.IosKeyboard; ime set "
                         + (ownKeys ? "ru.yandex.androidkeyboard.tv/ru.yandex.androidkeyboard.TvYandexKeyboardService" : h.getPackageName() + "/.IosKeyboard"));

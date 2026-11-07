@@ -139,6 +139,14 @@ final class IosRemote {
                             + " nohup setsid app_process /system/bin com.gathin.tvhome.IosShell </dev/null >/data/local/tmp/iosshell.log 2>&1 &); sleep 1.5");
                 }
                 Log.i(TAG, "shell server " + (adb.shell(listening).trim().equals("0") ? "down" : "up"));
+                // Своя клавиатура: после обновления лаунчера система сбрасывает её на Яндекс — возвращаем, если её выбрали.
+                String own = context.getPackageName() + "/.IosKeyboard";
+                boolean wantOwn = context.getSharedPreferences("ios_home_v4", 0).getBoolean("own_keyboard", true);
+                String current = android.provider.Settings.Secure.getString(context.getContentResolver(), android.provider.Settings.Secure.DEFAULT_INPUT_METHOD);
+                if (wantOwn && !own.equals(current) && !(context.getPackageName() + "/com.gathin.tvhome.IosKeyboard").equals(current)) {
+                    adb.shell("ime enable " + own + "; ime set " + own);
+                    Log.i(TAG, "keyboard restored, was " + current);
+                }
             } catch (Exception e) {
                 Log.w(TAG, "shell: " + e);
             } finally {
