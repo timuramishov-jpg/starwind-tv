@@ -106,6 +106,16 @@
         <!-- Ключи сервисов приходят только из adb (shell держит DUMP), в приложении их нет. -->
         <receiver android:name=".IosConfig" android:exported="true" android:permission="android.permission.DUMP" />
         <receiver android:name=".IosSleep" android:exported="false" />
+        <!-- Заставки по макетам: выбор в шестерёнке, включает tv deploy (settings screensaver_components). -->
+        <service android:name=".IosDream" android:exported="true" android:label="Заставки Starwind"
+            android:permission="android.permission.BIND_DREAM_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.dreams.DreamService" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </service>
+        <activity android:name=".IosSaverActivity" android:exported="false"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" android:excludeFromRecents="true" />
         <receiver android:name=".IosUpdate" android:exported="false" />
         <!-- Таймер сна: право только гасить экран. Включается из adb: dpm set-active-admin. -->
         <receiver android:name=".IosAdmin" android:exported="true" android:permission="android.permission.BIND_DEVICE_ADMIN">

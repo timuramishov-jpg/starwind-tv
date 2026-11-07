@@ -36,7 +36,17 @@ import zipfile,sys
 z=zipfile.ZipFile(sys.argv[1])
 for out,src in {"sf_light":"Light","sf_regular":"Regular","sf_medium":"Medium","sf_semibold":"Semibold"}.items():
     open(f"{sys.argv[2]}/{out}.ttf","wb").write(z.read(f"SF NF 17.0d11e1/TTF/SFNS-{src}.ttf"))
+# Заставки: широкие цифры прямоугольного циферблата.
+import os
+assets=os.path.join(os.path.dirname(os.path.dirname(sys.argv[2])),"assets")
+os.makedirs(assets,exist_ok=True)
+open(f"{assets}/sf_expanded.ttf","wb").write(z.read("SF NF 17.0d11e1/TTF/SFNSExtraExpanded-Medium.ttf"))
 P
+  # Скруглённые цифры заставки «Большие цифры»: системный SF Pro Rounded с мака.
+  A="$R/launcher/app/src/main/assets"
+  if [ -f "$DIR/sfx/SFNSRounded.ttf" ]; then cp "$DIR/sfx/SFNSRounded.ttf" "$A/sf_rounded.ttf"
+  elif [ -f /System/Library/Fonts/SFNSRounded.ttf ]; then cp /System/Library/Fonts/SFNSRounded.ttf "$A/sf_rounded.ttf"
+  else say "Нет SF Pro Rounded, большие цифры будут обычным SF"; fi
 }
 
 icons() {
@@ -101,6 +111,8 @@ deploy() {
   T "pm grant $PKG android.permission.READ_TV_LISTINGS; pm grant $PKG android.permission.WRITE_SECURE_SETTINGS" 2>&1 | grep -v '^$'
   # Таймер сна гасит экран правом администратора «только блокировка».
   T "dpm set-active-admin --user 0 $PKG/.IosAdmin" 2>&1 | grep -iv "success\|already" | grep -v '^$'
+  # Заставки лаунчера вместо выключенной заставки Яндекса.
+  T "settings put secure screensaver_enabled 1; settings put secure screensaver_components $PKG/.IosDream; settings put secure screensaver_default_component $PKG/.IosDream"
   # Обновление с GitHub ставит APK через системный установщик.
   T "appops set $PKG REQUEST_INSTALL_PACKAGES allow"
   T "am force-stop $PKG; cmd package set-home-activity --user 0 $PKG/.IosHome" > /dev/null

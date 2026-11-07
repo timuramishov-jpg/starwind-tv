@@ -27,6 +27,14 @@ final class IosWeather {
 
     IosWeather(Context c) { prefs = c.getSharedPreferences("ios_weather", 0); }
 
+    /** Для заставки: температура, слово, макс., мин., город — что знаем. */
+    static String[] details(Context c) {
+        SharedPreferences p = c.getSharedPreferences("ios_weather", 0);
+        String city = p.getString("city", "");
+        return new String[]{p.getString("temp", ""), p.getString("word", ""), p.getString("hi", ""), p.getString("lo", ""),
+                city.isEmpty() ? "Москва" : city};
+    }
+
     /** Последняя строка «+3°, облачно», пустая — ещё не знаем. */
     String last() { return prefs.getString("line", ""); }
 
@@ -52,10 +60,19 @@ final class IosWeather {
                     }
                 }
                 JSONObject w = get(String.format(Locale.ROOT,
-                        "https://api.open-meteo.com/v1/forecast?latitude=%.3f&longitude=%.3f&current=temperature_2m,weather_code&timezone=auto", lat, lon));
+                        "https://api.open-meteo.com/v1/forecast?latitude=%.3f&longitude=%.3f&current=temperature_2m,weather_code"
+                                + "&daily=temperature_2m_max,temperature_2m_min&forecast_days=1&timezone=auto", lat, lon));
                 JSONObject cur = w.getJSONObject("current");
                 String line = IosText.degrees(cur.getDouble("temperature_2m")) + ", " + word(cur.optInt("weather_code"));
-                prefs.edit().putString("line", line).apply();
+                SharedPreferences.Editor e = prefs.edit().putString("line", line)
+                        .putString("temp", IosText.degrees(cur.getDouble("temperature_2m")))
+                        .putString("word", word(cur.optInt("weather_code")));
+                JSONObject daily = w.optJSONObject("daily");
+                if (daily != null && daily.optJSONArray("temperature_2m_max") != null) {
+                    e.putString("hi", IosText.degrees(daily.getJSONArray("temperature_2m_max").getDouble(0)));
+                    e.putString("lo", IosText.degrees(daily.getJSONArray("temperature_2m_min").getDouble(0)));
+                }
+                e.apply();
                 main.post(() -> sink.done(line));
             } catch (Exception e) {
                 Log.w(TAG, "weather: " + e);

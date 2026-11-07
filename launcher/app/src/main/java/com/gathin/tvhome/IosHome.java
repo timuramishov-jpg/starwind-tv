@@ -1922,6 +1922,17 @@ public class IosHome extends Activity {
             Toast.makeText(this, step == 0 ? "Таймер сна выключен" : "Телевизор выключится через " + step + " мин", Toast.LENGTH_SHORT).show();
             showSettings();
         });
+        SharedPreferences saverPrefs = getSharedPreferences("ios_saver", 0);
+        int saverPick = saverPrefs.getInt("style", -1);
+        labels.add("Заставка: " + (saverPick < 0 ? "по очереди" : IosSaver.NAMES[saverPick]));
+        actions.add(() -> {
+            int next = saverPick + 1 >= IosSaver.NAMES.length ? -1 : saverPick + 1;
+            saverPrefs.edit().putInt("style", next).apply();
+            showSettings();
+        });
+        labels.add("Показать заставку");
+        actions.add(() -> startActivity(new Intent(this, IosSaverActivity.class)
+                .putExtra("style", saverPick < 0 ? 0 : saverPick)));
         labels.add("Пульт в телефоне (QR-код)");
         actions.add(this::showRemoteCode);
         labels.add("Обновить лаунчер (версия " + IosUpdate.installed(this) + ")");

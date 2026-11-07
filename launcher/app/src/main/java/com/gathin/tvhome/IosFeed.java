@@ -414,6 +414,50 @@ final class IosFeed {
 
     private File listFile(String pkg) { return new File(dir, "list-" + pkg + ".json"); }
 
+    /** Для заставки: адреса обложек из сохранённой ленты сервиса (без сети). */
+    static List<String> savedPictures(Context c, String pkg) {
+        List<String> out = new ArrayList<>();
+        try (FileInputStream in = new FileInputStream(new File(new File(c.getCacheDir(), "feed"), "list-" + pkg + ".json"))) {
+            JSONArray a = new JSONArray(new String(read(in), StandardCharsets.UTF_8));
+            for (int i = 0; i < a.length(); i++) {
+                JSONArray u = a.getJSONObject(i).optJSONArray("urls");
+                if (u != null && u.length() > 0) out.add(u.getString(0));
+            }
+        } catch (Exception ignored) { }
+        return out;
+    }
+
+    /** Обложка из дискового кэша лент, null — её там нет. */
+    static Bitmap savedPicture(Context c, String url, int target) {
+        File f = new File(new File(c.getCacheDir(), "feed"), "i" + Integer.toHexString(url.hashCode()));
+        if (!f.exists()) return null;
+        try (FileInputStream in = new FileInputStream(f)) {
+            return decode(read(in), target);
+        } catch (Exception | OutOfMemoryError e) {
+            return null;
+        }
+    }
+
+    /** Последнее открытое из всех лент: название, откуда и когда, адрес обложки. */
+    static String[] lastOpened(Context c) {
+        SharedPreferences p = c.getSharedPreferences("ios_feed", Context.MODE_PRIVATE);
+        String[] best = null;
+        long at = 0;
+        for (String pkg : new String[]{YOUTUBE, VK, RUTUBE, KINOPOISK, ZONA}) {
+            try {
+                JSONArray a = new JSONArray(p.getString("recent_" + pkg, "[]"));
+                if (a.length() == 0) continue;
+                JSONObject j = a.getJSONObject(0);
+                if (j.optLong("at") <= at) continue;
+                at = j.optLong("at");
+                JSONArray u = j.optJSONArray("urls");
+                String name = pkg.equals(YOUTUBE) ? "YouTube" : pkg.equals(VK) ? "ВК Видео" : pkg.equals(RUTUBE) ? "Рутуб" : pkg.equals(KINOPOISK) ? "Кинопоиск" : "Зона";
+                best = new String[]{j.optString("title"), name + " · " + IosText.ago(at, System.currentTimeMillis()), u != null && u.length() > 0 ? u.getString(0) : ""};
+            } catch (Exception ignored) { }
+        }
+        return best;
+    }
+
     private void save(String pkg, List<IosHome.FeedItem> list) {
         try {
             JSONArray a = new JSONArray();

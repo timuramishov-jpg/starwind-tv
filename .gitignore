@@ -29,3 +29,6 @@ launcher/app/src/main/res/drawable-nodpi/top_wifi.png
 launcher/app/src/main/res/drawable-nodpi/top_settings.png
 launcher/app/src/main/res/drawable-nodpi/top_grid.png
 launcher/app/src/main/res/drawable-nodpi/top_clean.png
+
+# Шрифты Apple для заставок: только локально, в git не идут.
+launcher/app/src/main/assets/sf_*.ttf
