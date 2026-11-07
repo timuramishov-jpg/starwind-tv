@@ -154,7 +154,7 @@ public class IosHome extends Activity {
     private FrameLayout root, dockLayer, content, cardsLayer, appsLayer, overlay;
     private TextView clock, date, temp, title, subtitle, action;
     private ImageView weatherIcon;
-    private static String returnTo;
+    private boolean restored;
     /** Три длительности на весь экран, кривая одна: ease. */
     private static final int FAST = 160, NORMAL = 260, SLOW = 420;
     private static final int CARD_CLIP = 20, CLEAN = IosPalette.TEAL;
@@ -303,7 +303,7 @@ public class IosHome extends Activity {
             wasAway = false;
             rotateFeeds();
         }
-        if (dirty || returnTo != null) {
+        if (dirty) {
             dirty = false;
             reload();
         }
@@ -405,7 +405,7 @@ public class IosHome extends Activity {
         if (q != null && !q.trim().isEmpty()) { handler.postDelayed(() -> runSearch(q.trim()), 300); return; }
         closeMenu();
         moving = false;
-        if (dirty || returnTo != null || dock.isEmpty()) {
+        if (dirty || dock.isEmpty()) {
             zone = DOCK;
             index = 0;
             selected = 0;
@@ -740,9 +740,11 @@ public class IosHome extends Activity {
         for (App a : apps.values()) if (!hidden.contains(a.pkg) && !used.contains(a.pkg)) rest.add(a);
         Collections.sort(rest, (x, y) -> x.label.compareToIgnoreCase(y.label));
         others.addAll(rest);
-        if (returnTo != null) {
-            for (int i = 0; i < dock.size(); i++) if (returnTo.equals(dock.get(i).pkg)) selected = i;
-            returnTo = null;
+        // Система выгрузила лаунчер (нехватка памяти) — возвращаемся к тому сервису, где были, а не к первому.
+        if (!restored) {
+            restored = true;
+            String at = prefs.getString("dock_at", "");
+            for (int i = 0; i < dock.size(); i++) if (at.equals(dock.get(i).pkg)) selected = i;
         }
         selected = dock.isEmpty() ? 0 : Math.min(selected, dock.size() - 1);
         render();
@@ -1521,6 +1523,7 @@ public class IosHome extends Activity {
         cardsLayer.setAlpha(1f);
         if (dock.isEmpty()) { showBrand(null); subtitle.setText(""); return; }
         App a = dock.get(selected);
+        if (!a.pkg.equals(prefs.getString("dock_at", ""))) prefs.edit().putString("dock_at", a.pkg).apply();
         Set<String> near = new HashSet<>();
         for (int k = Math.max(0, selected - 1); k <= Math.min(dock.size() - 1, selected + 1); k++) near.add(dock.get(k).pkg);
         feed.keepImages(near);
@@ -1600,15 +1603,15 @@ public class IosHome extends Activity {
             scrollTo(0);
             if (i != selected) {
                 selected = i;
-                // Зажатая стрелка по доку: ленту строим, когда остановились, а пока только логотип и цвет.
+                // По доку ленту строим, когда остановились (и при зажатой стрелке, и при быстрых нажатиях подряд):
+                // пока листаешь — только логотип и цвет. Иначе при нехватке памяти каждое нажатие пересобирает ленту
+                // и главный поток не успевает за кнопками.
                 handler.removeCallbacks(showLater);
-                if (holding) {
-                    showBrand(dock.get(i));
-                    washColor(dock.get(i).logo.accent);
-                    cardsLayer.animate().alpha(0.25f).setDuration(FAST).start();
-                    showPending = true;
-                    handler.postDelayed(showLater, 220);
-                } else showSelected();
+                showBrand(dock.get(i));
+                washColor(dock.get(i).logo.accent);
+                cardsLayer.animate().alpha(0.25f).setDuration(FAST).start();
+                showPending = true;
+                handler.postDelayed(showLater, holding ? 220 : 160);
             }
             else washColor(dock.get(i).logo.accent);
             next.animate().scaleX(1f).scaleY(1f).setDuration(FAST).setInterpolator(ease).start();

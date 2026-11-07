@@ -124,9 +124,10 @@ public final class IosShell {
             }
             case "home": press(KeyEvent.KEYCODE_HOME); json = "{}"; break;
             case "power": {
-                // Сон и пробуждение, как кнопка питания пульта. Будить можно, пока телевизор в сети (быстрый режим ожидания).
+                // Как кнопка питания пульта. KEYCODE_SLEEP эта прошивка не слушает, а POWER уводит телевизор в сон.
+                // Во сне он отключает Wi-Fi, поэтому включить с телефона нельзя — только пультом.
                 boolean on = "1".equals(a.get("on"));
-                press(on ? KeyEvent.KEYCODE_WAKEUP : KeyEvent.KEYCODE_SLEEP);
+                press(on ? KeyEvent.KEYCODE_WAKEUP : KeyEvent.KEYCODE_POWER);
                 json = say(on ? "Включаю телевизор" : "Выключаю телевизор");
                 break;
             }
@@ -151,6 +152,16 @@ public final class IosShell {
                 if (s == null || s.trim().isEmpty()) { json = say("Напиши, что искать"); break; }
                 sh("am start -n " + PKG + "/.IosHome --es search " + quote(s.trim()));
                 json = say("Ищу на телевизоре");
+                break;
+            }
+            case "ytsearch": {
+                // У YouTube своя клавиатура, ввод в неё не доходит. Зато ссылка на результаты поиска открывает их сразу.
+                String q = a.get("q"), yt = youTube();
+                if (q == null || q.trim().isEmpty()) { json = say("Напиши, что искать"); break; }
+                if (yt == null) { json = say("YouTube не открыт"); break; }
+                sh("am start -a android.intent.action.VIEW -d " + quote("https://www.youtube.com/results?search_query=" + URLEncoder.encode(q.trim(), "UTF-8"))
+                        + " -n " + yt);
+                json = say("Ищу на YouTube");
                 break;
             }
             case "vpn": {
@@ -234,8 +245,9 @@ public final class IosShell {
         return "{}";
     }
 
-    /** Приложения со своей экранной клавиатурой: пока они на экране, телефон держит поле ввода наготове. */
-    private static final String[] OWN_KEYBOARD = {"com.yandex.tv.ytplayer", "com.google.android.youtube.tv"};
+    /** YouTube для телевизора (у Яндекса своя сборка Cobalt): пакет → экран, который принимает ссылки youtube.com. */
+    private static final String[][] YOUTUBE = {{"com.yandex.tv.ytplayer", "com.yandex.tv.ytplayer/dev.cobalt.app.MainActivity"},
+            {"com.google.android.youtube.tv", "com.google.android.youtube.tv/com.google.android.apps.youtube.tv.activity.ShellActivity"}};
     private static String front = "";
     private static long frontAt;
 
@@ -249,11 +261,16 @@ public final class IosShell {
         return front;
     }
 
-    private static String typingMode() {
-        if ("1".equals(read(DIR + "/typing").trim())) return "ime";
+    /** Открытый сейчас YouTube (экран для ссылки) или null. */
+    private static String youTube() {
         String f = front();
-        for (String p : OWN_KEYBOARD) if (p.equals(f)) return "app";
-        return "";
+        for (String[] y : YOUTUBE) if (y[0].equals(f)) return y[1];
+        return null;
+    }
+
+    /** ime — на телевизоре открыта наша клавиатура, ждут текст. */
+    private static String typingMode() {
+        return "1".equals(read(DIR + "/typing").trim()) ? "ime" : "";
     }
 
     // ---------- Приложения и ссылки ----------
@@ -355,6 +372,7 @@ public final class IosShell {
         return new JSONObject().put("anim", "0.5".equals(anim)).put("dns", "hostname".equals(mode) && IosTools.DNS_HOST.equals(host))
                 .put("vpn", new File("/sys/class/net/tun0").exists()).put("place", s.optString("place"))
                 .put("typing", typingMode())
+                .put("yt", youTube() != null)
                 .put("sleep", sleepAt <= System.currentTimeMillis() ? 0 : (sleepAt - System.currentTimeMillis() + 59_999) / 60000).toString();
     }
 
