@@ -109,11 +109,12 @@ final class IosRemote {
                 String apk = context.getApplicationInfo().sourceDir;
                 // Сервер из старого APK (лаунчер обновили) — останавливаем, запустим новый.
                 if (!adb.shell("cat /data/local/tmp/iosshell.apk 2>/dev/null").trim().equals(apk)) {
-                    adb.shell("pkill -f com.gathin.tvhome.IosShell; sleep 0.5");
+                    adb.shell("pkill -f 'com.gathin.tvhome.IosShel[l]'; sleep 0.5");
                 }
                 if (adb.shell(listening).trim().equals("0")) {
                     // Подоболочка с nohup и setsid переживает конец сеанса adb; пауза — чтобы процесс успел стартовать.
-                    adb.shell("pkill -f 'nc -L -p " + IosShell.PORT + "'; sleep 0.3; "
+                    // Образцы pkill — с [скобкой]: иначе pkill находит в своей же командной строке оболочку и убивает её.
+                    adb.shell("pkill -f 'n[c] -L -p " + IosShell.PORT + "'; sleep 0.3; "
                             + "(CLASSPATH=" + context.getApplicationInfo().sourceDir
                             + " nohup setsid app_process /system/bin com.gathin.tvhome.IosShell </dev/null >/data/local/tmp/iosshell.log 2>&1 &); sleep 1.5");
                 }
