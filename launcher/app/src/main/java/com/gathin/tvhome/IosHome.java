@@ -180,6 +180,7 @@ public class IosHome extends Activity {
     private float s;
     private int screenW;
     private Typeface regular, medium, semibold;
+    private IosArt pics;
     private int zone = DOCK, index = 0, selected = 0;
     private float scroll = 0;
     private boolean moving, washOnA, okDown, okLong;
@@ -211,6 +212,7 @@ public class IosHome extends Activity {
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
+        IosCrash.install(this);
         prefs = getSharedPreferences("ios_home_v4", MODE_PRIVATE);
         feed = new IosFeed(this);
         screenW = getResources().getDisplayMetrics().widthPixels;
@@ -218,6 +220,7 @@ public class IosHome extends Activity {
         regular = font(R.font.sf_regular);
         medium = font(R.font.sf_medium);
         semibold = font(R.font.sf_semibold);
+        pics = new IosArt(s, medium, semibold);
         root = new FrameLayout(this);
         root.setBackgroundColor(GROUND);
         root.setClipChildren(false);
@@ -699,16 +702,6 @@ public class IosHome extends Activity {
         store("order", g);
     }
 
-    /** Доля «краски» в картинке: сколько её площади реально закрашено (по прозрачности). */
-    static float inkShare(Bitmap b) {
-        if (b == null) return 0;
-        int w = Math.min(96, b.getWidth()), h = Math.max(1, Math.round(b.getHeight() * (float) w / b.getWidth()));
-        Bitmap s = Bitmap.createScaledBitmap(b, w, h, true);
-        long sum = 0;
-        for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) sum += Color.alpha(s.getPixel(x, y));
-        if (s != b) s.recycle();
-        return sum / 255f / (w * h);
-    }
 
     private final Map<Integer, Float> wordInk = new HashMap<>();
     private float wordRef;
@@ -721,7 +714,7 @@ public class IosHome extends Activity {
         float area = 0;
         if (b != null) {
             float fit = Math.min(1100f / b.getWidth(), 76f / b.getHeight());
-            area = inkShare(b) * b.getWidth() * fit * b.getHeight() * fit;
+            area = IosArt.inkShare(b) * b.getWidth() * fit * b.getHeight() * fit;
             b.recycle();
         }
         wordInk.put(res, area);
@@ -832,7 +825,7 @@ public class IosHome extends Activity {
         dockViews.clear();
         // Значки дока одного оптического веса: у плотного квадрата ВК и тонкой иконки разная «масса» краски.
         float[] ink = new float[dock.size()];
-        for (int i = 0; i < dock.size(); i++) ink[i] = inkShare(dock.get(i).logo.mono);
+        for (int i = 0; i < dock.size(); i++) ink[i] = IosArt.inkShare(dock.get(i).logo.mono);
         float[] sorted = ink.clone();
         Arrays.sort(sorted);
         float ref = sorted.length == 0 ? 0 : sorted[sorted.length / 2];
@@ -923,14 +916,14 @@ public class IosHome extends Activity {
         toggle.poster = true;
         toggle.title = on ? "VPN включён" : "VPN выключен";
         toggle.subtitle = own ? (on ? "ОК, чтобы выключить" : "ОК, чтобы включить") : "Включается в приложении";
-        toggle.image = switchArt(on, accent);
+        toggle.image = pics.switchArt(on, accent);
         toggle.action = () -> { if (own) vpnCommand(!on); else launch(a); };
 
         FeedItem link = new FeedItem();
         link.poster = true;
         link.title = !on ? "Нет подключения" : where.isEmpty() ? "Определяю страну" : where;
         link.subtitle = !on ? "Сначала включи VPN" : (measured ? parts[1] + (vpnSpeed.isEmpty() ? "" : ", " + vpnSpeed) + ". " : "Измеряю. ") + "ОК, обновить";
-        link.image = linkArt(on && !iso.isEmpty() ? flagOf(iso) : "\uD83C\uDF10", grade, measured ? parts[0] : on ? "…" : "—", accent);
+        link.image = pics.linkArt(on && !iso.isEmpty() ? flagOf(iso) : "\uD83C\uDF10", grade, measured ? parts[0] : on ? "…" : "—", accent, vpnHistory());
         link.action = () -> {
             prefs.edit().remove("vpn_place").remove("vpn_iso").apply();
             feed.resetProbe();
@@ -943,7 +936,7 @@ public class IosHome extends Activity {
         server.poster = true;
         server.title = "Сменить сервер";
         server.subtitle = own ? "Откроется Happ" : "Откроется приложение";
-        server.image = serverArt(accent);
+        server.image = pics.serverArt(accent);
         server.action = () -> launch(a);
 
         FeedItem[] all = {toggle, link, server};
@@ -951,99 +944,11 @@ public class IosHome extends Activity {
         if (on) { checkExit(); checkSpeed(); checkDownload(false); }
     }
 
-    private Bitmap art() {
-        Bitmap b = Bitmap.createBitmap(px(POSTER_W), px(CARD_H), Bitmap.Config.ARGB_8888);
-        b.eraseColor(PILL);
-        return b;
-    }
 
-    private Paint paint(int color) {
-        Paint p = new Paint(Paint.ANTI_ALIAS_FLAG);
-        p.setColor(color);
-        return p;
-    }
 
-    private void glow(Canvas c, float cx, float cy, float r, int accent) {
-        Paint g = paint(accent);
-        g.setShader(new RadialGradient(cx, cy, r, (accent & 0x00FFFFFF) | 0x77000000, accent & 0x00FFFFFF, Shader.TileMode.CLAMP));
-        c.drawCircle(cx, cy, r, g);
-    }
 
-    /** Вертикальный тумблер: включённый светится цветом секции, бегунок наверху. */
-    private Bitmap switchArt(boolean on, int accent) {
-        Bitmap b = art();
-        Canvas c = new Canvas(b);
-        float cx = b.getWidth() / 2f, cy = b.getHeight() / 2f, w = px(150), h = px(270);
-        if (on) glow(c, cx, cy, px(260), accent);
-        c.drawRoundRect(cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2, w / 2, w / 2, paint(on ? accent : 0xFF3A3A3F));
-        float r = w / 2 - px(12), ky = on ? cy - h / 2 + w / 2 : cy + h / 2 - w / 2;
-        c.drawCircle(cx, ky + px(5), r, paint(0x55000000));
-        c.drawCircle(cx, ky, r, paint(INK));
-        return b;
-    }
 
-    /** Связь: флаг страны выхода сверху, под ним дуга отклика с числом. */
-    private Bitmap linkArt(String flag, int grade, String value, int accent) {
-        Bitmap b = art();
-        Canvas c = new Canvas(b);
-        float cx = b.getWidth() / 2f;
-        Paint f = paint(INK);
-        f.setTextSize(px(110));
-        f.setTextAlign(Paint.Align.CENTER);
-        c.drawText(flag, cx, px(140), f);
-        drawHistory(c, accent);
-        float cy = px(300), r = px(92);
-        Paint arc = paint(0xFF3A3A3F);
-        arc.setStyle(Paint.Style.STROKE);
-        arc.setStrokeWidth(px(22));
-        arc.setStrokeCap(Paint.Cap.ROUND);
-        android.graphics.RectF box = new android.graphics.RectF(cx - r, cy - r, cx + r, cy + r);
-        c.drawArc(box, 180, 180, false, arc);
-        if (grade >= 0) {
-            arc.setColor(grade >= 2 ? accent : grade == 1 ? 0xFFFF9F0A : 0xFFFF453A);
-            c.drawArc(box, 180, 180 * (grade + 1) / 4f, false, arc);
-        }
-        Paint t = paint(INK);
-        t.setTypeface(semibold);
-        t.setTextSize(px(value.length() > 6 ? 40 : 52));
-        t.setTextAlign(Paint.Align.CENTER);
-        c.drawText(value, cx, cy - px(8), t);
-        return b;
-    }
 
-    /** Отклик за последний час тонкой линией внизу карточки: видно, ровная связь или скачет. */
-    private void drawHistory(Canvas c, int accent) {
-        List<long[]> h = vpnHistory();
-        float left = px(30), right = c.getWidth() - px(30), top = px(372), bottom = px(452);
-        Paint label = paint(0xFF8E8E93);
-        label.setTextSize(px(20));
-        label.setTypeface(medium);
-        c.drawText("отклик за час", left, px(478), label);
-        Paint base = paint(0xFF3A3A3F);
-        base.setStrokeWidth(px(2));
-        c.drawLine(left, bottom, right, bottom, base);
-        if (h.size() < 2) return;
-        long now = System.currentTimeMillis(), from = now - 3600_000L;
-        long max = 100;
-        for (long[] p : h) max = Math.max(max, p[1]);
-        android.graphics.Path line = new android.graphics.Path();
-        boolean first = true;
-        for (long[] p : h) {
-            float x = left + (right - left) * (p[0] - from) / 3600_000f;
-            float y = bottom - (bottom - top) * Math.min(1f, p[1] / (float) max);
-            if (first) { line.moveTo(x, y); first = false; } else line.lineTo(x, y);
-        }
-        Paint stroke = paint(accent);
-        stroke.setStyle(Paint.Style.STROKE);
-        stroke.setStrokeWidth(px(4));
-        stroke.setStrokeJoin(Paint.Join.ROUND);
-        stroke.setStrokeCap(Paint.Cap.ROUND);
-        c.drawPath(line, stroke);
-        Paint top10 = paint(0xFF8E8E93);
-        top10.setTextSize(px(18));
-        top10.setTextAlign(Paint.Align.RIGHT);
-        c.drawText(max + " мс", right, top - px(8), top10);
-    }
 
     /** История отклика VPN за час: «время:мс» через запятую в настройках. */
     private List<long[]> vpnHistory() {
@@ -1068,21 +973,6 @@ public class IosHome extends Activity {
         prefs.edit().putString("vpn_hist", b.toString()).apply();
     }
 
-    /** Смена сервера: стопка из трёх серверов, верхний светится. */
-    private Bitmap serverArt(int accent) {
-        Bitmap b = art();
-        Canvas c = new Canvas(b);
-        float cx = b.getWidth() / 2f, w = px(200), h = px(56), gap = px(22), top = b.getHeight() / 2f - (3 * h + 2 * gap) / 2;
-        glow(c, cx, top + h / 2, px(180), accent);
-        for (int i = 0; i < 3; i++) {
-            float y = top + i * (h + gap);
-            c.drawRoundRect(cx - w / 2, y, cx + w / 2, y + h, px(16), px(16), paint(i == 0 ? accent : 0xFF3A3A3F));
-            c.drawCircle(cx - w / 2 + px(30), y + h / 2, px(9), paint(i == 0 ? INK : 0xFF6E6E73));
-            Paint line = paint(i == 0 ? INK : 0xFF6E6E73);
-            c.drawRoundRect(cx - w / 2 + px(56), y + h / 2 - px(5), cx + w / 2 - px(28), y + h / 2 + px(5), px(5), px(5), line);
-        }
-        return b;
-    }
 
     /** Отклик через VPN: пять запросов подряд, среднее, разброс и потери. */
     private void checkSpeed() {
@@ -1252,7 +1142,7 @@ public class IosHome extends Activity {
     /** Обложка выбранной карточки догрузилась: фон перекрашивается в её цвет. */
     private void toneFor(View card, FeedItem item) {
         if (card != focused || zone != CARDS) return;
-        int t = coverTone(item.image);
+        int t = IosArt.coverTone(item.image);
         if (t != 0) washColor(t);
     }
 
@@ -1285,24 +1175,6 @@ public class IosHome extends Activity {
 
     /** Цвет обложки для подсветки фона: насыщенные точки весят больше, итог приглушён на треть,
      *  чтобы фон жил вместе с карточкой, но не спорил с ней. 0 — обложки ещё нет. */
-    static int coverTone(Bitmap b) {
-        if (b == null || b.isRecycled()) return 0;
-        Bitmap s = Bitmap.createScaledBitmap(b, 24, 14, true);
-        float r = 0, g = 0, bl = 0, wsum = 0;
-        float[] hsv = new float[3];
-        for (int y = 0; y < s.getHeight(); y++) for (int x = 0; x < s.getWidth(); x++) {
-            int c = s.getPixel(x, y);
-            Color.colorToHSV(c, hsv);
-            float w = 0.05f + hsv[1] * hsv[2] * (hsv[2] > 0.15f ? 1f : 0.2f);
-            r += Color.red(c) * w; g += Color.green(c) * w; bl += Color.blue(c) * w; wsum += w;
-        }
-        if (s != b) s.recycle();
-        int avg = Color.rgb(Math.round(r / wsum), Math.round(g / wsum), Math.round(bl / wsum));
-        Color.colorToHSV(avg, hsv);
-        hsv[1] = Math.min(0.75f, hsv[1] * 0.67f);
-        hsv[2] = Math.max(0.55f, Math.min(0.9f, hsv[2] * 1.4f));
-        return Color.HSVToColor(hsv);
-    }
 
     /** Тонкая, почти невидимая линия по краю выбранной карточки, как у окон macOS: отделяет её от фона без «рамки». */
     private Drawable hairline() {
@@ -1706,7 +1578,7 @@ public class IosHome extends Activity {
                 cardsLayer.animate().translationX(-px(i * (w + CARD_GAP))).setDuration(NORMAL).setInterpolator(ease).start();
                 next.animate().scaleX(1.04f).scaleY(1.04f).setDuration(FAST).setInterpolator(ease).start();
                 dimCards(next, i);
-                int tone = coverTone(item.image);
+                int tone = IosArt.coverTone(item.image);
                 washColor(tone != 0 ? tone : dock.get(selected).logo.accent);
                 spotAt(tone != 0 ? tone : dock.get(selected).logo.accent, MAIN_X + w / 2f, CARDS_Y + CARD_H / 2f, item.poster ? 900 : 1500);
             } else {

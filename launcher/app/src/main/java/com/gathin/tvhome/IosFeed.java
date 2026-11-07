@@ -215,12 +215,7 @@ final class IosFeed {
         return out;
     }
 
-    static String ago(long at) {
-        long m = (System.currentTimeMillis() - at) / 60000;
-        if (m < 60) return Math.max(1, m) + " мин назад";
-        if (m < 24 * 60) return (m / 60) + " ч назад";
-        return m / (24 * 60) == 1 ? "вчера" : (m / (24 * 60)) + " дн назад";
-    }
+    static String ago(long at) { return IosText.ago(at, System.currentTimeMillis()); }
 
     /** Режим ленты сервиса: "" — как обычно, "popular" — популярное вместо подписок, "off" — ленты нет. */
     String mode(String pkg) { return prefs.getString("mode_" + pkg, ""); }
@@ -648,11 +643,8 @@ final class IosFeed {
         }
     }
 
-    /** Помечен как шортс прямо в названии. */
-    static boolean taggedShort(String title) {
-        String t = title == null ? "" : title.toLowerCase(java.util.Locale.ROOT);
-        return t.contains("#short") || t.contains("#шортс") || t.contains("#шорт");
-    }
+    static boolean taggedShort(String title) { return IosText.taggedShort(title); }
+    static int seconds(String d) { return IosText.seconds(d); }
 
     /** Что из роликов шортсы. Длиннее 3 минут шортсов не бывает. Короче — спрашиваем YouTube:
      *  адрес youtube.com/shorts/ID у шортса открывается, у обычного ролика перенаправляет на watch.
@@ -699,28 +691,8 @@ final class IosFeed {
         return out;
     }
 
-    static int seconds(String d) {
-        java.util.regex.Matcher m = Pattern.compile("P(?:(\\d+)D)?T?(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+)S)?").matcher(d == null ? "" : d);
-        if (!m.matches()) return 0;
-        int[] v = new int[4];
-        for (int k = 0; k < 4; k++) v[k] = m.group(k + 1) == null ? 0 : Integer.parseInt(m.group(k + 1));
-        return v[0] * 86400 + v[1] * 3600 + v[2] * 60 + v[3];
-    }
-
-    /** PT1H2M3S в 1:02:03. */
-    static String iso(String d) {
-        java.util.regex.Matcher m = Pattern.compile("PT(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+)S)?").matcher(d == null ? "" : d);
-        if (!m.matches()) return "";
-        int hh = m.group(1) == null ? 0 : Integer.parseInt(m.group(1)), mm = m.group(2) == null ? 0 : Integer.parseInt(m.group(2)),
-                ss = m.group(3) == null ? 0 : Integer.parseInt(m.group(3));
-        return clock(hh * 3600 + mm * 60 + ss);
-    }
-
-    static String clock(int s) {
-        if (s <= 0) return "";
-        return s >= 3600 ? String.format(java.util.Locale.ROOT, "%d:%02d:%02d", s / 3600, s / 60 % 60, s % 60)
-                : String.format(java.util.Locale.ROOT, "%d:%02d", s / 60, s % 60);
-    }
+    static String iso(String d) { return IosText.iso(d); }
+    static String clock(int s) { return IosText.clock(s); }
 
     private IosHome.FeedItem youtubeItem(JSONObject s, String id) throws Exception {
         IosHome.FeedItem it = new IosHome.FeedItem();
@@ -733,17 +705,7 @@ final class IosFeed {
         return it;
     }
 
-    /** 2026-11-06T18:00:00Z в миллисекунды, 0 если не разобрать. */
-    static long when(String iso) {
-        if (iso == null || iso.length() < 19) return 0;
-        try {
-            java.text.SimpleDateFormat f = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss", java.util.Locale.ROOT);
-            f.setTimeZone(java.util.TimeZone.getTimeZone("UTC"));
-            return f.parse(iso.substring(0, 19)).getTime();
-        } catch (Exception e) {
-            return 0;
-        }
-    }
+    static long when(String iso) { return IosText.when(iso); }
 
     private List<IosHome.FeedItem> subscriptions() throws Exception {
         String token = accessToken();

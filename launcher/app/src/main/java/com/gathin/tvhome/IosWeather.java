@@ -54,8 +54,7 @@ final class IosWeather {
                 JSONObject w = get(String.format(Locale.ROOT,
                         "https://api.open-meteo.com/v1/forecast?latitude=%.3f&longitude=%.3f&current=temperature_2m,weather_code&timezone=auto", lat, lon));
                 JSONObject cur = w.getJSONObject("current");
-                long t = Math.round(cur.getDouble("temperature_2m"));
-                String line = (t > 0 ? "+" : t < 0 ? "−" : "") + Math.abs(t) + "°, " + word(cur.optInt("weather_code"));
+                String line = IosText.degrees(cur.getDouble("temperature_2m")) + ", " + word(cur.optInt("weather_code"));
                 prefs.edit().putString("line", line).apply();
                 main.post(() -> sink.done(line));
             } catch (Exception e) {
@@ -64,19 +63,7 @@ final class IosWeather {
         }, "weather").start();
     }
 
-    /** Коды погоды WMO словами. */
-    static String word(int code) {
-        if (code == 0) return "ясно";
-        if (code <= 2) return "переменная облачность";
-        if (code == 3) return "облачно";
-        if (code <= 48) return "туман";
-        if (code <= 57) return "морось";
-        if (code <= 67) return "дождь";
-        if (code <= 77) return "снег";
-        if (code <= 82) return "ливень";
-        if (code <= 86) return "снегопад";
-        return "гроза";
-    }
+    static String word(int code) { return IosText.weather(code); }
 
     private static JSONObject get(String url) throws Exception {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();

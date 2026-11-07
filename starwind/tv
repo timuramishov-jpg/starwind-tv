@@ -125,7 +125,8 @@ check() {
 
 # Отчёт для Claude: состояние и журнал лаунчера в report.txt рядом со скриптом.
 report() {
-  { check; say "== Журнал"; T "logcat -d -s IosFeed:* IosHome:* IosConfig:*" | tail -80; } 2>&1 | tee "$DIR/report.txt" | head -12
+  { check; say "== Падения лаунчера"; T "tail -40 /sdcard/Android/data/$PKG/files/crash.txt 2>/dev/null || echo нет"
+    say "== Журнал"; T "logcat -d -s IosFeed:* IosHome:* IosConfig:* IosRemote:* IosWeather:* IosUpdate:*" | tail -80; } 2>&1 | tee "$DIR/report.txt" | head -12
 }
 
 case "${1:-}" in
