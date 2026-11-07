@@ -130,6 +130,11 @@ report() {
 }
 
 case "${1:-}" in
+  pull)
+    # Новая версия от Claude: пакет starwind.bundle рядом со скриптом.
+    cd "$R" || die "нет $R"
+    git fetch -q "$DIR/starwind.bundle" starwind || die "нет пакета starwind.bundle"
+    git reset -q --hard FETCH_HEAD && chmod +x starwind/tv && say "== Версия $(git log -1 --format='%h %s')" ;;
   deploy) deploy ;;
   release) release ;;
   report) report ;;
@@ -253,6 +258,7 @@ case "${1:-}" in
   *) cat <<'H'
 tv deploy        собрать текущую версию, поставить, передать ключи, проверить
 tv check         что сейчас на телевизоре: домашний экран, VPN, память, падения
+tv pull          забрать новую версию от Claude (starwind.bundle)
 tv release       выложить собранный лаунчер на GitHub: телек обновится сам
 tv report        то же и журнал лаунчера, в report.txt для Claude
 tv trace         записать журнал, пока ты что-то делаешь на телеке, в trace.txt
