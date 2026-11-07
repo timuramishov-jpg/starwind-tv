@@ -228,7 +228,7 @@ async function powerOff(){await go('power',{on:0})}
 fetch(url('apps')).then(r=>r.json()).then(l=>{l.slice(0,8).forEach(x=>{
   const b=document.createElement('button');b.className='app';
   b.setAttribute('aria-label',x.label);
-  b.innerHTML='<img alt="" src="'+url('logo',{p:x.pkg,c:1})+'">';
+  b.innerHTML='<img alt="" src="'+url('logo',{p:x.pkg,v:x.v||0})+'">';
   b.onclick=()=>{lastAccent=x.accent||lastAccent;glow(lastAccent);document.querySelectorAll('.app').forEach(a=>a.classList.toggle('lit',a===b));go('app',{p:x.pkg})};
   $('dock').appendChild(b)})});
 

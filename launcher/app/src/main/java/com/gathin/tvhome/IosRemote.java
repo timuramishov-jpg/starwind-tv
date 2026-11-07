@@ -69,17 +69,20 @@ final class IosRemote {
     void publish(List<Entry> apps, Map<String, String> labels) {
         new Thread(() -> {
             try {
+                long updatedAt = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).lastUpdateTime;
                 File d = dir(), logos = new File(d, "logos");
                 logos.mkdirs();
                 write(new File(d, "key"), key);
                 JSONArray a = new JSONArray();
                 for (Entry e : apps) {
-                    a.put(new JSONObject().put("pkg", e.pkg).put("label", e.label).put("component", e.component == null ? "" : e.component)
-                            .put("accent", String.format("#%06X", e.accent & 0xFFFFFF)));
                     File png = new File(logos, e.pkg + ".png");
-                    if (e.logo != null && !png.exists()) {
+                    // Логотипы перерисовываем после каждого обновления лаунчера: иначе в телефоне остаются старые цвета.
+                    if (e.logo != null && (!png.exists() || png.lastModified() < updatedAt)) {
                         try (OutputStream o = new FileOutputStream(png)) { e.logo.compress(Bitmap.CompressFormat.PNG, 100, o); }
                     }
+                    // v — версия картинки: телефон держит логотипы в кэше, новая версия — новый адрес.
+                    a.put(new JSONObject().put("pkg", e.pkg).put("label", e.label).put("component", e.component == null ? "" : e.component)
+                            .put("accent", String.format("#%06X", e.accent & 0xFFFFFF)).put("v", png.lastModified() / 1000));
                 }
                 write(new File(d, "apps.json"), a.toString());
                 write(new File(d, "labels.json"), new JSONObject(labels).toString());
