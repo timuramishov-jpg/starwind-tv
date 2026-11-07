@@ -77,7 +77,7 @@ import java.util.Set;
  */
 public class IosHome extends Activity {
     // Все цвета — из IosPalette: одна система на весь телевизор.
-    private static final int INK = IosPalette.INK, INK_2 = IosPalette.SECONDARY, ICON_REST = IosPalette.GRAY1, GROUND = IosPalette.BLACK,
+    static final int INK = IosPalette.INK, INK_2 = IosPalette.SECONDARY, ICON_REST = IosPalette.GRAY1, GROUND = IosPalette.BLACK,
             PANEL = IosPalette.GRAY6, PILL = IosPalette.GRAY6, ROW_ON = IosPalette.INK, ROW_ON_TEXT = IosPalette.ON_LIGHT, SCRIM = IosPalette.SCRIM;
     private static final float DOCK_CX = 95, DOCK_CELL = 116, DOCK_LOGO = 96, DOCK_REST = 0.875f, MAIN_X = 236,
             TITLE_Y = 170, PILL_Y = 300, CARDS_Y = 300, CARD_W = 880, CARD_H = 495, CARD_GAP = IosPalette.S4, EDGE_X = IosPalette.EDGE,
@@ -151,7 +151,7 @@ public class IosHome extends Activity {
     private final PathInterpolator ease = new PathInterpolator(0.2f, 0f, 0f, 1f);
 
     SharedPreferences prefs;
-    private FrameLayout root, dockLayer, content, cardsLayer, appsLayer, overlay;
+    FrameLayout root, dockLayer, content, cardsLayer, appsLayer, overlay;
     private TextView clock, date, temp, title, subtitle, action;
     private ImageView weatherIcon;
     private boolean restored;
@@ -159,7 +159,7 @@ public class IosHome extends Activity {
     private static final int FAST = 160, NORMAL = 260, SLOW = 420;
     private static final int CARD_CLIP = 20, CLEAN = IosPalette.TEAL;
     private static final int MENU_W = 620, MENU_ROW = 78, POSTER_W = 330;
-    private LinearLayout menuPanel;
+    LinearLayout menuPanel;
     private final Map<String, Integer> cardMemory = new HashMap<>();
     private final List<ObjectAnimator> drift = new ArrayList<>();
     private ImageView glow;
@@ -177,7 +177,7 @@ public class IosHome extends Activity {
     private int washNow;
     private float s;
     private int screenW;
-    private Typeface regular, medium, semibold;
+    Typeface regular, medium, semibold;
     IosArt pics;
     int zone = DOCK, index = 0, selected = 0;
     private float scroll = 0;
@@ -212,8 +212,11 @@ public class IosHome extends Activity {
     };
 
     final IosVpn vpn = new IosVpn(this);
+    final IosSearch search = new IosSearch(this);
+    boolean superDispatch(KeyEvent e) { return super.dispatchKeyEvent(e); }
+    final IosInputs inputs = new IosInputs(this);
     final IosSettings settings = new IosSettings(this);
-    private int px(float v) { return Math.round(v * s); }
+    int px(float v) { return Math.round(v * s); }
     boolean overlayOpen() { return overlay.getVisibility() == View.VISIBLE; }
 
     @Override protected void onCreate(Bundle state) {
@@ -267,7 +270,7 @@ public class IosHome extends Activity {
         new Thread(() -> IosAdb.get(this).ready(), "adb").start();
         remote = new IosRemote(this);
         weather = new IosWeather(this);
-        watchInputs();
+        inputs.watch();
         // VPN отслеживается событиями системы, а не опросом.
         ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         if (cm != null) {
@@ -283,8 +286,7 @@ public class IosHome extends Activity {
     @Override protected void onDestroy() {
         unregisterReceiver(packages);
 
-        TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
-        if (tim != null && inputWatch != null) tim.unregisterCallback(inputWatch);
+        inputs.unwatch();
         ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         if (cm != null && vpnWatch != null) cm.unregisterNetworkCallback(vpnWatch);
         super.onDestroy();
@@ -402,7 +404,7 @@ public class IosHome extends Activity {
             return;
         }
         String q = intent.getStringExtra("search");
-        if (q != null && !q.trim().isEmpty()) { handler.postDelayed(() -> runSearch(q.trim()), 300); return; }
+        if (q != null && !q.trim().isEmpty()) { handler.postDelayed(() -> search.run(q.trim()), 300); return; }
         closeMenu();
         moving = false;
         if (dirty || dock.isEmpty()) {
@@ -521,7 +523,7 @@ public class IosHome extends Activity {
 
     // ---------- Каркас ----------
 
-    private TextView text(float size, Typeface tf, int color) {
+    TextView text(float size, Typeface tf, int color) {
         TextView t = new TextView(this);
         t.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(size));
         t.setTypeface(tf);
@@ -613,9 +615,9 @@ public class IosHome extends Activity {
         tp.leftMargin = px(IosPalette.S1);
         status.addView(temp, tp);
         root.addView(status, at(EDGE_X, 36, 0, 0));
-        addButton(1544, R.drawable.top_search, "Поиск", this::askSearch);
+        addButton(1544, R.drawable.top_search, "Поиск", search::ask);
         addButton(1612, R.drawable.top_remote, "Пульт в телефоне", this::showRemoteCode);
-        addButton(1680, R.drawable.top_input, "Источники", this::showInputs);
+        addButton(1680, R.drawable.top_input, "Источники", inputs::show);
         addButton(1748, R.drawable.top_wifi, "Wi-Fi", settings::showWifi);
         addButton(1816, R.drawable.top_settings, "Настройки", settings::show);
 
@@ -1203,19 +1205,10 @@ public class IosHome extends Activity {
             e.logo = a.logo == null ? null : a.logo.color;
             list.add(e);
         }
-        Map<String, String> labels = new HashMap<>();
-        try {
-            PackageManager pm = getPackageManager();
-            for (android.content.pm.ApplicationInfo ai : pm.getInstalledApplications(PackageManager.MATCH_DISABLED_COMPONENTS))
-                labels.put(ai.packageName, String.valueOf(pm.getApplicationLabel(ai)));
-        } catch (Exception ignored) { }
-        remote.publish(list, labels);
+        remote.publish(list);
         remote.state(prefs.getString("vpn_place", ""), IosSleep.at(this));
     }
     private IosWeather weather;
-    private TvInputManager.TvInputCallback inputWatch;
-    private String hdmiPending;
-    private long hdmiUntil;
 
     /** Команды со страницы пульта в телефоне (главный поток). */
 
@@ -1259,131 +1252,6 @@ public class IosHome extends Activity {
         lp.gravity = Gravity.CENTER;
         overlay.addView(box, lp);
         overlay.setVisibility(View.VISIBLE);
-    }
-
-    /** Поиск с пульта телевизора: поле ввода, клавиатура Яндекса умеет и голос. */
-    private EditText searchField;
-
-    /** Поиск в боковой панели лаунчера: поле ввода в стиле меню и недавние запросы. Клавиатура — системная, другой нет. */
-    private void askSearch() {
-        List<String> recent = stored("searches");
-        List<Runnable> actions = new ArrayList<>();
-        for (String q : recent) actions.add(() -> runSearch(q));
-        showMenu("Поиск", recent, actions);
-        menuKind = "search";
-        LinearLayout panel = (LinearLayout) ((View) menuPanel.getParent()).getParent();
-        EditText field = new EditText(this);
-        field.setSingleLine(true);
-        field.setHint("Фильм, ролик, канал");
-        field.setHintTextColor(IosPalette.TERTIARY);
-        field.setTextColor(INK);
-        field.setTypeface(regular);
-        field.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(IosPalette.BODY));
-        field.setPadding(px(IosPalette.S3), 0, px(IosPalette.S3), 0);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(IosPalette.GRAY5);
-        bg.setCornerRadius(px(IosPalette.R_ROW));
-        field.setBackground(bg);
-        field.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
-        field.setOnEditorActionListener((v, action, ev) -> {
-            String q = field.getText().toString().trim();
-            if (q.isEmpty()) return true;
-            List<String> h = stored("searches");
-            h.remove(q);
-            h.add(0, q);
-            while (h.size() > 8) h.remove(h.size() - 1);
-            store("searches", h);
-            hideKeyboard(field);
-            runSearch(q);
-            return true;
-        });
-        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, px(84));
-        lp.bottomMargin = px(IosPalette.S3);
-        panel.addView(field, 1, lp);
-        if (!recent.isEmpty()) {
-            TextView head = text(IosPalette.FOOTNOTE, medium, IosPalette.SECONDARY);
-            head.setText("Недавние");
-            head.setPadding(px(IosPalette.S3), 0, px(IosPalette.S3), px(12));
-            panel.addView(head, 2, new LinearLayout.LayoutParams(-1, -2));
-        }
-        searchField = field;
-        menuIndex = -1;
-        paintMenu();
-        field.requestFocus();
-        handler.postDelayed(() -> {
-            android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-            if (imm != null && field.isAttachedToWindow()) imm.showSoftInput(field, 0);
-        }, 150);
-    }
-
-    private void hideKeyboard(View v) {
-        android.view.inputmethod.InputMethodManager imm = (android.view.inputmethod.InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
-        if (imm != null) imm.hideSoftInputFromWindow(v.getWindowToken(), 0);
-    }
-
-    /** Пока курсор в поле поиска, кнопки идут полю; вниз — к недавним запросам, назад — закрыть. */
-    private boolean searchKey(KeyEvent e) {
-        if (searchField == null || !overlayOpen() || !"search".equals(menuKind) || !searchField.hasFocus()) return false;
-        int key = e.getKeyCode();
-        if (key == KeyEvent.KEYCODE_BACK) {
-            if (e.getAction() == KeyEvent.ACTION_UP) closeMenu();
-            return true;
-        }
-        if (key == KeyEvent.KEYCODE_DPAD_DOWN && !menuViews.isEmpty()) {
-            if (e.getAction() == KeyEvent.ACTION_DOWN) {
-                hideKeyboard(searchField);
-                searchField.clearFocus();
-                root.requestFocus();
-                menuIndex = 0;
-                paintMenu();
-            }
-            return true;
-        }
-        return super.dispatchKeyEvent(e);
-    }
-
-    private void runSearch(String q) {
-        if (q.isEmpty()) return;
-        note("Ищу «" + q + "»");
-        feed.search(q, found -> {
-            if (found.isEmpty()) { note("Ничего не нашлось"); return; }
-            List<String> labels = new ArrayList<>();
-            List<Runnable> actions = new ArrayList<>();
-            for (FeedItem it : found) {
-                labels.add(it.subtitle.split(" · ")[0] + ": " + it.title);
-                actions.add(() -> {
-                    try { startActivity(it.open); } catch (Exception e) { note("Не открылось"); }
-                });
-            }
-            showMenu("Поиск: " + q, labels, actions);
-        });
-    }
-
-    /** Подключили приставку или ноутбук по HDMI — предлагаем перейти на этот вход (15 секунд, ОК). */
-    private void watchInputs() {
-        TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
-        if (tim == null) return;
-        final Map<String, Integer> was = new HashMap<>();
-        try { for (TvInputInfo info : tim.getTvInputList()) if (info.isPassthroughInput()) was.put(info.getId(), tim.getInputState(info.getId())); }
-        catch (Exception ignored) { }
-        inputWatch = new TvInputManager.TvInputCallback() {
-            @Override public void onInputStateChanged(String id, int state) {
-                Integer before = was.put(id, state);
-                if (state != TvInputManager.INPUT_STATE_CONNECTED || (before != null && before == TvInputManager.INPUT_STATE_CONNECTED)) return;
-                if (!hasWindowFocus()) return;
-                String name = id;
-                try { name = String.valueOf(tim.getTvInputInfo(id).loadLabel(IosHome.this)); } catch (Exception ignored) { }
-                hdmiPending = id;
-                hdmiUntil = SystemClock.elapsedRealtime() + 15000;
-                note("Подключено: " + name + ". ОК — перейти");
-            }
-        };
-        tim.registerCallback(inputWatch, handler);
-    }
-
-    private void openInput(String id) {
-        open(new Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput(id).buildUpon().scheme("live-tv").build())
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
     }
 
     /** Сообщение лаунчера: тёмная плашка сверху по центру в общем стиле (вместо системного тоста). */
@@ -1664,7 +1532,7 @@ public class IosHome extends Activity {
     @Override public boolean dispatchKeyEvent(KeyEvent e) {
         int key = e.getKeyCode();
         if (dimming) { wake(); return true; }
-        if (searchKey(e)) return true;
+        if (search.key(e)) return true;
         lastInput = SystemClock.uptimeMillis();
         if (e.getAction() == KeyEvent.ACTION_DOWN) {
             for (ObjectAnimator a : drift) if (a.isRunning()) a.pause();
@@ -1718,7 +1586,7 @@ public class IosHome extends Activity {
                 if (overlayOpen()) closeMenu(); else settings.show();
                 return true;
             case KeyEvent.KEYCODE_TV_INPUT:
-                showInputs();
+                inputs.show();
                 return true;
             default:
                 return super.dispatchKeyEvent(e);
@@ -1734,12 +1602,7 @@ public class IosHome extends Activity {
             }
             return;
         }
-        if (hdmiPending != null && SystemClock.elapsedRealtime() < hdmiUntil) {
-            String id = hdmiPending;
-            hdmiPending = null;
-            openInput(id);
-            return;
-        }
+        if (inputs.openPending()) return;
         if (moving) { stopMoving(); return; }
         if (focused == null) return;
         Object tag = focused.getTag();
@@ -1890,10 +1753,10 @@ public class IosHome extends Activity {
     }
 
     private void menuKey(int key) {
-        if (key == KeyEvent.KEYCODE_DPAD_UP && menuIndex == 0 && "search".equals(menuKind) && searchField != null) {
+        if (key == KeyEvent.KEYCODE_DPAD_UP && menuIndex == 0 && "search".equals(menuKind) && search.field != null) {
             menuIndex = -1;
             paintMenu();
-            searchField.requestFocus();
+            search.field.requestFocus();
             return;
         }
         // Строки-сведения (INFO) не выбираются: курсор их перескакивает.
@@ -1909,8 +1772,8 @@ public class IosHome extends Activity {
     /** Строка-сведение в меню: показывает значение, но не выбирается. */
     final Runnable INFO = new Keep(() -> { });
 
-    private void closeMenu() {
-        if (searchField != null) { hideKeyboard(searchField); searchField = null; }
+    void closeMenu() {
+        if (search.field != null) { search.hideKeyboard(search.field); search.field = null; }
         menuKind = "";
         feed.stopPolling();
         overlay.setVisibility(View.GONE);
@@ -2021,34 +1884,5 @@ public class IosHome extends Activity {
         dimming = false;
         root.animate().cancel();
         root.animate().alpha(1f).setDuration(FAST).start();
-    }
-
-    private void showInputs() {
-        List<String> labels = new ArrayList<>();
-        List<Runnable> actions = new ArrayList<>();
-        TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
-        if (tim != null) {
-            List<TvInputInfo> inputs = new ArrayList<>(tim.getTvInputList());
-            Collections.sort(inputs, (a, b) ->
-                    String.valueOf(a.loadLabel(this)).compareToIgnoreCase(String.valueOf(b.loadLabel(this))));
-            for (final TvInputInfo info : inputs) {
-                String label = String.valueOf(info.loadLabel(this));
-                if (!info.isPassthroughInput() || info.isHidden(this) || label.startsWith("Playback")) continue;
-                labels.add(label);
-                actions.add(() -> open(new Intent(Intent.ACTION_VIEW,
-                        TvContract.buildChannelUriForPassthroughInput(info.getId()).buildUpon().scheme("live-tv").build())
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
-            }
-        }
-        final Intent live = getPackageManager().getLeanbackLaunchIntentForPackage("com.yandex.tv.live");
-        if (live != null) {
-            labels.add("Телеканалы");
-            actions.add(() -> open(live));
-        }
-        if (labels.isEmpty()) {
-            note("Источники не найдены");
-            return;
-        }
-        showMenu("Источники", labels, actions);
     }
 }

@@ -66,7 +66,17 @@ final class IosRemote {
     }
 
     /** Список приложений с логотипами и названия всех пакетов — для страницы пульта. В фоне. */
-    void publish(List<Entry> apps, Map<String, String> labels) {
+    private String published = "";
+    private int labelsFor = -1;
+
+    /** Вызывается часто (каждый показ главного экрана), поэтому всё — в фоне, и только если что-то поменялось:
+     *  названия всех пакетов — это обход каждого APK, на нехватке памяти он подвешивал главный поток. */
+    void publish(List<Entry> apps) {
+        StringBuilder sig = new StringBuilder();
+        for (Entry e : apps) sig.append(e.pkg).append(e.accent).append(',');
+        String now = sig.toString();
+        if (now.equals(published)) return;
+        published = now;
         new Thread(() -> {
             try {
                 long updatedAt = context.getPackageManager().getPackageInfo(context.getPackageName(), 0).lastUpdateTime;
@@ -85,7 +95,14 @@ final class IosRemote {
                             .put("accent", String.format("#%06X", e.accent & 0xFFFFFF)).put("v", png.lastModified() / 1000));
                 }
                 write(new File(d, "apps.json"), a.toString());
-                write(new File(d, "labels.json"), new JSONObject(labels).toString());
+                android.content.pm.PackageManager pm = context.getPackageManager();
+                List<android.content.pm.ApplicationInfo> all = pm.getInstalledApplications(android.content.pm.PackageManager.MATCH_DISABLED_COMPONENTS);
+                if (all.size() != labelsFor || !new File(d, "labels.json").exists()) {
+                    Map<String, String> labels = new java.util.HashMap<>();
+                    for (android.content.pm.ApplicationInfo ai : all) labels.put(ai.packageName, String.valueOf(pm.getApplicationLabel(ai)));
+                    write(new File(d, "labels.json"), new JSONObject(labels).toString());
+                    labelsFor = all.size();
+                }
             } catch (Exception e) {
                 Log.w(TAG, "publish: " + e);
             }
