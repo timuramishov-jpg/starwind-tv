@@ -189,6 +189,9 @@ public class IosHome extends Activity {
     private final List<Runnable> menuActions = new ArrayList<>();
     private final List<TextView> menuViews = new ArrayList<>();
     private int menuIndex;
+    private IosTools tools;
+    private long lastInput = SystemClock.uptimeMillis();
+    private boolean dimming;
 
     private final Runnable ticker = new Runnable() {
         @Override public void run() {
@@ -197,6 +200,7 @@ public class IosHome extends Activity {
             if (ticks % 12 == 0 && zone != CARDS && zone != APPS && !overlayOpen()) rotateFeeds();
             if (ticks % 4 == 0) loadAllFeeds();
             if (ticks % 20 == 0 && vpnOn()) checkSpeed();
+            checkIdle();
             handler.postDelayed(this, 15000);
         }
     };
@@ -255,6 +259,9 @@ public class IosHome extends Activity {
         f.addAction(Intent.ACTION_PACKAGE_CHANGED);
         f.addDataScheme("package");
         registerReceiver(packages, f);
+        tools = new IosTools(this);
+        // Свой adb: один раз телевизор спросит «Разрешить отладку?» — пусть спросит сразу, пока человек у экрана.
+        new Thread(() -> IosAdb.get(this).ready(), "adb").start();
         remote = new IosRemote(this, this::remoteCommand);
         remote.start();
         weather = new IosWeather(this);
@@ -283,6 +290,8 @@ public class IosHome extends Activity {
 
     @Override protected void onResume() {
         super.onResume();
+        wake();
+        root.setAlpha(1f);
         handler.post(ticker);
         for (ObjectAnimator a : drift) { if (a.isPaused()) a.resume(); else if (!a.isStarted()) a.start(); }
         if (wasAway) {
@@ -1674,6 +1683,8 @@ public class IosHome extends Activity {
 
     @Override public boolean dispatchKeyEvent(KeyEvent e) {
         int key = e.getKeyCode();
+        if (dimming) { wake(); return true; }
+        lastInput = SystemClock.uptimeMillis();
         if (e.getAction() == KeyEvent.ACTION_DOWN) {
             for (ObjectAnimator a : drift) if (a.isRunning()) a.pause();
             handler.removeCallbacks(driftOn);
@@ -2000,7 +2011,7 @@ public class IosHome extends Activity {
             long step = left == 0 ? 30 : left <= 30 ? 60 : left <= 60 ? 90 : 0;
             IosSleep.schedule(this, step);
             note(step == 0 ? "Таймер сна выключен" : "Телевизор выключится через " + step + " мин");
-            showSettings();
+            reopenSettings();
         });
         SharedPreferences saverPrefs = getSharedPreferences("ios_saver", 0);
         int saverPick = saverPrefs.getInt("style", -1);
@@ -2008,11 +2019,28 @@ public class IosHome extends Activity {
         actions.add(() -> {
             int next = saverPick + 1 >= IosSaver.NAMES.length ? -1 : saverPick + 1;
             saverPrefs.edit().putInt("style", next).apply();
-            showSettings();
+            reopenSettings();
         });
         labels.add("Показать заставку");
         actions.add(() -> startActivity(new Intent(this, IosSaverActivity.class)
                 .putExtra("style", saverPick < 0 ? 0 : saverPick)));
+        int idle = saverPrefs.getInt("idle", 5);
+        labels.add("Заставка при простое: " + (idle == 0 ? "никогда" : "через " + idle + " мин"));
+        actions.add(() -> {
+            int next = idle == 2 ? 5 : idle == 5 ? 10 : idle == 10 ? 15 : idle == 15 ? 0 : 2;
+            saverPrefs.edit().putInt("idle", next).apply();
+            reopenSettings();
+        });
+        boolean ads = IosTools.adsBlocked(this), fast = IosTools.fastAnim(this);
+        labels.add("Блокировка рекламы: " + (ads ? "включена" : "выключена"));
+        actions.add(() -> tweak("dns", !ads));
+        labels.add("Быстрые анимации: " + (fast ? "включены" : "выключены"));
+        actions.add(() -> tweak("anim", !fast));
+        labels.add("Очистить кэш приложений");
+        actions.add(() -> {
+            note("Чищу кэш…");
+            new Thread(() -> { boolean ok = tools.trim(); handler.post(() -> note(ok ? "Кэш очищен" : "Нет доступа к отладке: разреши её на экране")); }, "trim").start();
+        });
         labels.add("Пульт в телефоне (QR-код)");
         actions.add(this::showRemoteCode);
         labels.add("Обновить лаунчер (версия " + IosUpdate.installed(this) + ")");
@@ -2039,6 +2067,45 @@ public class IosHome extends Activity {
             });
         }
         showMenu("Настройки", labels, actions);
+    }
+
+    /** Переоткрыть настройки на той же строке: после переключателя. */
+    private void reopenSettings() {
+        int at = menuIndex;
+        showSettings();
+        menuIndex = Math.min(at, menuViews.size() - 1);
+        paintMenu();
+    }
+
+    private void tweak(String what, boolean on) {
+        new Thread(() -> {
+            String r;
+            try { r = tools.tweak(what, on ? "1" : "0"); } catch (Exception e) { r = IosTools.say("Не получилось"); }
+            String msg = r.replaceAll("^\\{\"say\":\"|\"\\}$", "");
+            handler.post(() -> { note(msg); if (overlayOpen()) reopenSettings(); });
+        }, "tweak").start();
+    }
+
+    /** Долго без нажатий на главном экране: экран мягко притухает, потом заставка. Заодно чистка кэша раз в 15 дней. */
+    private void checkIdle() {
+        int idle = getSharedPreferences("ios_saver", 0).getInt("idle", 5);
+        if (idle == 0 || overlayOpen() || !hasWindowFocus() || dimming) return;
+        if (SystemClock.uptimeMillis() - lastInput < idle * 60_000L) return;
+        dimming = true;
+        tools.trimIfDue();
+        root.animate().alpha(0.25f).setDuration(2500).withEndAction(() -> {
+            if (!dimming) return;
+            startActivity(new Intent(this, IosSaverActivity.class));
+            overridePendingTransition(android.R.anim.fade_in, android.R.anim.fade_out);
+        }).start();
+    }
+
+    private void wake() {
+        lastInput = SystemClock.uptimeMillis();
+        if (!dimming) return;
+        dimming = false;
+        root.animate().cancel();
+        root.animate().alpha(1f).setDuration(FAST).start();
     }
 
     private void showInputs() {

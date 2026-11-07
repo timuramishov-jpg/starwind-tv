@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Пульт Starwind</title>
+<style>
+:root{color-scheme:dark;--bg:#000;--card:#1c1c1e;--fill:#2c2c2e;--line:#38383a;--ink:#f5f5f7;--sub:#8e8e93;--orange:#ff9f0a;--red:#ff453a;--green:#30d158}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{overflow-x:clip}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.35 -apple-system,BlinkMacSystemFont,"SF Pro Text",system-ui,sans-serif;padding:max(16px,env(safe-area-inset-top)) 16px 48px;-webkit-user-select:none;user-select:none}
+h1{font-size:34px;font-weight:700;letter-spacing:-.4px;margin:6px 4px 14px}
+h2{font-size:13px;font-weight:400;color:var(--sub);margin:24px 16px 8px}
+.seg{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--fill);border-radius:9px;padding:2px;position:sticky;top:8px;z-index:5}
+.seg button{background:none;color:var(--ink);font-size:13px;font-weight:500;padding:7px 2px;border-radius:7px}
+.seg button.on{background:#636366}
+.tab{display:none}.tab.on{display:block}
+.g{background:var(--card);border-radius:12px;overflow:hidden}
+.row{display:flex;gap:10px;padding:10px;align-items:center}
+input[type=text],input[type=url],input[type=search]{flex:1;min-width:0;font:inherit;color:inherit;background:var(--fill);border:0;border-radius:10px;padding:11px 14px;outline:none;-webkit-user-select:text;user-select:text}
+button{font:inherit;font-weight:600;border:0;border-radius:10px;padding:11px 16px;background:var(--orange);color:#000;cursor:pointer}
+button.s{background:var(--fill);color:var(--ink)}
+button.r{background:none;color:var(--red);font-weight:400}
+button:active{opacity:.55}
+button:focus-visible{outline:2px solid var(--orange);outline-offset:2px}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;padding:10px}
+.grid button{padding:15px 4px}
+.pad{position:relative;width:min(78vw,300px);aspect-ratio:1;margin:18px auto 8px;border-radius:50%;background:var(--card)}
+.pad button{position:absolute;background:none;color:var(--ink);width:33%;height:33%;border-radius:50%;font-size:24px;font-weight:400}
+.pad .u{left:33.5%;top:2%}.pad .d{left:33.5%;bottom:2%}.pad .l{left:2%;top:33.5%}.pad .rt{right:2%;top:33.5%}
+.pad .ok{left:30%;top:30%;width:40%;height:40%;background:var(--fill);font-size:17px;font-weight:600}
+.list>*{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border-radius:0;border-top:.5px solid var(--line);padding:12px 16px;font-weight:400;color:var(--ink)}
+.list>*:first-child{border-top:0}
+.list .name{flex:1;min-width:0}
+.list .name small{display:block;color:var(--sub);font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag{font-size:13px;color:var(--sub);white-space:nowrap}
+.acts{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 12px;border-top:0!important}
+.acts button{padding:8px 12px;font-size:15px}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.stat{background:var(--card);border-radius:12px;padding:12px 14px}
+.stat b{display:block;font-size:28px;font-weight:600;letter-spacing:-.3px;font-variant-numeric:tabular-nums}
+.stat span{font-size:13px;color:var(--sub)}
+.bar{height:4px;border-radius:2px;background:var(--fill);margin-top:8px;overflow:hidden}.bar i{display:block;height:100%;background:var(--orange)}
+.sw{appearance:none;-webkit-appearance:none;width:51px;height:31px;border-radius:16px;background:#39393d;position:relative;flex:none;margin:0;transition:background .2s}
+.sw::after{content:"";position:absolute;left:2px;top:2px;width:27px;height:27px;border-radius:50%;background:#fff;transition:transform .2s}
+.sw:checked{background:var(--green)}.sw:checked::after{transform:translateX(20px)}
+.note{background:#3a2a00;color:#ffd60a;border-radius:12px;padding:12px 14px;margin-top:14px;font-size:15px;display:none}
+img.shot{display:block;width:100%;border-radius:12px;margin-top:10px}
+.file{position:relative;overflow:hidden}.file input{position:absolute;inset:0;opacity:0}
+progress{width:100%;height:4px;display:none}
+#t{position:fixed;left:50%;bottom:28px;transform:translateX(-50%);background:var(--fill);padding:10px 18px;border-radius:999px;font-size:15px;opacity:0;transition:opacity .2s;pointer-events:none;max-width:90vw;text-align:center}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<h1>Пульт</h1>
+<div class="seg" id="seg"><button class="on" data-t="remote">Пульт</button><button data-t="apps">Приложения</button><button data-t="tv">Телевизор</button><button data-t="files">Файлы</button></div>
+<div class="note" id="ask">На телевизоре окно «Разрешить отладку». Отметь «Всегда разрешать с этого компьютера» и нажми ОК.</div>
+
+<section class="tab on" id="remote">
+  <div class="pad">
+    <button class="u" data-key="DPAD_UP" aria-label="Вверх">▲</button>
+    <button class="l" data-key="DPAD_LEFT" aria-label="Влево">◀</button>
+    <button class="ok" data-key="DPAD_CENTER">ОК</button>
+    <button class="rt" data-key="DPAD_RIGHT" aria-label="Вправо">▶</button>
+    <button class="d" data-key="DPAD_DOWN" aria-label="Вниз">▼</button>
+  </div>
+  <div class="grid">
+    <button class="s" data-key="BACK">Назад</button><button class="s" onclick="go('home',{})">Домой</button><button class="s" data-key="MEDIA_PLAY_PAUSE">Пауза</button>
+    <button class="s" onclick="go('vol',{d:'down'})">Тише</button><button class="s" onclick="go('vol',{d:'mute'})">Без звука</button><button class="s" onclick="go('vol',{d:'up'})">Громче</button>
+  </div>
+  <h2>Напечатать на телевизоре</h2>
+  <div class="g"><div class="row"><input type="text" id="tx" placeholder="Текст в поле на экране" enterkeyhint="send"><button onclick="typeText()">Ввести</button></div>
+  <div class="grid" style="padding-top:0"><button class="s" data-key="DEL">Стереть</button><button class="s" data-key="SPACE">Пробел</button><button class="s" data-key="ENTER">Ввод</button></div></div>
+  <h2>Открыть на телевизоре</h2>
+  <div class="g"><div class="row"><input type="url" id="u" placeholder="Ссылка YouTube, ВК, Рутуб"><button onclick="go('open',{u:val('u')})">Открыть</button></div></div>
+  <h2>Поиск</h2>
+  <div class="g"><div class="row"><input type="search" id="q" placeholder="Фильм, ролик, канал" enterkeyhint="search"><button onclick="go('search',{q:val('q')})">Найти</button></div></div>
+  <h2>VPN и сон</h2>
+  <div class="g"><div class="grid">
+    <button class="s" onclick="go('vpn',{on:1})">VPN вкл</button><button class="s" onclick="go('vpn',{on:0})">VPN выкл</button><button class="s" onclick="go('sleep',{m:0})">Без сна</button>
+    <button class="s" onclick="go('sleep',{m:30})">Сон 30</button><button class="s" onclick="go('sleep',{m:60})">Сон 60</button><button class="s" onclick="go('sleep',{m:90})">Сон 90</button>
+  </div></div>
+  <h2>Открыть приложение</h2>
+  <div class="g list" id="dock"></div>
+</section>
+
+<section class="tab" id="apps">
+  <h2>Установить с телефона</h2>
+  <div class="g"><div class="row"><button class="file s" style="flex:1">Выбрать APK<input type="file" accept=".apk,application/vnd.android.package-archive" onchange="installApk(this)"></button></div><progress id="ip" max="1"></progress></div>
+  <h2>Можно смело отключить</h2><div class="g list" id="bloat"></div>
+  <h2>Установленные</h2><div class="g list" id="user"></div>
+  <h2>Встроенные</h2><div class="g list" id="sys"></div>
+</section>
+
+<section class="tab" id="tv">
+  <h2>Сейчас</h2>
+  <div class="stats">
+    <div class="stat"><span>Процессор</span><b id="cpu">—</b><div class="bar"><i id="cpub" style="width:0"></i></div></div>
+    <div class="stat"><span id="raml">Память</span><b id="ram">—</b><div class="bar"><i id="ramb" style="width:0"></i></div></div>
+    <div class="stat"><span>Температура</span><b id="temp">—</b></div>
+    <div class="stat"><span id="netl">Сеть, Мбит/с</span><b id="net">—</b></div>
+    <div class="stat" style="grid-column:1/-1"><span>Свободно на диске</span><b id="disk">—</b></div>
+  </div>
+  <h2>Больше всего памяти</h2><div class="g list" id="top"></div>
+  <h2>Настройки</h2>
+  <div class="g list">
+    <label><span class="name">Быстрые анимации<small>Меню и переходы вдвое быстрее</small></span><input type="checkbox" class="sw" id="anim" onchange="tweak('anim',this.checked)"></label>
+    <label><span class="name">Блокировка рекламы<small>Через DNS AdGuard, для всех приложений</small></span><input type="checkbox" class="sw" id="dns" onchange="tweak('dns',this.checked)"></label>
+  </div>
+  <h2>Действия</h2>
+  <div class="g list">
+    <button onclick="shot()"><span class="name">Снимок экрана</span></button>
+    <button onclick="tweak('trim')"><span class="name">Очистить кэш приложений<small>Входы и данные остаются</small></span></button>
+    <button onclick="tweak('devsettings')"><span class="name">Доступ к отладке<small>Там же можно отозвать все разрешения</small></span></button>
+    <button onclick="if(confirm('Перезагрузить телевизор?'))tweak('reboot')"><span class="name" style="color:var(--red)">Перезагрузить телевизор</span></button>
+  </div>
+  <div id="shotbox"></div>
+</section>
+
+<section class="tab" id="files">
+  <div class="seg" style="grid-template-columns:repeat(2,minmax(0,1fr));position:static;margin-top:14px" id="fseg"><button class="on" data-d="Download">Загрузки</button><button data-d="Movies">Фильмы</button></div>
+  <h2>Отправить на телевизор</h2>
+  <div class="g"><div class="row"><button class="file s" style="flex:1">Выбрать файл<input type="file" onchange="upload(this)"></button></div><progress id="up" max="1"></progress></div>
+  <h2>На телевизоре</h2><div class="g list" id="flist"></div>
+</section>
+<div id="t" role="status"></div>
+
+<script>
+const k=new URLSearchParams(location.search).get('k');
+const $=i=>document.getElementById(i);
+function val(i){return $(i).value.trim()}
+function toast(s){const t=$('t');t.textContent=s;t.style.opacity=1;clearTimeout(t.h);t.h=setTimeout(()=>t.style.opacity=0,1800)}
+function url(w,a){a=a||{};a.k=k;return '/'+w+'?'+new URLSearchParams(a)}
+async function call(w,a){const r=await fetch(url(w,a));return r.json()}
+async function go(w,a){try{const j=await call(w,a);if(j.say)toast(j.say);return j}catch(e){toast('Телевизор не ответил')}}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+function mb(n){return n>=1024?(n/1024).toFixed(1).replace('.',',')+' ГБ':n+' МБ'}
+
+document.querySelectorAll('#seg button').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('#seg button').forEach(x=>x.classList.toggle('on',x===b));
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.id===b.dataset.t));
+  if(b.dataset.t==='apps')loadApps();if(b.dataset.t==='files')loadFiles();if(b.dataset.t==='tv'){stats();topApps()}
+});
+
+// Кнопки пульта: зажатая повторяет нажатие.
+document.querySelectorAll('[data-key]').forEach(b=>{
+  let rep;const send=()=>go('key',{c:b.dataset.key});
+  b.addEventListener('pointerdown',e=>{e.preventDefault();send();rep=setTimeout(function r(){send();rep=setTimeout(r,180)},450)});
+  ['pointerup','pointerleave','pointercancel'].forEach(ev=>b.addEventListener(ev,()=>clearTimeout(rep)));
+});
+async function typeText(){const t=$('tx').value;if(!t)return;await go('text',{t});$('tx').value=''}
+$('tx').addEventListener('keydown',e=>{if(e.key==='Enter')typeText()});
+$('q').addEventListener('keydown',e=>{if(e.key==='Enter')go('search',{q:val('q')})});
+
+fetch(url('apps')).then(r=>r.json()).then(l=>{l.forEach(x=>{const b=document.createElement('button');b.innerHTML='<span class=name>'+esc(x.label)+'</span>';b.onclick=()=>go('app',{p:x.pkg});$('dock').appendChild(b)})});
+
+async function loadApps(){
+  let l;try{l=await call('pkgs')}catch(e){toast('Телевизор не ответил');return}
+  if(l.say){toast(l.say);return}
+  ['bloat','user','sys'].forEach(i=>$(i).innerHTML='');
+  l.forEach(x=>{
+    const box=$(x.bloat?'bloat':x.user?'user':'sys');
+    const b=document.createElement('button');
+    b.innerHTML='<span class=name>'+esc(x.label)+'<small>'+esc(x.pkg)+'</small></span><span class=tag>'+(x.off?'отключено':x.keep?'системное':'')+'</span>';
+    b.onclick=()=>{const n=b.nextElementSibling;if(n&&n.classList.contains('acts')){n.remove();return}
+      const a=document.createElement('div');a.className='acts';
+      const add=(t,w,c)=>{const q=document.createElement('button');q.className=c||'s';q.textContent=t;q.onclick=async()=>{const j=await go('pkg',{p:x.pkg,a:w});if(j&&j.say==='Готово')loadApps()};a.appendChild(q)};
+      if(!x.keep){add('Остановить','stop');add(x.off?'Включить':'Отключить',x.off?'enable':'disable');if(x.user)add('Удалить','uninstall','r')}else if(x.off)add('Включить','enable');
+      if(!a.children.length){a.innerHTML='<span class=tag>Это нужно телевизору, не трогаю</span>'}
+      b.after(a)};
+    box.appendChild(b)});
+  ['bloat','user','sys'].forEach(i=>{if(!$(i).children.length)$(i).innerHTML='<div><span class="name tag">Пусто</span></div>'});
+}
+
+function sendFile(path,file,bar,done){
+  const x=new XMLHttpRequest();x.open('POST',path);bar.style.display='block';bar.value=0;
+  x.upload.onprogress=e=>{if(e.lengthComputable)bar.value=e.loaded/e.total};
+  x.onload=()=>{bar.style.display='none';try{toast(JSON.parse(x.responseText).say||'Готово')}catch(e){toast('Готово')}done&&done()};
+  x.onerror=()=>{bar.style.display='none';toast('Телевизор не ответил')};x.send(file)}
+function installApk(i){const f=i.files[0];if(!f)return;toast('Ставлю '+f.name);sendFile(url('install'),f,$('ip'),loadApps);i.value=''}
+
+let dir='Download';
+document.querySelectorAll('#fseg button').forEach(b=>b.onclick=()=>{dir=b.dataset.d;document.querySelectorAll('#fseg button').forEach(x=>x.classList.toggle('on',x===b));loadFiles()});
+async function loadFiles(){
+  let l;try{l=await call('files',{d:dir})}catch(e){toast('Телевизор не ответил');return}
+  const box=$('flist');box.innerHTML='';
+  if(l.say){toast(l.say);return}
+  if(!l.length)box.innerHTML='<div><span class="name tag">Пусто</span></div>';
+  l.forEach(f=>{const r=document.createElement('div');
+    r.innerHTML='<span class=name>'+esc(f.name)+'<small>'+mb(Math.max(1,Math.round(f.size/1048576)))+'</small></span>';
+    const a=document.createElement('a');a.href=url('get',{d:dir,n:f.name});a.download=f.name;a.textContent='Скачать';a.style.cssText='color:var(--orange);text-decoration:none';
+    const del=document.createElement('button');del.className='r';del.textContent='Удалить';del.style.padding='0 0 0 12px';
+    del.onclick=async()=>{if(confirm('Удалить '+f.name+'?')){await go('rm',{d:dir,n:f.name});loadFiles()}};
+    r.append(a,del);box.appendChild(r)})}
+function upload(i){const f=i.files[0];if(!f)return;sendFile(url('upload',{d:dir,n:f.name}),f,$('up'),loadFiles);i.value=''}
+
+async function stats(){
+  if(!$('tv').classList.contains('on'))return;
+  try{const s=await call('stats');
+    if(s.cpu!=null){$('cpu').textContent=s.cpu+'%';$('cpub').style.width=s.cpu+'%'}
+    const used=s.ramTotal-s.ramFree;$('ram').textContent=Math.round(100*used/s.ramTotal)+'%';$('raml').textContent='Память, МБ · '+used+' из '+s.ramTotal;$('ramb').style.width=Math.round(100*used/s.ramTotal)+'%';
+    if(s.temp!=null)$('temp').textContent=s.temp+'°';
+    if(s.down!=null){$('net').textContent='↓ '+(s.down/1000).toFixed(1).replace('.',',');$('netl').textContent='Сеть, Мбит/с · ↑ '+(s.up/1000).toFixed(1).replace('.',',')}
+    $('disk').textContent=mb(s.diskFree)+' из '+mb(s.diskTotal);
+  }catch(e){}
+  setTimeout(stats,2500)}
+async function topApps(){
+  if(!$('tv').classList.contains('on'))return;
+  try{const l=await call('top');if(Array.isArray(l)){const box=$('top');box.innerHTML='';
+    l.forEach(x=>{const r=document.createElement('div');r.innerHTML='<span class=name>'+esc(x.label)+'<small>'+esc(x.pkg)+'</small></span><span class=tag>'+x.mb+' МБ</span>';box.appendChild(r)})}}catch(e){}
+  setTimeout(topApps,12000)}
+async function tweak(w,on){await go('tweak',{w,v:on?1:0});state()}
+async function state(){try{const s=await call('state');$('anim').checked=!!s.anim;$('dns').checked=!!s.dns;$('ask').style.display=s.asking?'block':'none'}catch(e){}}
+function shot(){toast('Снимаю экран');const img=new Image();img.className='shot';img.alt='Снимок экрана телевизора';
+  img.onload=()=>{$('shotbox').innerHTML='';const a=document.createElement('a');a.href=img.src;a.download='tv.png';a.appendChild(img);$('shotbox').appendChild(a)};
+  img.onerror=()=>toast('Не получилось снять экран');img.src=url('shot',{t:Date.now()})}
+state();setInterval(state,5000);
+</script>
+</body>
+</html>

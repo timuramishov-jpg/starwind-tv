@@ -146,6 +146,8 @@ deploy() {
   T "settings put secure screensaver_enabled 1; settings put secure screensaver_components $PKG/.IosDream; settings put secure screensaver_default_component $PKG/.IosDream"
   # Обновление с GitHub ставит APK через системный установщик.
   T "appops set $PKG REQUEST_INSTALL_PACKAGES allow"
+  # Системные анимации вдвое быстрее (переключается в шестерёнке и в пульте телефона).
+  T "settings put global window_animation_scale 0.5; settings put global transition_animation_scale 0.5; settings put global animator_duration_scale 0.5"
   T "am force-stop $PKG; cmd package set-home-activity --user 0 $PKG/.IosHome" > /dev/null
   keys
   home; sleep 12
@@ -311,6 +313,7 @@ case "${1:-}" in
     online
     [ "${2:-}" = off ] || { say "tv adb off: выключить отладку. Включить обратно: Настройки лаунчера, Отладка по сети"; exit 0; }
     T 'settings put global adb_enabled 0' ; say "Отладка выключена. Включить: Настройки лаунчера, Отладка по сети" ;;
+  backup) online; backup && say "Настройки лаунчера в $DIR/backup" || die "копии на телевизоре пока нет: лаунчер делает её, когда уходишь с главного экрана" ;;
   slim) online; T 'for p in com.yandex.tv.input.efir com.yandex.tv.videoplayer com.yandex.devices.farm.companion com.yandex.tv.home; do pm disable-user --user 0 $p; done' | grep -c disabled-user ;;
   rollback)
     online
@@ -332,6 +335,7 @@ tv adb off       выключить отладку по сети
 tv aurora        поставить Aurora Store (Google Play без сервисов Google)
 tv install F.apk поставить любое приложение
 tv slim          отключить лишнее Яндекса и его оболочку
+tv backup        забрать копию настроек лаунчера в backup/
 tv rollback      вернуть оболочку Яндекса
 tv reboot        перезагрузить телевизор
 H
