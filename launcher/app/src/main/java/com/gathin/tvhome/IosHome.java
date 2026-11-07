@@ -36,7 +36,10 @@ import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.NetworkRequest;
+import android.media.AudioManager;
 import android.net.Uri;
+import android.os.SystemClock;
+import android.widget.EditText;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -247,6 +250,10 @@ public class IosHome extends Activity {
         f.addAction(Intent.ACTION_PACKAGE_CHANGED);
         f.addDataScheme("package");
         registerReceiver(packages, f);
+        remote = new IosRemote(this, this::remoteCommand);
+        remote.start();
+        weather = new IosWeather(this);
+        watchInputs();
         // VPN отслеживается событиями системы, а не опросом.
         ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         if (cm != null) {
@@ -261,6 +268,9 @@ public class IosHome extends Activity {
 
     @Override protected void onDestroy() {
         unregisterReceiver(packages);
+        if (remote != null) remote.stop();
+        TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
+        if (tim != null && inputWatch != null) tim.unregisterCallback(inputWatch);
         ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         if (cm != null && vpnWatch != null) cm.unregisterNetworkCallback(vpnWatch);
         super.onDestroy();
@@ -546,6 +556,8 @@ public class IosHome extends Activity {
         status.addView(clock);
         status.addView(date, lp);
         root.addView(status, at(EDGE_X, 36, 0, 0));
+        addButton(1544, R.drawable.top_search, "Поиск", this::askSearch);
+        addButton(1612, R.drawable.top_remote, "Пульт в телефоне", this::showRemoteCode);
         addButton(1680, R.drawable.top_input, "Источники", this::showInputs);
         addButton(1748, R.drawable.top_wifi, "Wi-Fi", () -> open(SystemSettings.intent(this, Settings.ACTION_WIFI_SETTINGS)));
         addButton(1816, R.drawable.top_settings, "Настройки", this::showSettings);
@@ -579,7 +591,10 @@ public class IosHome extends Activity {
         Date now = new Date();
         clock.setText(new SimpleDateFormat("HH:mm", Locale.getDefault()).format(now));
         String d = new SimpleDateFormat("EEEE, d MMMM", Locale.getDefault()).format(now);
-        date.setText(d.isEmpty() ? d : d.substring(0, 1).toUpperCase(Locale.getDefault()) + d.substring(1));
+        String day = d.isEmpty() ? d : d.substring(0, 1).toUpperCase(Locale.getDefault()) + d.substring(1);
+        String w = weather == null ? "" : weather.last();
+        date.setText(w.isEmpty() ? day : day + "   " + w);
+        if (weather != null) weather.refresh(line -> updateClock());
     }
 
     // ---------- Приложения ----------
@@ -1313,6 +1328,179 @@ public class IosHome extends Activity {
         }
     }
 
+    // ---------- Пульт в телефоне, поиск, входы HDMI ----------
+
+    private IosRemote remote;
+    private IosWeather weather;
+    private TvInputManager.TvInputCallback inputWatch;
+    private String hdmiPending;
+    private long hdmiUntil;
+
+    /** Команды со страницы пульта в телефоне (главный поток). */
+    private String remoteCommand(String what, Map<String, String> args) {
+        AudioManager audio = (AudioManager) getSystemService(AUDIO_SERVICE);
+        switch (what) {
+            case "open": {
+                String u = args.get("u");
+                if (u == null || u.isEmpty()) return say("Вставь ссылку");
+                if (!u.startsWith("http")) u = "https://" + u;
+                Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse(u)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                String host = Uri.parse(u).getHost() == null ? "" : Uri.parse(u).getHost();
+                if (host.contains("youtu")) i.setPackage(IosFeed.YOUTUBE);
+                else if (host.contains("rutube")) i.setPackage(IosFeed.RUTUBE);
+                else if (host.contains("vk.com") || host.contains("vkvideo")) i.setPackage(IosFeed.VK);
+                try { startActivity(i); return say("Открываю на телевизоре"); }
+                catch (Exception e) { return say("Телевизор не знает, чем открыть эту ссылку"); }
+            }
+            case "search": {
+                String q = args.get("q");
+                if (q == null || q.trim().isEmpty()) return say("Напиши, что искать");
+                bringHome();
+                runSearch(q.trim());
+                return say("Ищу на телевизоре");
+            }
+            case "vol": {
+                if (audio == null) return say("Нет звука");
+                String d = args.get("d");
+                int dir = "up".equals(d) ? AudioManager.ADJUST_RAISE : "down".equals(d) ? AudioManager.ADJUST_LOWER : AudioManager.ADJUST_TOGGLE_MUTE;
+                audio.adjustStreamVolume(AudioManager.STREAM_MUSIC, dir, AudioManager.FLAG_SHOW_UI);
+                return say("Громкость " + audio.getStreamVolume(AudioManager.STREAM_MUSIC));
+            }
+            case "vpn": vpnCommand("1".equals(args.get("on"))); return say("1".equals(args.get("on")) ? "Включаю VPN" : "Выключаю VPN");
+            case "sleep": {
+                long m = 0;
+                try { m = Long.parseLong(args.get("m")); } catch (Exception ignored) { }
+                IosSleep.schedule(this, m);
+                return say(m == 0 ? "Таймер сна выключен" : "Выключу через " + m + " мин");
+            }
+            case "home": bringHome(); return say("Домашний экран");
+            case "apps": {
+                StringBuilder b = new StringBuilder("[");
+                List<App> all = new ArrayList<>(dock);
+                all.addAll(others);
+                for (App a : all) {
+                    if (b.length() > 1) b.append(',');
+                    b.append("{\"label\":").append(org.json.JSONObject.quote(a.label)).append(",\"pkg\":").append(org.json.JSONObject.quote(a.pkg)).append('}');
+                }
+                return b.append(']').toString();
+            }
+            case "app": {
+                for (App a : dock) if (a.pkg.equals(args.get("p"))) { launch(a); return say("Открываю " + a.label); }
+                for (App a : others) if (a.pkg.equals(args.get("p"))) { launch(a); return say("Открываю " + a.label); }
+                return say("Нет такого приложения");
+            }
+            default: return say("Не понял");
+        }
+    }
+
+    private static String say(String s) { return "{\"say\":" + org.json.JSONObject.quote(s) + "}"; }
+
+    private void bringHome() {
+        startActivity(new Intent(this, IosHome.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT));
+    }
+
+    /** Большой QR-код: навёл камеру телефона — открылся пульт. */
+    private void showRemoteCode() {
+        String url = remote == null ? null : remote.address();
+        if (url == null) { Toast.makeText(this, "Телевизор не в сети", Toast.LENGTH_SHORT).show(); return; }
+        Bitmap qr = IosQr.make(url, px(440));
+        overlay.removeAllViews();
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setGravity(Gravity.CENTER_HORIZONTAL);
+        TextView t = text(44, semibold, INK);
+        t.setText("Пульт в телефоне");
+        box.addView(t);
+        TextView h = text(28, regular, INK_2);
+        h.setText("Наведи камеру телефона на код");
+        h.setPadding(0, px(10), 0, px(36));
+        box.addView(h);
+        FrameLayout plate = new FrameLayout(this);
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(0xFFFFFFFF);
+        g.setCornerRadius(px(36));
+        plate.setBackground(g);
+        plate.setPadding(px(28), px(28), px(28), px(28));
+        ImageView code = new ImageView(this);
+        code.setImageBitmap(qr);
+        plate.addView(code, new FrameLayout.LayoutParams(px(440), px(440)));
+        box.addView(plate, new LinearLayout.LayoutParams(-2, -2));
+        TextView a = text(24, regular, INK_2);
+        a.setText(url.replaceAll("\\?k=.*", ""));
+        a.setPadding(0, px(28), 0, 0);
+        box.addView(a);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2);
+        lp.gravity = Gravity.CENTER;
+        overlay.addView(box, lp);
+        overlay.setVisibility(View.VISIBLE);
+    }
+
+    /** Поиск с пульта телевизора: поле ввода, клавиатура Яндекса умеет и голос. */
+    private void askSearch() {
+        EditText field = new EditText(this);
+        field.setSingleLine(true);
+        field.setHint("Фильм, ролик, канал");
+        field.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH);
+        android.app.AlertDialog d = new android.app.AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle("Поиск по YouTube, Рутубу и Кинопоиску")
+                .setView(field)
+                .setPositiveButton("Найти", (x, y) -> runSearch(field.getText().toString().trim()))
+                .setNegativeButton("Отмена", null)
+                .create();
+        field.setOnEditorActionListener((v, action, ev) -> { d.dismiss(); runSearch(field.getText().toString().trim()); return true; });
+        d.show();
+        field.requestFocus();
+    }
+
+    private void runSearch(String q) {
+        if (q.isEmpty()) return;
+        Toast.makeText(this, "Ищу «" + q + "»", Toast.LENGTH_SHORT).show();
+        feed.search(q, found -> {
+            if (found.isEmpty()) { Toast.makeText(this, "Ничего не нашлось", Toast.LENGTH_SHORT).show(); return; }
+            List<String> labels = new ArrayList<>();
+            List<Runnable> actions = new ArrayList<>();
+            for (FeedItem it : found) {
+                labels.add(it.subtitle.split(" · ")[0] + ": " + it.title);
+                actions.add(() -> {
+                    if (it.poster) {
+                        ClipboardManager cb = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                        if (cb != null) cb.setPrimaryClip(ClipData.newPlainText("Фильм", it.title));
+                        Toast.makeText(this, "«" + it.title + "» скопировано: вставь в поиск Кинопоиска", Toast.LENGTH_LONG).show();
+                    }
+                    try { startActivity(it.open); } catch (Exception e) { Toast.makeText(this, "Не открылось", Toast.LENGTH_SHORT).show(); }
+                });
+            }
+            showMenu("Поиск: " + q, labels, actions);
+        });
+    }
+
+    /** Подключили приставку или ноутбук по HDMI — предлагаем перейти на этот вход (15 секунд, ОК). */
+    private void watchInputs() {
+        TvInputManager tim = (TvInputManager) getSystemService(TV_INPUT_SERVICE);
+        if (tim == null) return;
+        final Map<String, Integer> was = new HashMap<>();
+        try { for (TvInputInfo info : tim.getTvInputList()) if (info.isPassthroughInput()) was.put(info.getId(), tim.getInputState(info.getId())); }
+        catch (Exception ignored) { }
+        inputWatch = new TvInputManager.TvInputCallback() {
+            @Override public void onInputStateChanged(String id, int state) {
+                Integer before = was.put(id, state);
+                if (state != TvInputManager.INPUT_STATE_CONNECTED || (before != null && before == TvInputManager.INPUT_STATE_CONNECTED)) return;
+                if (!hasWindowFocus()) return;
+                String name = id;
+                try { name = String.valueOf(tim.getTvInputInfo(id).loadLabel(IosHome.this)); } catch (Exception ignored) { }
+                hdmiPending = id;
+                hdmiUntil = SystemClock.elapsedRealtime() + 15000;
+                Toast.makeText(IosHome.this, "Подключено: " + name + ". ОК — перейти", Toast.LENGTH_LONG).show();
+            }
+        };
+        tim.registerCallback(inputWatch, handler);
+    }
+
+    private void openInput(String id) {
+        open(new Intent(Intent.ACTION_VIEW, TvContract.buildChannelUriForPassthroughInput(id).buildUpon().scheme("live-tv").build())
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+    }
+
     private void startYouTubeSignIn() {
         final TextView[] hint = new TextView[1];
         overlay.removeAllViews();
@@ -1609,6 +1797,12 @@ public class IosHome extends Activity {
             }
             return;
         }
+        if (hdmiPending != null && SystemClock.elapsedRealtime() < hdmiUntil) {
+            String id = hdmiPending;
+            hdmiPending = null;
+            openInput(id);
+            return;
+        }
         if (moving) { stopMoving(); return; }
         if (focused == null) return;
         Object tag = focused.getTag();
@@ -1855,6 +2049,13 @@ public class IosHome extends Activity {
             IosSleep.schedule(this, step);
             Toast.makeText(this, step == 0 ? "Таймер сна выключен" : "Телевизор выключится через " + step + " мин", Toast.LENGTH_SHORT).show();
             showSettings();
+        });
+        labels.add("Пульт в телефоне (QR-код)");
+        actions.add(this::showRemoteCode);
+        labels.add("Обновить лаунчер (версия " + IosUpdate.installed(this) + ")");
+        actions.add(() -> {
+            Toast.makeText(this, "Проверяю обновление…", Toast.LENGTH_SHORT).show();
+            IosUpdate.check(this, m -> Toast.makeText(this, m, Toast.LENGTH_LONG).show());
         });
         // Аккаунт Яндекса всего телевизора: за ним следуют Кинопоиск и другие приложения Яндекса.
         labels.add("Аккаунт Яндекса");

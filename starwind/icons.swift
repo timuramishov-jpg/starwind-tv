@@ -4,6 +4,7 @@ let out = CommandLine.arguments[1]
 let map: [(String, String)] = [
     ("top_input", "tv.fill"), ("top_wifi", "wifi"), ("top_settings", "gearshape.fill"),
     ("top_grid", "square.grid.2x2.fill"), ("top_clean", "sparkles"),
+    ("top_search", "magnifyingglass"), ("top_remote", "iphone"),
 ]
 for (name, symbol) in map {
     let cfg = NSImage.SymbolConfiguration(pointSize: 100, weight: .semibold)

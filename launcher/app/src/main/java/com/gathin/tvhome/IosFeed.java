@@ -866,6 +866,86 @@ final class IosFeed {
         return out;
     }
 
+    interface SearchSink { void done(List<IosHome.FeedItem> found); }
+
+    /** Общий поиск: YouTube, Рутуб и каталог Кинопоиска одновременно, сверху вниз в этом порядке. */
+    void search(String q, SearchSink sink) {
+        if (apiKey.isEmpty()) keys();
+        pool.execute(() -> {
+            List<Callable<List<IosHome.FeedItem>>> jobs = new ArrayList<>();
+            jobs.add(() -> searchYouTube(q));
+            jobs.add(() -> searchRutube(q));
+            jobs.add(() -> searchKino(q));
+            List<IosHome.FeedItem> all = new ArrayList<>();
+            try {
+                for (Future<List<IosHome.FeedItem>> f : requests.invokeAll(jobs)) {
+                    try { all.addAll(f.get()); } catch (ExecutionException e) { Log.w(TAG, "search: " + e.getCause()); }
+                }
+            } catch (InterruptedException ignored) { }
+            main.post(() -> sink.done(all));
+        });
+    }
+
+    private List<IosHome.FeedItem> searchYouTube(String q) throws Exception {
+        List<IosHome.FeedItem> out = new ArrayList<>();
+        JSONObject r = call("https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&regionCode=RU&q="
+                + Uri.encode(q) + "&key=" + apiKey, null, null);
+        JSONArray list = r.optJSONArray("items");
+        for (int i = 0; list != null && i < list.length(); i++) {
+            JSONObject v = list.getJSONObject(i);
+            IosHome.FeedItem it = youtubeItem(v.getJSONObject("snippet"), v.getJSONObject("id").getString("videoId"));
+            it.subtitle = "YouTube · " + it.subtitle;
+            out.add(it);
+        }
+        return out;
+    }
+
+    private List<IosHome.FeedItem> searchRutube(String q) throws Exception {
+        List<IosHome.FeedItem> out = new ArrayList<>();
+        JSONObject r = call("https://rutube.ru/api/search/video/?format=json&query=" + Uri.encode(q), null, null);
+        JSONArray list = r.optJSONArray("results");
+        for (int i = 0; list != null && i < list.length() && out.size() < 8; i++) {
+            JSONObject v = list.getJSONObject(i);
+            String id = v.optString("id");
+            if (id.isEmpty()) continue;
+            IosHome.FeedItem it = new IosHome.FeedItem();
+            it.title = v.optString("title");
+            JSONObject author = v.optJSONObject("author");
+            it.subtitle = "Рутуб" + (author == null ? "" : " · " + author.optString("name"));
+            it.open = new Intent(Intent.ACTION_VIEW, Uri.parse("rutube://rutube.ru/video/" + id + "/"))
+                    .setPackage(RUTUBE).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            String thumb = v.optString("thumbnail_url").replaceAll("\\?.*$", "");
+            it.urls = thumb.isEmpty() ? new String[0] : new String[]{thumb};
+            out.add(it);
+        }
+        return out;
+    }
+
+    private List<IosHome.FeedItem> searchKino(String q) throws Exception {
+        List<IosHome.FeedItem> out = new ArrayList<>();
+        if (kinoKey.isEmpty()) return out;
+        HttpURLConnection c = (HttpURLConnection) new URL("https://kinopoiskapiunofficial.tech/api/v2.1/films/search-by-keyword?page=1&keyword=" + Uri.encode(q)).openConnection();
+        c.setConnectTimeout(8000);
+        c.setReadTimeout(10000);
+        c.setRequestProperty("X-API-KEY", kinoKey);
+        if (c.getResponseCode() >= 400) return out;
+        JSONArray films = new JSONObject(new String(read(c.getInputStream()), StandardCharsets.UTF_8)).optJSONArray("films");
+        for (int i = 0; films != null && i < films.length() && out.size() < 8; i++) {
+            JSONObject f = films.getJSONObject(i);
+            IosHome.FeedItem it = new IosHome.FeedItem();
+            it.title = f.optString("nameRu", f.optString("nameEn"));
+            if (it.title.isEmpty() || it.title.equals("null")) continue;
+            String year = f.optString("year");
+            it.subtitle = "Кинопоиск" + (year.isEmpty() || year.equals("null") ? "" : " · " + year);
+            it.poster = true;
+            it.open = kinoHome();
+            String poster = f.optString("posterUrlPreview");
+            it.urls = poster.isEmpty() ? new String[0] : new String[]{poster};
+            out.add(it);
+        }
+        return out;
+    }
+
     /** Афиша открывает Кинопоиск так же, как иконка: телевизионная точка входа, задача поднимается целиком. */
     private Intent kinoHome() {
         android.content.pm.PackageManager pm = context.getPackageManager();

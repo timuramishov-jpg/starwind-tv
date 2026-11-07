@@ -45,6 +45,31 @@ icons() {
   swift "$R/starwind/icons.swift" "$R/launcher/app/src/main/res/drawable-nodpi" || say "Значки не нарисовались, остались прежние"
 }
 
+# Свой ключ подписи в ~/Documents/Claude: создаётся один раз, пароль рядом, оба вне git.
+signing() {
+  KS="$DIR/starwind.jks"; KP="$DIR/starwind.pass"
+  if [ ! -f "$KS" ]; then
+    say "== Создаю свой ключ подписи (один раз)"
+    openssl rand -hex 16 > "$KP"; chmod 600 "$KP"
+    keytool -genkeypair -keystore "$KS" -storepass "$(cat "$KP")" -keypass "$(cat "$KP")" -alias starwind \
+      -keyalg RSA -keysize 2048 -validity 36500 -dname "CN=Starwind launcher" > /dev/null 2>&1 || die "ключ не создался"
+    chmod 600 "$KS"
+  fi
+  export STARWIND_KEYSTORE="$KS" STARWIND_KEY_PASS="$(cat "$KP")"
+}
+
+# Выложить собранный APK в релиз GitHub: телевизор сам обновится из шестерёнки.
+release() {
+  cd "$R" || die "нет $R"
+  command -v gh > /dev/null || die "нужен gh (brew install gh, потом gh auth login)"
+  APK=launcher/app/build/outputs/apk/release/app-release.apk
+  [ -f "$APK" ] || die "сначала tv deploy"
+  CODE=$(( $(git rev-list --count HEAD) + 100 ))
+  cp "$APK" "$DIR/tvhome-$CODE.apk"
+  gh release create "v$CODE" "$DIR/tvhome-$CODE.apk" -R timuramishov-jpg/tv-home -t "Лаунчер, сборка $CODE" -n "$(git log -1 --format=%s)" \
+    && say "Выложено: v$CODE. На телевизоре: шестерёнка → Обновить лаунчер"
+}
+
 deploy() {
   online
   cd "$R" || die "нет $R"
@@ -55,16 +80,29 @@ deploy() {
   export JAVA_HOME="$(/opt/homebrew/bin/brew --prefix openjdk@17)/libexec/openjdk.jdk/Contents/Home"
   export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
   export PATH="$JAVA_HOME/bin:$PATH"
+  signing
   say "== Тесты пульта"; bash "$R/starwind/test/run.sh" > "$DIR/test.log" 2>&1 || { tail -5 "$DIR/test.log"; die "тесты пульта не прошли, ничего не ставлю"; }
   say "== Сборка"
   (cd launcher && ./gradlew assembleRelease --console=plain > "$DIR/build.log" 2>&1) || { tail -30 "$DIR/build.log"; die "сборка не прошла, лог в build.log"; }
   APK=launcher/app/build/outputs/apk/release/app-release.apk
   "$PY" -I tools/b64push.py "$APK" /data/local/tmp/tvhome.apk || die "загрузка"
-  OUT=$(T 'pm install -r /data/local/tmp/tvhome.apk; rm -f /data/local/tmp/tvhome.apk'); say "$OUT"
+  OUT=$(T 'pm install -r /data/local/tmp/tvhome.apk'); say "$OUT"
+  case "$OUT" in
+    *UPDATE_INCOMPATIBLE*)
+      # Один раз: старый лаунчер подписан отладочным ключом, новый — своим. Поверх не ставится.
+      say ">>> Лаунчер переходит на свой ключ подписи. Старый надо удалить: порядок дока и вход в YouTube придётся настроить заново."
+      printf "Продолжить? [y/N] "; read -r yes
+      [ "$yes" = y ] || { T 'rm -f /data/local/tmp/tvhome.apk'; die "отменено"; }
+      T "pm uninstall $PKG" | tail -1
+      OUT=$(T 'pm install -r /data/local/tmp/tvhome.apk'); say "$OUT" ;;
+  esac
+  T 'rm -f /data/local/tmp/tvhome.apk'
   case "$OUT" in *Success*) ;; *) die "установка" ;; esac
   T "pm grant $PKG android.permission.READ_TV_LISTINGS; pm grant $PKG android.permission.WRITE_SECURE_SETTINGS" 2>&1 | grep -v '^$'
   # Таймер сна гасит экран правом администратора «только блокировка».
   T "dpm set-active-admin --user 0 $PKG/.IosAdmin" 2>&1 | grep -iv "success\|already" | grep -v '^$'
+  # Обновление с GitHub ставит APK через системный установщик.
+  T "appops set $PKG REQUEST_INSTALL_PACKAGES allow"
   T "am force-stop $PKG; cmd package set-home-activity --user 0 $PKG/.IosHome" > /dev/null
   keys
   home; sleep 12
@@ -92,6 +130,7 @@ report() {
 
 case "${1:-}" in
   deploy) deploy ;;
+  release) release ;;
   report) report ;;
   uninstall) online; T "pm uninstall ${2:?tv uninstall пакет}" | tail -1 ;;
   install) online
@@ -213,6 +252,7 @@ case "${1:-}" in
   *) cat <<'H'
 tv deploy        собрать текущую версию, поставить, передать ключи, проверить
 tv check         что сейчас на телевизоре: домашний экран, VPN, память, падения
+tv release       выложить собранный лаунчер на GitHub: телек обновится сам
 tv report        то же и журнал лаунчера, в report.txt для Claude
 tv trace         записать журнал, пока ты что-то делаешь на телеке, в trace.txt
 tv keys          заново передать ключи сервисов из secrets.json
