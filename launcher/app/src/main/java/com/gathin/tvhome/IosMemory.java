@@ -52,7 +52,9 @@ final class IosMemory {
         return n;
     }
 
-    /** На главном экране, в фоне: если памяти мало — чистим, не чаще раза в 2 минуты. */
+    /** На главном экране, в фоне: если памяти мало — закрываем приложения из «недавних», кроме того, из которого
+     *  только что вышли. killBackgroundProcesses здесь почти ничего не освобождает, поэтому — am kill от имени оболочки:
+     *  он закрывает только то, что сейчас не на экране и не проигрывает. Не чаще раза в 2 минуты. */
     static void autoClean(Context context) {
         Context c = context.getApplicationContext();
         if (SystemClock.elapsedRealtime() - lastAuto < 120_000) return;
@@ -61,27 +63,24 @@ final class IosMemory {
                 long before = freeMb(c);
                 if (before >= LOW_MB) return;
                 lastAuto = SystemClock.elapsedRealtime();
-                Set<String> except = new HashSet<>();
-                String last = lastApp(c);
-                if (last != null) except.add(last);
-                int n = killBackground(c, except);
+                IosAdb adb = IosAdb.get(c);
+                Matcher m = Pattern.compile("type=standard[^\\n]*?A=\\d+:([\\w.]+)").matcher(adb.shell("dumpsys activity recents | grep 'Recent #'"));
+                Set<String> keep = keep(c);
+                String last = null;
+                StringBuilder cmd = new StringBuilder();
+                while (m.find()) {
+                    String pkg = m.group(1);
+                    if (pkg.equals(c.getPackageName())) continue;
+                    if (last == null) { last = pkg; continue; }
+                    if (keep.contains(pkg)) continue;
+                    cmd.append("am kill ").append(pkg).append("; ");
+                }
+                if (cmd.length() > 0) adb.shell(cmd.toString());
                 Thread.sleep(1500);
-                Log.i(TAG, "auto: " + before + " → " + freeMb(c) + " MB free, " + n + " packages, kept " + last);
+                Log.i(TAG, "auto: " + before + " → " + freeMb(c) + " MB free, kept " + last + ", " + cmd);
             } catch (Exception e) {
                 Log.w(TAG, "auto: " + e);
             }
         }, "memory").start();
-    }
-
-    /** Приложение, из которого вернулись на главный экран: верхняя задача в «недавних», кроме лаунчера. */
-    private static String lastApp(Context c) {
-        try {
-            String out = IosAdb.get(c).shell("dumpsys activity recents | grep -m4 'realActivity='");
-            Matcher m = Pattern.compile("realActivity=\\{?([\\w.]+)/").matcher(out);
-            while (m.find()) if (!m.group(1).equals(c.getPackageName())) return m.group(1);
-        } catch (Exception e) {
-            Log.w(TAG, "recents: " + e);
-        }
-        return null;
     }
 }
