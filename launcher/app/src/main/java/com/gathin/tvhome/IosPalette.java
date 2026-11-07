@@ -58,6 +58,11 @@ final class IosPalette {
     // Скругления: значок-бейдж, строка и поле, карточка, плашка-пилюля и крупные панели.
     static final float R_BADGE = 10, R_ROW = 20, R_CARD = 26, R_PILL = 40;
 
+    // Отступы: сетка 8 точек (4 — только для тонкой подгонки внутри мелких элементов). Других отступов нет.
+    static final float S1 = 8, S2 = 16, S3 = 24, S4 = 32, S5 = 48, S6 = 64, S7 = 96;
+    /** Поле экрана слева и справа: всё начинается и кончается на одной линии. */
+    static final float EDGE = 56;
+
     /** Акцент с прозрачностью: свечение (GLOW) и подложка (TINT). */
     static int glow(int accent) { return (accent & 0x00FFFFFF) | 0x77000000; }
     static int tint(int accent) { return (accent & 0x00FFFFFF) | 0x55000000; }

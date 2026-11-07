@@ -80,7 +80,7 @@ public class IosHome extends Activity {
     private static final int INK = IosPalette.INK, INK_2 = IosPalette.SECONDARY, ICON_REST = IosPalette.GRAY1, GROUND = IosPalette.BLACK,
             PANEL = IosPalette.GRAY6, PILL = IosPalette.GRAY6, ROW_ON = IosPalette.INK, ROW_ON_TEXT = IosPalette.ON_LIGHT, SCRIM = IosPalette.SCRIM;
     private static final float DOCK_CX = 95, DOCK_CELL = 116, DOCK_LOGO = 96, DOCK_REST = 0.875f, MAIN_X = 236,
-            TITLE_Y = 170, PILL_Y = 300, CARDS_Y = 300, CARD_W = 880, CARD_H = 495, CARD_GAP = 36, EDGE_X = 57,
+            TITLE_Y = 170, PILL_Y = 300, CARDS_Y = 300, CARD_W = 880, CARD_H = 495, CARD_GAP = IosPalette.S4, EDGE_X = IosPalette.EDGE,
             HEADER_Y = 1180, APPS_Y = 1280, APPS_SCROLL = 1090;
     private static final int MAX_DOCK = 7;
     private static final int DOCK = 0, CARDS = 1, APPS = 2, TOP = 3;
@@ -133,7 +133,7 @@ public class IosHome extends Activity {
         String duration;
     }
 
-    private static final class App {
+    static final class App {
         String pkg, label;
         ComponentName component;
         boolean system;
@@ -142,15 +142,15 @@ public class IosHome extends Activity {
 
     private interface Action { void run(); }
 
-    private final Handler handler = new Handler(Looper.getMainLooper());
+    final Handler handler = new Handler(Looper.getMainLooper());
     private final Map<String, App> apps = new HashMap<>(), cache = new HashMap<>();
-    private final List<App> dock = new ArrayList<>(), others = new ArrayList<>();
-    private final List<View> dockViews = new ArrayList<>(), appViews = new ArrayList<>(), cardViews = new ArrayList<>(),
+    final List<App> dock = new ArrayList<>(), others = new ArrayList<>();
+    final List<View> dockViews = new ArrayList<>(), appViews = new ArrayList<>(), cardViews = new ArrayList<>(),
             topViews = new ArrayList<>();
     private final Set<String> hidden = new HashSet<>();
     private final PathInterpolator ease = new PathInterpolator(0.2f, 0f, 0f, 1f);
 
-    private SharedPreferences prefs;
+    SharedPreferences prefs;
     private FrameLayout root, dockLayer, content, cardsLayer, appsLayer, overlay;
     private TextView clock, date, temp, title, subtitle, action;
     private ImageView weatherIcon;
@@ -160,7 +160,6 @@ public class IosHome extends Activity {
     private static final int CARD_CLIP = 20, CLEAN = IosPalette.TEAL;
     private static final int MENU_W = 620, MENU_ROW = 78, POSTER_W = 330;
     private LinearLayout menuPanel;
-    private String vpnShown = "", vpnStats = "", vpnSpeed = "";
     private final Map<String, Integer> cardMemory = new HashMap<>();
     private final List<ObjectAnimator> drift = new ArrayList<>();
     private ImageView glow;
@@ -169,28 +168,28 @@ public class IosHome extends Activity {
     private int ticks;
     private ImageView wordmark;
     private TextView caption, captionSub;
-    private final Map<View, TextView[]> cardLabels = new HashMap<>();
+    final Map<View, TextView[]> cardLabels = new HashMap<>();
     /** Подписи карточек: в покое, у соседей выбранной. */
     private static final float LABEL_REST = 0.66f, LABEL_DIM = 0.55f;
-    private IosFeed feed;
+    IosFeed feed;
     private final Map<String, String> feedShown = new HashMap<>();
     private ImageView washA, washB, spot;
     private int washNow;
     private float s;
     private int screenW;
     private Typeface regular, medium, semibold;
-    private IosArt pics;
-    private int zone = DOCK, index = 0, selected = 0;
+    IosArt pics;
+    int zone = DOCK, index = 0, selected = 0;
     private float scroll = 0;
     private boolean moving, washOnA, okDown, okLong;
     private long okDownAt;
     private View focused;
-    private final List<Runnable> menuActions = new ArrayList<>();
-    private final List<TextView> menuViews = new ArrayList<>();
-    private int menuIndex;
+    final List<Runnable> menuActions = new ArrayList<>();
+    final List<TextView> menuViews = new ArrayList<>();
+    int menuIndex;
     /** Что открыто в боковой панели: settings, wifi, search или пусто. */
-    private String menuKind = "";
-    private IosTools tools;
+    String menuKind = "";
+    IosTools tools;
     private long lastInput = SystemClock.uptimeMillis();
     private boolean dimming;
 
@@ -200,7 +199,7 @@ public class IosHome extends Activity {
             ticks++;
             if (ticks % 12 == 0 && zone != CARDS && zone != APPS && !overlayOpen()) rotateFeeds();
             if (ticks % 4 == 0) loadAllFeeds();
-            if (ticks % 20 == 0 && vpnOn()) checkSpeed();
+            if (ticks % 20 == 0 && vpnOn()) vpn.checkSpeed();
             checkIdle();
             handler.postDelayed(this, 15000);
         }
@@ -212,8 +211,10 @@ public class IosHome extends Activity {
         }
     };
 
+    final IosVpn vpn = new IosVpn(this);
+    final IosSettings settings = new IosSettings(this);
     private int px(float v) { return Math.round(v * s); }
-    private boolean overlayOpen() { return overlay.getVisibility() == View.VISIBLE; }
+    boolean overlayOpen() { return overlay.getVisibility() == View.VISIBLE; }
 
     @Override protected void onCreate(Bundle state) {
         super.onCreate(state);
@@ -306,7 +307,7 @@ public class IosHome extends Activity {
             dirty = false;
             reload();
         }
-        refreshVpn();
+        vpn.refreshVpn();
         loadAllFeeds();
         autoVpn();
         if (!prefs.getBoolean("hint_seen", false)) handler.postDelayed(this::showHint, 2500);
@@ -348,7 +349,7 @@ public class IosHome extends Activity {
         if (on == lastVpn) return;
         lastVpn = on;
         feed.expire();
-        refreshVpn();
+        vpn.refreshVpn();
         loadAllFeeds();
     }
 
@@ -363,7 +364,7 @@ public class IosHome extends Activity {
         prefs.edit().putInt("vpn_boot", boot).apply();
         // VPN держим включённым, только если ты сам его не выключал.
         for (long delay : new long[]{3000, 10000, 22000})
-            handler.postDelayed(() -> { if (!vpnOn() && !prefs.getBoolean("vpn_user_off", false)) vpnCommand(true); }, delay);
+            handler.postDelayed(() -> { if (!vpnOn() && !prefs.getBoolean("vpn_user_off", false)) vpn.vpnCommand(true); }, delay);
     }
 
     @Override protected void onPause() {
@@ -397,7 +398,7 @@ public class IosHome extends Activity {
         super.onNewIntent(intent);
         // Поиск с телефона: сервер пульта открывает лаунчер с запросом.
         if (intent.getBooleanExtra("settings", false)) {
-            handler.postDelayed(() -> { if (!overlayOpen() || !"settings".equals(menuKind)) showSettings(); }, 250);
+            handler.postDelayed(() -> { if (!overlayOpen() || !"settings".equals(menuKind)) settings.show(); }, 250);
             return;
         }
         String q = intent.getStringExtra("search");
@@ -604,19 +605,19 @@ public class IosHome extends Activity {
         weatherIcon = new ImageView(this);
         weatherIcon.setImageTintList(ColorStateList.valueOf(INK_2));
         weatherIcon.setVisibility(View.GONE);
-        LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(px(30), px(30));
-        ip.leftMargin = px(22);
+        LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(px(IosPalette.S4), px(IosPalette.S4));
+        ip.leftMargin = px(IosPalette.S3);
         status.addView(weatherIcon, ip);
         temp = text(IosPalette.CALLOUT, regular, INK_2);
         LinearLayout.LayoutParams tp = new LinearLayout.LayoutParams(-2, -2);
-        tp.leftMargin = px(8);
+        tp.leftMargin = px(IosPalette.S1);
         status.addView(temp, tp);
         root.addView(status, at(EDGE_X, 36, 0, 0));
         addButton(1544, R.drawable.top_search, "Поиск", this::askSearch);
         addButton(1612, R.drawable.top_remote, "Пульт в телефоне", this::showRemoteCode);
         addButton(1680, R.drawable.top_input, "Источники", this::showInputs);
-        addButton(1748, R.drawable.top_wifi, "Wi-Fi", this::showWifi);
-        addButton(1816, R.drawable.top_settings, "Настройки", this::showSettings);
+        addButton(1748, R.drawable.top_wifi, "Wi-Fi", settings::showWifi);
+        addButton(1816, R.drawable.top_settings, "Настройки", settings::show);
 
         overlay = new FrameLayout(this);
         overlay.setBackgroundColor(SCRIM);
@@ -629,7 +630,7 @@ public class IosHome extends Activity {
         ImageView i = new ImageView(this);
         i.setImageResource(icon);
         i.setImageTintList(ColorStateList.valueOf(INK_2));
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(px(36), px(36));
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(px(IosPalette.S4), px(IosPalette.S4));
         lp.gravity = Gravity.CENTER;
         b.addView(i, lp);
         b.setTag(new Object[]{name, action, i});
@@ -663,12 +664,12 @@ public class IosHome extends Activity {
         return false;
     }
 
-    private List<String> stored(String key) {
+    List<String> stored(String key) {
         String v = prefs.getString(key, "");
         return v.isEmpty() ? new ArrayList<>() : new ArrayList<>(Arrays.asList(v.split(",")));
     }
 
-    private void store(String key, List<String> values) {
+    void store(String key, List<String> values) {
         prefs.edit().putString(key, TextUtils.join(",", values)).apply();
     }
 
@@ -703,7 +704,7 @@ public class IosHome extends Activity {
         }
     }
 
-    private void reload() {
+    void reload() {
         loadApps();
         hidden.clear();
         hidden.addAll(stored("hidden"));
@@ -855,7 +856,7 @@ public class IosHome extends Activity {
     /** Последняя кнопка дока: наведение прокручивает к общему списку приложений. */
     private View gridButton() {
         FrameLayout box = new FrameLayout(this);
-        int pad = px(14);
+        int pad = px(IosPalette.S2);
         for (int tint : new int[]{ICON_REST, INK}) {
             ImageView v = new ImageView(this);
             v.setImageResource(R.drawable.top_grid);
@@ -954,10 +955,10 @@ public class IosHome extends Activity {
         moveTo(zone, Math.max(0, Math.min(index, views(zone).size() - 1)));
     }
 
-    private static final String HAPP = "su.happ.proxyutility", SOTA = "org.interhive.sota.connect";
+    static final String HAPP = "su.happ.proxyutility", SOTA = "org.interhive.sota.connect";
     private static final int VPN_H = 280;
 
-    private boolean vpnOn() {
+    boolean vpnOn() {
         ConnectivityManager cm = (ConnectivityManager) getSystemService(CONNECTIVITY_SERVICE);
         if (cm == null) return false;
         for (Network n : cm.getAllNetworks()) {
@@ -965,142 +966,6 @@ public class IosHome extends Activity {
             if (c != null && c.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return true;
         }
         return false;
-    }
-
-    private void vpnCommand(boolean connect) {
-        prefs.edit().putBoolean("vpn_user_off", !connect).apply();
-        Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse("happ://" + (connect ? "connect" : "disconnect") + "_without_ui"))
-                .setClassName(HAPP, HAPP + ".feature.deeplink.DeeplinkInterceptorActivity")
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        open(i);
-        for (long delay : new long[]{700, 1800, 3500, 6000}) handler.postDelayed(this::refreshVpn, delay);
-    }
-
-    private void refreshVpn() {
-        if (dock.isEmpty() || !(HAPP.equals(dock.get(selected).pkg) || SOTA.equals(dock.get(selected).pkg))) return;
-        String state = vpnOn() + "|" + prefs.getString("vpn_place", "") + "|" + vpnStats + "|" + vpnSpeed + "|" + dock.get(selected).pkg;
-        if (state.equals(vpnShown)) return;
-        // Карточки VPN обновляются на месте: ничего не пересобирается и не прыгает.
-        FeedItem[] fresh = vpnItems(dock.get(selected));
-        if (cardViews.size() != fresh.length) { showSelected(); return; }
-        for (int i = 0; i < fresh.length; i++) {
-            View card = cardViews.get(i);
-            if (!(card.getTag() instanceof FeedItem)) { showSelected(); return; }
-            FeedItem old = (FeedItem) card.getTag();
-            old.title = fresh[i].title;
-            old.subtitle = fresh[i].subtitle;
-            old.image = fresh[i].image;
-            old.action = fresh[i].action;
-            TextView[] l = cardLabels.get(card);
-            if (l != null) { l[0].setText(old.title); l[1].setText(old.subtitle); }
-            if (card instanceof FrameLayout && ((FrameLayout) card).getChildCount() > 0 && ((FrameLayout) card).getChildAt(0) instanceof ImageView)
-                ((ImageView) ((FrameLayout) card).getChildAt(0)).setImageBitmap(old.image);
-        }
-    }
-
-
-
-    /** Экран VPN: три узкие карточки, как афиши. Тумблер, связь (страна и отклик), смена сервера. */
-    private void showVpn(App a) {
-        FeedItem[] all = vpnItems(a);
-        for (int i = 0; i < all.length; i++) addCard(all[i], i);
-        if (vpnOn()) { checkExit(); checkSpeed(); checkDownload(false); }
-    }
-
-    private FeedItem[] vpnItems(App a) {
-        boolean on = vpnOn(), own = HAPP.equals(a.pkg);
-        int accent = a.logo.accent;
-        vpnShown = on + "|" + prefs.getString("vpn_place", "") + "|" + vpnStats + "|" + vpnSpeed + "|" + a.pkg;
-        String iso = prefs.getString("vpn_iso", ""), where = prefs.getString("vpn_place", "");
-        String[] parts = vpnStats.split("\\|");
-        boolean measured = on && parts.length == 3;
-        int grade = measured ? Integer.parseInt(parts[2]) : -1;
-
-        FeedItem toggle = new FeedItem();
-        toggle.poster = true;
-        toggle.title = on ? "VPN включён" : "VPN выключен";
-        toggle.subtitle = own ? "Happ" : a.label;
-        toggle.image = pics.switchArt(on, accent);
-        toggle.action = () -> { if (own) vpnCommand(!on); else launch(a); };
-
-        FeedItem link = new FeedItem();
-        link.poster = true;
-        link.title = !on ? "Нет подключения" : where.isEmpty() ? "Определяю страну" : where;
-        link.subtitle = !on ? "Сначала включи VPN" : measured ? parts[1] + (vpnSpeed.isEmpty() ? "" : " · " + vpnSpeed) : "Измеряю";
-        link.image = pics.linkArt(on && !iso.isEmpty() ? flagOf(iso) : "", grade, measured ? parts[0] : on ? "…" : "—", accent, vpnHistory());
-        link.action = () -> {
-            prefs.edit().remove("vpn_place").remove("vpn_iso").apply();
-            feed.resetProbe();
-            vpnStats = "";
-            refreshVpn();
-            if (vpnOn()) { checkExit(); checkSpeed(); checkDownload(true); }
-        };
-
-        FeedItem server = new FeedItem();
-        server.poster = true;
-        server.title = "Сменить сервер";
-        server.subtitle = own ? "Откроется Happ" : "Откроется приложение";
-        server.image = pics.serverArt(accent);
-        server.action = () -> launch(a);
-        return new FeedItem[]{toggle, link, server};
-    }
-
-    /** История отклика VPN за час: «время:мс» через запятую в настройках. */
-    private List<long[]> vpnHistory() {
-        List<long[]> out = new ArrayList<>();
-        long from = System.currentTimeMillis() - 3600_000L;
-        for (String part : prefs.getString("vpn_hist", "").split(",")) {
-            String[] kv = part.split(":");
-            if (kv.length != 2) continue;
-            try {
-                long t = Long.parseLong(kv[0]), ms = Long.parseLong(kv[1]);
-                if (t >= from && ms > 0) out.add(new long[]{t, ms});
-            } catch (NumberFormatException ignored) { }
-        }
-        return out;
-    }
-
-    private void rememberPing(int ms) {
-        if (ms <= 0) return;
-        StringBuilder b = new StringBuilder();
-        for (long[] p : vpnHistory()) b.append(p[0]).append(':').append(p[1]).append(',');
-        b.append(System.currentTimeMillis()).append(':').append(ms);
-        prefs.edit().putString("vpn_hist", b.toString()).apply();
-    }
-
-
-    /** Отклик через VPN: пять запросов подряд, среднее, разброс и потери. */
-    private void checkSpeed() {
-        feed.probe((avg, spread, lost) -> {
-            int grade = lost > 1 || avg < 0 ? 0 : spread > 120 || avg > 600 ? 1 : spread > 50 || avg > 250 ? 2 : 3;
-            String word = grade == 0 ? "Связь рвётся" : grade == 1 ? "Нестабильно" : grade == 2 ? "Стабильно" : "Отлично";
-            vpnStats = (avg < 0 ? "нет ответа" : avg + " мс") + "|" + word + "|" + grade;
-            rememberPing(avg);
-            refreshVpn();
-        });
-    }
-
-    /** Скорость загрузки через VPN: 4 МБ с серверов Google (они идут через VPN), не чаще раза в 10 минут. */
-    private void checkDownload(boolean force) {
-        feed.download(force, mbit -> {
-            vpnSpeed = mbit <= 0 ? "" : String.format(new Locale("ru"), "%.0f Мбит/с", mbit);
-            refreshVpn();
-        });
-    }
-
-    private static String flagOf(String iso) {
-        return new String(Character.toChars(0x1F1E6 + iso.charAt(0) - 'A')) + new String(Character.toChars(0x1F1E6 + iso.charAt(1) - 'A'));
-    }
-
-    /** Страну показывает адрес, с которого виден телевизор через VPN. */
-    private void checkExit() {
-        feed.exit((iso, city) -> {
-            // Только страна: город у VPN-серверов часто неточный и не влезает в подпись.
-            String place = new Locale("", iso).getDisplayCountry(new Locale("ru"));
-            if (place.equals(prefs.getString("vpn_place", ""))) return;
-            prefs.edit().putString("vpn_iso", iso).putString("vpn_place", place).apply();
-            if (!dock.isEmpty() && (HAPP.equals(dock.get(selected).pkg) || SOTA.equals(dock.get(selected).pkg))) refreshVpn();
-        });
     }
 
     private void showFeed(App a) {
@@ -1141,7 +1006,7 @@ public class IosHome extends Activity {
 
     /** Карточка ленты. Сама рамка и подписи создаются всегда, а обложка, плашка длительности
      *  и «дыхание» — только у карточек рядом с выбранной (fillCard): так длинная лента почти ничего не весит. */
-    private void addCard(FeedItem item, int i) {
+    void addCard(FeedItem item, int i) {
         FrameLayout card = new FrameLayout(this);
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(PILL);
@@ -1207,21 +1072,21 @@ public class IosHome extends Activity {
                 t.setGravity(Gravity.CENTER);
                 t.setMaxLines(4);
                 t.setEllipsize(TextUtils.TruncateAt.END);
-                t.setPadding(px(36), px(36), px(36), px(36));
+                t.setPadding(px(IosPalette.S4), px(IosPalette.S4), px(IosPalette.S4), px(IosPalette.S4));
                 card.addView(t, new FrameLayout.LayoutParams(-1, -1));
             };
         }
         if (item.duration != null && !item.duration.isEmpty()) {
             TextView d = text(IosPalette.FOOTNOTE, semibold, INK);
             d.setText(item.duration);
-            d.setPadding(px(12), px(5), px(12), px(5));
+            d.setPadding(px(12), px(4), px(12), px(4));
             GradientDrawable g = new GradientDrawable();
             g.setColor(IosPalette.SCRIM_STRONG);
             g.setCornerRadius(px(IosPalette.R_BADGE));
             d.setBackground(g);
             FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2);
             lp.gravity = Gravity.BOTTOM | Gravity.RIGHT;
-            lp.rightMargin = lp.bottomMargin = px(16);
+            lp.rightMargin = lp.bottomMargin = px(IosPalette.S2);
             card.addView(d, lp);
         }
         if (item.fresh) {
@@ -1234,7 +1099,7 @@ public class IosHome extends Activity {
             n.setBackground(g);
             FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2);
             lp.gravity = Gravity.TOP | Gravity.LEFT;
-            lp.leftMargin = lp.topMargin = px(16);
+            lp.leftMargin = lp.topMargin = px(IosPalette.S2);
             card.addView(n, lp);
         }
     }
@@ -1359,7 +1224,7 @@ public class IosHome extends Activity {
     }
 
     /** Большой QR-код: навёл камеру телефона — открылся пульт. */
-    private void showRemoteCode() {
+    void showRemoteCode() {
         String url = remote == null ? null : remote.address();
         if (url == null) { note("Телевизор не в сети"); return; }
         Bitmap qr = IosQr.make(url, px(440));
@@ -1372,7 +1237,7 @@ public class IosHome extends Activity {
         box.addView(t);
         TextView h = text(IosPalette.CALLOUT, regular, INK_2);
         h.setText("Наведи камеру телефона на код");
-        h.setPadding(0, px(10), 0, px(36));
+        h.setPadding(0, px(IosPalette.S1), 0, px(IosPalette.S4));
         box.addView(h);
         FrameLayout plate = new FrameLayout(this);
         GradientDrawable g = new GradientDrawable();
@@ -1412,7 +1277,7 @@ public class IosHome extends Activity {
         field.setTextColor(INK);
         field.setTypeface(regular);
         field.setTextSize(TypedValue.COMPLEX_UNIT_PX, px(IosPalette.BODY));
-        field.setPadding(px(24), 0, px(24), 0);
+        field.setPadding(px(IosPalette.S3), 0, px(IosPalette.S3), 0);
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(IosPalette.GRAY5);
         bg.setCornerRadius(px(IosPalette.R_ROW));
@@ -1431,12 +1296,12 @@ public class IosHome extends Activity {
             return true;
         });
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, px(84));
-        lp.bottomMargin = px(24);
+        lp.bottomMargin = px(IosPalette.S3);
         panel.addView(field, 1, lp);
         if (!recent.isEmpty()) {
             TextView head = text(IosPalette.FOOTNOTE, medium, IosPalette.SECONDARY);
             head.setText("Недавние");
-            head.setPadding(px(24), 0, px(24), px(12));
+            head.setPadding(px(IosPalette.S3), 0, px(IosPalette.S3), px(12));
             panel.addView(head, 2, new LinearLayout.LayoutParams(-1, -2));
         }
         searchField = field;
@@ -1523,10 +1388,10 @@ public class IosHome extends Activity {
     private TextView noteView;
     private final Runnable noteOff = () -> { if (noteView != null) noteView.animate().alpha(0f).setDuration(NORMAL).start(); };
 
-    private void note(String text) {
+    void note(String text) {
         if (noteView == null) {
             noteView = text(IosPalette.CALLOUT, semibold, INK);
-            noteView.setPadding(px(34), px(18), px(34), px(18));
+            noteView.setPadding(px(IosPalette.S4), px(IosPalette.S2), px(IosPalette.S4), px(IosPalette.S2));
             GradientDrawable g = new GradientDrawable();
             g.setColor(IosPalette.alpha(IosPalette.GRAY6, 0.95f));
             g.setCornerRadius(px(IosPalette.R_PILL));
@@ -1534,7 +1399,7 @@ public class IosHome extends Activity {
             noteView.setAlpha(0f);
             FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2);
             lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-            lp.topMargin = px(36);
+            lp.topMargin = px(IosPalette.S4);
             root.addView(noteView, lp);
         }
         noteView.bringToFront();
@@ -1551,7 +1416,7 @@ public class IosHome extends Activity {
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
         panel.setGravity(Gravity.CENTER_HORIZONTAL);
-        panel.setPadding(px(50), px(46), px(50), px(46));
+        panel.setPadding(px(IosPalette.S5), px(IosPalette.S5), px(IosPalette.S5), px(IosPalette.S5));
         GradientDrawable g = new GradientDrawable();
         g.setColor(PANEL);
         g.setCornerRadius(px(IosPalette.R_PILL));
@@ -1563,7 +1428,7 @@ public class IosHome extends Activity {
         tip.setText("Получаю код от Google");
         tip.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
-        lp.topMargin = px(24);
+        lp.topMargin = px(IosPalette.S3);
         panel.addView(code);
         panel.addView(tip, lp);
         overlay.addView(panel, at(x, y, w, 0));
@@ -1592,7 +1457,7 @@ public class IosHome extends Activity {
         TextView pill = text(IosPalette.BODY, semibold, INK);
         pill.setText(text);
         pill.setGravity(Gravity.CENTER);
-        pill.setPadding(px(46), 0, px(46), 0);
+        pill.setPadding(px(IosPalette.S5), 0, px(IosPalette.S5), 0);
         GradientDrawable g = new GradientDrawable();
         g.setColor(PILL);
         g.setCornerRadius(px(IosPalette.R_PILL));
@@ -1645,7 +1510,7 @@ public class IosHome extends Activity {
     }
 
     /** Заголовок и цвет экрана берутся из выбранного в доке сервиса. */
-    private void showSelected() {
+    void showSelected() {
         cardsLayer.removeAllViews();
         cardViews.clear();
         cardLabels.clear();
@@ -1662,7 +1527,7 @@ public class IosHome extends Activity {
         showBrand(a);
         if (HAPP.equals(a.pkg) || SOTA.equals(a.pkg)) {
             subtitle.setText("");
-            showVpn(a);
+            vpn.showVpn(a);
         } else {
             subtitle.setText("");
             if (IosFeed.supports(a.pkg)) showFeed(a);
@@ -1847,7 +1712,7 @@ public class IosHome extends Activity {
                 if (overlayOpen()) closeMenu(); else showAppMenu();
                 return true;
             case KeyEvent.KEYCODE_SETTINGS:
-                if (overlayOpen()) closeMenu(); else showSettings();
+                if (overlayOpen()) closeMenu(); else settings.show();
                 return true;
             case KeyEvent.KEYCODE_TV_INPUT:
                 showInputs();
@@ -1937,11 +1802,11 @@ public class IosHome extends Activity {
         else if (m.kind == IosNav.Move.GO) moveTo(m.zone, m.index);
     }
 
-    private void launch(App a) {
+    void launch(App a) {
         open(new Intent(Intent.ACTION_MAIN).setComponent(a.component)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED));
     }
-    private void open(Intent i) {
+    void open(Intent i) {
         if (i == null) return;
         try {
             startActivity(i);
@@ -1953,10 +1818,10 @@ public class IosHome extends Activity {
     // ---------- Меню ----------
 
     /** Все меню выезжают одной панелью справа, как настройки. */
-    private void showMenu(String title, List<String> labels, List<Runnable> actions) { showMenu(title, labels, actions, true); }
+    void showMenu(String title, List<String> labels, List<Runnable> actions) { showMenu(title, labels, actions, true); }
 
     /** Боковая панель. slide = false — панель уже на экране и только меняет содержимое. */
-    private void showMenu(String title, List<String> labels, List<Runnable> actions, boolean slide) {
+    void showMenu(String title, List<String> labels, List<Runnable> actions, boolean slide) {
         menuKind = "";
         overlay.removeAllViews();
         menuActions.clear();
@@ -1964,13 +1829,13 @@ public class IosHome extends Activity {
         menuViews.clear();
         LinearLayout panel = new LinearLayout(this);
         panel.setOrientation(LinearLayout.VERTICAL);
-        panel.setPadding(px(24), px(64), px(24), px(40));
+        panel.setPadding(px(IosPalette.S3), px(IosPalette.S6), px(IosPalette.S3), px(40));
         panel.setBackgroundColor(PANEL);
         TextView t = text(IosPalette.TITLE, semibold, INK);
         t.setText(title);
         t.setSingleLine(true);
         t.setEllipsize(TextUtils.TruncateAt.END);
-        t.setPadding(px(24), 0, px(24), px(32));
+        t.setPadding(px(IosPalette.S3), 0, px(IosPalette.S3), px(IosPalette.S4));
         panel.addView(t, new LinearLayout.LayoutParams(-1, -2));
         // Пункты лежат в отдельном окне: панель стоит на месте, листается только список.
         FrameLayout window = new FrameLayout(this);
@@ -1986,7 +1851,7 @@ public class IosHome extends Activity {
             r.setSingleLine(true);
             r.setEllipsize(TextUtils.TruncateAt.END);
             r.setGravity(Gravity.CENTER_VERTICAL);
-            r.setPadding(px(24), 0, px(24), 0);
+            r.setPadding(px(IosPalette.S3), 0, px(IosPalette.S3), 0);
             list.addView(r, new LinearLayout.LayoutParams(-1, px(MENU_ROW)));
             menuViews.add(r);
         }
@@ -2003,7 +1868,7 @@ public class IosHome extends Activity {
         paintMenu();
     }
 
-    private void paintMenu() {
+    void paintMenu() {
         if (menuPanel != null) {
             View window = (View) menuPanel.getParent();
             float room = window.getHeight() > 0 ? window.getHeight() : px(1080 - 64 - 40 - 90);
@@ -2039,7 +1904,7 @@ public class IosHome extends Activity {
     }
 
     /** Строка-сведение в меню: показывает значение, но не выбирается. */
-    private final Runnable INFO = new Keep(() -> { });
+    final Runnable INFO = new Keep(() -> { });
 
     private void closeMenu() {
         if (searchField != null) { hideKeyboard(searchField); searchField = null; }
@@ -2127,160 +1992,10 @@ public class IosHome extends Activity {
     }
 
     /** Пункт меню, после которого меню остаётся открытым: переключатели. Подпись обновляется на месте, без анимации. */
-    private static final class Keep implements Runnable {
+    static final class Keep implements Runnable {
         final Runnable r;
         Keep(Runnable r) { this.r = r; }
         @Override public void run() { r.run(); }
-    }
-
-    private Runnable keep(Runnable r) { return new Keep(r); }
-
-    /** Настройки лаунчера. Системные экраны прошивки — только в отдельном пункте «Системные настройки». */
-    private void settingsItems(List<String> labels, List<Runnable> actions) {
-        labels.add("Wi-Fi и интернет");
-        actions.add(this::showWifi);
-        long sleepAt = IosSleep.at(this), left = sleepAt == 0 ? 0 : (sleepAt - System.currentTimeMillis() + 59_999) / 60000;
-        labels.add(sleepAt == 0 ? "Таймер сна: выключен" : "Таймер сна: через " + left + " мин");
-        actions.add(keep(() -> {
-            // Каждое нажатие — следующий шаг: 30, 60, 90 минут, выключить.
-            long step = left == 0 ? 30 : left <= 30 ? 60 : left <= 60 ? 90 : 0;
-            IosSleep.schedule(this, step);
-            refreshSettings();
-        }));
-        SharedPreferences saverPrefs = getSharedPreferences("ios_saver", 0);
-        int saverPick = saverPrefs.getInt("style", -1);
-        labels.add("Заставка: " + (saverPick < 0 ? "по очереди" : IosSaver.NAMES[saverPick]));
-        actions.add(keep(() -> {
-            int next = saverPick + 1 >= IosSaver.NAMES.length ? -1 : saverPick + 1;
-            saverPrefs.edit().putInt("style", next).apply();
-            refreshSettings();
-        }));
-        int idle = saverPrefs.getInt("idle", 5);
-        labels.add("Заставка при простое: " + (idle == 0 ? "никогда" : "через " + idle + " мин"));
-        actions.add(keep(() -> {
-            int next = idle == 2 ? 5 : idle == 5 ? 10 : idle == 10 ? 15 : idle == 15 ? 0 : 2;
-            saverPrefs.edit().putInt("idle", next).apply();
-            refreshSettings();
-        }));
-        labels.add("Показать заставку");
-        actions.add(() -> startActivity(new Intent(this, IosSaverActivity.class)
-                .putExtra("style", saverPick < 0 ? 0 : saverPick)));
-        boolean ads = IosTools.adsBlocked(this), fast = IosTools.fastAnim(this);
-        labels.add("Блокировка рекламы: " + (ads ? "включена" : "выключена"));
-        actions.add(keep(() -> tweak("dns", !ads)));
-        labels.add("Быстрые анимации: " + (fast ? "включены" : "выключены"));
-        actions.add(keep(() -> tweak("anim", !fast)));
-        boolean ownKeys = String.valueOf(Settings.Secure.getString(getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD)).startsWith(getPackageName());
-        labels.add("Клавиатура: " + (ownKeys ? "Starwind" : "Яндекс"));
-        actions.add(keep(() -> new Thread(() -> {
-            try {
-                IosAdb.get(this).shell("ime enable " + getPackageName() + "/.IosKeyboard; ime set "
-                        + (ownKeys ? "ru.yandex.androidkeyboard.tv/ru.yandex.androidkeyboard.TvYandexKeyboardService" : getPackageName() + "/.IosKeyboard"));
-            } catch (Exception e) { Log.w("IosHome", "ime: " + e); }
-            handler.post(this::refreshSettings);
-        }, "ime").start()));
-        labels.add("Очистить кэш приложений");
-        actions.add(keep(() -> {
-            note("Чищу кэш…");
-            new Thread(() -> { boolean ok = tools.trim(); handler.post(() -> note(ok ? "Кэш очищен" : "Нет доступа к отладке")); }, "trim").start();
-        }));
-        labels.add("Пульт в телефоне");
-        actions.add(this::showRemoteCode);
-        labels.add("Обновить лаунчер, версия " + IosUpdate.installed(this));
-        actions.add(keep(() -> {
-            note("Проверяю обновление…");
-            IosUpdate.check(this, m -> note(m));
-        }));
-        // Аккаунт Яндекса всего телевизора: за ним следуют Кинопоиск и другие приложения Яндекса.
-        labels.add("Аккаунт Яндекса");
-        actions.add(() -> open(new Intent("com.yandex.tv.passport.MANAGE_ACCOUNTS").setPackage("com.yandex.tv.services")
-                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)));
-        labels.add("Системные настройки");
-        actions.add(this::showSystemSettings);
-        for (final String pkg : stored("hidden")) {
-            String name = pkg;
-            try {
-                PackageManager pm = getPackageManager();
-                name = String.valueOf(pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)));
-            } catch (PackageManager.NameNotFoundException ignored) { }
-            labels.add("Вернуть " + name);
-            actions.add(() -> {
-                List<String> h = stored("hidden");
-                h.remove(pkg);
-                store("hidden", h);
-                reload();
-            });
-        }
-    }
-
-    private void showSettings() {
-        List<String> labels = new ArrayList<>();
-        List<Runnable> actions = new ArrayList<>();
-        settingsItems(labels, actions);
-        showMenu("Настройки", labels, actions);
-        menuKind = "settings";
-    }
-
-    /** Переключатель сработал: подписи меняются на месте, меню не переоткрывается. */
-    private void refreshSettings() {
-        if (!overlayOpen() || !"settings".equals(menuKind)) return;
-        List<String> labels = new ArrayList<>();
-        List<Runnable> actions = new ArrayList<>();
-        settingsItems(labels, actions);
-        if (labels.size() != menuViews.size()) { int at = menuIndex; showSettings(); menuIndex = Math.min(at, menuViews.size() - 1); paintMenu(); return; }
-        for (int i = 0; i < labels.size(); i++) menuViews.get(i).setText(labels.get(i));
-        menuActions.clear();
-        menuActions.addAll(actions);
-    }
-
-    /** Экраны прошивки собраны в одном месте и так и названы: всё остальное — в стиле лаунчера. */
-    private void showSystemSettings() {
-        List<String> labels = new ArrayList<>();
-        List<Runnable> actions = new ArrayList<>();
-        String[][] rows = {{"Сети Wi-Fi и пароль", Settings.ACTION_WIFI_SETTINGS}, {"Bluetooth и пульты", Settings.ACTION_BLUETOOTH_SETTINGS},
-                {"Звук", Settings.ACTION_SOUND_SETTINGS}, {"Изображение", Settings.ACTION_DISPLAY_SETTINGS},
-                {"Приложения", Settings.ACTION_APPLICATION_SETTINGS}, {"Все настройки телевизора", Settings.ACTION_SETTINGS}};
-        for (String[] row : rows) {
-            labels.add(row[0]);
-            actions.add(() -> open(SystemSettings.intent(this, row[1])));
-        }
-        showMenu("Системные настройки", labels, actions);
-    }
-
-    /** Wi-Fi в стиле лаунчера: сеть, сигнал, скорость, адрес, VPN. Сменить сеть — в системных настройках. */
-    private void showWifi() {
-        List<String> labels = new ArrayList<>();
-        List<Runnable> actions = new ArrayList<>();
-        labels.add("Проверяю сеть…");
-        actions.add(INFO);
-        showMenu("Wi-Fi и интернет", labels, actions);
-        menuKind = "wifi";
-        new Thread(() -> {
-            List<String> info = tools.wifi();
-            handler.post(() -> {
-                if (!overlayOpen() || !"wifi".equals(menuKind)) return;
-                List<String> l = new ArrayList<>(info);
-                List<Runnable> a = new ArrayList<>();
-                for (int i = 0; i < l.size(); i++) a.add(INFO);
-                l.add("VPN: " + (vpnOn() ? "включён" : "выключен"));
-                a.add(INFO);
-                l.add("Сменить сеть");
-                a.add(() -> open(SystemSettings.intent(this, Settings.ACTION_WIFI_SETTINGS)));
-                showMenu("Wi-Fi и интернет", l, a, false);
-                menuKind = "wifi";
-                menuIndex = l.size() - 1;
-                paintMenu();
-            });
-        }, "wifi").start();
-    }
-
-    private void tweak(String what, boolean on) {
-        new Thread(() -> {
-            String r;
-            try { r = tools.tweak(what, on ? "1" : "0"); } catch (Exception e) { r = IosTools.say("Не получилось"); }
-            String msg = r.replaceAll("^\\{\"say\":\"|\"\\}$", "");
-            handler.post(() -> { note(msg); refreshSettings(); });
-        }, "tweak").start();
     }
 
     /** Долго без нажатий на главном экране: экран мягко притухает, потом заставка. Заодно чистка кэша раз в 15 дней. */
