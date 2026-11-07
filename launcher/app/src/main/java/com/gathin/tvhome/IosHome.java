@@ -47,6 +47,7 @@ import android.util.TypedValue;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.PathInterpolator;
 import android.widget.FrameLayout;
@@ -153,7 +154,7 @@ public class IosHome extends Activity {
     private static final int CARD_CLIP = 20, CLEAN = 0xFF30D5C8;
     private static final int MENU_W = 620, MENU_ROW = 78, POSTER_W = 330;
     private LinearLayout menuPanel;
-    private String vpnShown = "", vpnStats = "";
+    private String vpnShown = "", vpnStats = "", vpnSpeed = "";
     private final Map<String, Integer> cardMemory = new HashMap<>();
     private final List<ObjectAnimator> drift = new ArrayList<>();
     private ImageView glow;
@@ -164,7 +165,7 @@ public class IosHome extends Activity {
     private TextView caption, captionSub, appLabel;
     private final Map<View, TextView[]> cardLabels = new HashMap<>();
     /** Подписи карточек: в покое, у соседей выбранной. */
-    private static final float LABEL_REST = 0.62f, LABEL_DIM = 0.4f;
+    private static final float LABEL_REST = 0.66f, LABEL_DIM = 0.55f;
     private IosFeed feed;
     private final Map<String, String> feedShown = new HashMap<>();
     private ImageView washA, washB, spot;
@@ -187,6 +188,7 @@ public class IosHome extends Activity {
             ticks++;
             if (ticks % 12 == 0 && zone != CARDS && zone != APPS && !overlayOpen()) rotateFeeds();
             if (ticks % 4 == 0) loadAllFeeds();
+            if (ticks % 20 == 0 && vpnOn()) checkSpeed();
             handler.postDelayed(this, 15000);
         }
     };
@@ -678,6 +680,35 @@ public class IosHome extends Activity {
         store("order", g);
     }
 
+    /** Доля «краски» в картинке: сколько её площади реально закрашено (по прозрачности). */
+    static float inkShare(Bitmap b) {
+        if (b == null) return 0;
+        int w = Math.min(96, b.getWidth()), h = Math.max(1, Math.round(b.getHeight() * (float) w / b.getWidth()));
+        Bitmap s = Bitmap.createScaledBitmap(b, w, h, true);
+        long sum = 0;
+        for (int y = 0; y < h; y++) for (int x = 0; x < w; x++) sum += Color.alpha(s.getPixel(x, y));
+        if (s != b) s.recycle();
+        return sum / 255f / (w * h);
+    }
+
+    private final Map<Integer, Float> wordInk = new HashMap<>();
+    private float wordRef;
+
+    /** Площадь краски логотипа в шапке, как он ляжет в рамку 1100×76. */
+    private float wordArea(int res) {
+        Float got = wordInk.get(res);
+        if (got != null) return got;
+        Bitmap b = BitmapFactory.decodeResource(getResources(), res);
+        float area = 0;
+        if (b != null) {
+            float fit = Math.min(1100f / b.getWidth(), 76f / b.getHeight());
+            area = inkShare(b) * b.getWidth() * fit * b.getHeight() * fit;
+            b.recycle();
+        }
+        wordInk.put(res, area);
+        return area;
+    }
+
     private ImageView image(Bitmap b) {
         ImageView i = new ImageView(this);
         i.setImageBitmap(b);
@@ -779,10 +810,21 @@ public class IosHome extends Activity {
         focused = null;
         dockLayer.removeAllViews();
         dockViews.clear();
+        // Значки дока одного оптического веса: у плотного квадрата ВК и тонкой иконки разная «масса» краски.
+        float[] ink = new float[dock.size()];
+        for (int i = 0; i < dock.size(); i++) ink[i] = inkShare(dock.get(i).logo.mono);
+        float[] sorted = ink.clone();
+        Arrays.sort(sorted);
+        float ref = sorted.length == 0 ? 0 : sorted[sorted.length / 2];
         for (int i = 0; i < dock.size(); i++) {
             View v = logoView(dock.get(i));
             v.setScaleX(DOCK_REST);
             v.setScaleY(DOCK_REST);
+            if (ink[i] > 0 && ref > 0) {
+                float k = Math.max(0.86f, Math.min(1.12f, (float) Math.sqrt(ref / ink[i])));
+                ViewGroup box = (ViewGroup) v;
+                for (int c = 0; c < box.getChildCount(); c++) { box.getChildAt(c).setScaleX(k); box.getChildAt(c).setScaleY(k); }
+            }
             dockLayer.addView(v, at(DOCK_CX - DOCK_LOGO / 2f, dockY(i), DOCK_LOGO, DOCK_LOGO));
             dockViews.add(v);
         }
@@ -867,14 +909,14 @@ public class IosHome extends Activity {
         FeedItem link = new FeedItem();
         link.poster = true;
         link.title = !on ? "Нет подключения" : where.isEmpty() ? "Определяю страну" : where;
-        link.subtitle = !on ? "Сначала включи VPN" : (measured ? parts[0] + ", " + parts[1].toLowerCase(new Locale("ru")) + ". " : "Измеряю. ") + "ОК, обновить";
+        link.subtitle = !on ? "Сначала включи VPN" : (measured ? parts[1] + (vpnSpeed.isEmpty() ? "" : ", " + vpnSpeed) + ". " : "Измеряю. ") + "ОК, обновить";
         link.image = linkArt(on && !iso.isEmpty() ? flagOf(iso) : "\uD83C\uDF10", grade, measured ? parts[0] : on ? "…" : "—", accent);
         link.action = () -> {
             prefs.edit().remove("vpn_place").remove("vpn_iso").apply();
             feed.resetProbe();
             vpnStats = "";
             refreshVpn();
-            if (vpnOn()) { checkExit(); checkSpeed(); }
+            if (vpnOn()) { checkExit(); checkSpeed(); checkDownload(true); }
         };
 
         FeedItem server = new FeedItem();
@@ -886,7 +928,7 @@ public class IosHome extends Activity {
 
         FeedItem[] all = {toggle, link, server};
         for (int i = 0; i < all.length; i++) addCard(all[i], i);
-        if (on) { checkExit(); checkSpeed(); }
+        if (on) { checkExit(); checkSpeed(); checkDownload(false); }
     }
 
     private Bitmap art() {
@@ -926,10 +968,11 @@ public class IosHome extends Activity {
         Canvas c = new Canvas(b);
         float cx = b.getWidth() / 2f;
         Paint f = paint(INK);
-        f.setTextSize(px(150));
+        f.setTextSize(px(110));
         f.setTextAlign(Paint.Align.CENTER);
-        c.drawText(flag, cx, px(200), f);
-        float cy = px(400), r = px(110);
+        c.drawText(flag, cx, px(140), f);
+        drawHistory(c, accent);
+        float cy = px(300), r = px(92);
         Paint arc = paint(0xFF3A3A3F);
         arc.setStyle(Paint.Style.STROKE);
         arc.setStrokeWidth(px(22));
@@ -946,6 +989,63 @@ public class IosHome extends Activity {
         t.setTextAlign(Paint.Align.CENTER);
         c.drawText(value, cx, cy - px(8), t);
         return b;
+    }
+
+    /** Отклик за последний час тонкой линией внизу карточки: видно, ровная связь или скачет. */
+    private void drawHistory(Canvas c, int accent) {
+        List<long[]> h = vpnHistory();
+        float left = px(30), right = c.getWidth() - px(30), top = px(372), bottom = px(452);
+        Paint label = paint(0xFF8E8E93);
+        label.setTextSize(px(20));
+        label.setTypeface(medium);
+        c.drawText("отклик за час", left, px(478), label);
+        Paint base = paint(0xFF3A3A3F);
+        base.setStrokeWidth(px(2));
+        c.drawLine(left, bottom, right, bottom, base);
+        if (h.size() < 2) return;
+        long now = System.currentTimeMillis(), from = now - 3600_000L;
+        long max = 100;
+        for (long[] p : h) max = Math.max(max, p[1]);
+        android.graphics.Path line = new android.graphics.Path();
+        boolean first = true;
+        for (long[] p : h) {
+            float x = left + (right - left) * (p[0] - from) / 3600_000f;
+            float y = bottom - (bottom - top) * Math.min(1f, p[1] / (float) max);
+            if (first) { line.moveTo(x, y); first = false; } else line.lineTo(x, y);
+        }
+        Paint stroke = paint(accent);
+        stroke.setStyle(Paint.Style.STROKE);
+        stroke.setStrokeWidth(px(4));
+        stroke.setStrokeJoin(Paint.Join.ROUND);
+        stroke.setStrokeCap(Paint.Cap.ROUND);
+        c.drawPath(line, stroke);
+        Paint top10 = paint(0xFF8E8E93);
+        top10.setTextSize(px(18));
+        top10.setTextAlign(Paint.Align.RIGHT);
+        c.drawText(max + " мс", right, top - px(8), top10);
+    }
+
+    /** История отклика VPN за час: «время:мс» через запятую в настройках. */
+    private List<long[]> vpnHistory() {
+        List<long[]> out = new ArrayList<>();
+        long from = System.currentTimeMillis() - 3600_000L;
+        for (String part : prefs.getString("vpn_hist", "").split(",")) {
+            String[] kv = part.split(":");
+            if (kv.length != 2) continue;
+            try {
+                long t = Long.parseLong(kv[0]), ms = Long.parseLong(kv[1]);
+                if (t >= from && ms > 0) out.add(new long[]{t, ms});
+            } catch (NumberFormatException ignored) { }
+        }
+        return out;
+    }
+
+    private void rememberPing(int ms) {
+        if (ms <= 0) return;
+        StringBuilder b = new StringBuilder();
+        for (long[] p : vpnHistory()) b.append(p[0]).append(':').append(p[1]).append(',');
+        b.append(System.currentTimeMillis()).append(':').append(ms);
+        prefs.edit().putString("vpn_hist", b.toString()).apply();
     }
 
     /** Смена сервера: стопка из трёх серверов, верхний светится. */
@@ -970,6 +1070,15 @@ public class IosHome extends Activity {
             int grade = lost > 1 || avg < 0 ? 0 : spread > 120 || avg > 600 ? 1 : spread > 50 || avg > 250 ? 2 : 3;
             String word = grade == 0 ? "Связь рвётся" : grade == 1 ? "Нестабильно" : grade == 2 ? "Стабильно" : "Отлично";
             vpnStats = (avg < 0 ? "нет ответа" : avg + " мс") + "|" + word + "|" + grade;
+            rememberPing(avg);
+            refreshVpn();
+        });
+    }
+
+    /** Скорость загрузки через VPN: 4 МБ с серверов Google (они идут через VPN), не чаще раза в 10 минут. */
+    private void checkDownload(boolean force) {
+        feed.download(force, mbit -> {
+            vpnSpeed = mbit <= 0 ? "" : String.format(new Locale("ru"), "%.0f Мбит/с", mbit);
             refreshVpn();
         });
     }
@@ -1056,7 +1165,7 @@ public class IosHome extends Activity {
         card.addView(pic, new FrameLayout.LayoutParams(-1, -1));
         if (item.image != null) {
             pic.setImageBitmap(item.image);
-            item.onImage = () -> pic.setImageBitmap(item.image);
+            item.onImage = () -> { pic.setImageBitmap(item.image); toneFor(card, item); };
         } else {
             // Пока обложка грузится, карточка мягко дышит.
             final ObjectAnimator pulse = breathe ? ObjectAnimator.ofFloat(card, "alpha", 1f, 0.55f) : null;
@@ -1072,6 +1181,7 @@ public class IosHome extends Activity {
                 pic.setAlpha(0f);
                 pic.setImageBitmap(item.image);
                 pic.animate().alpha(1f).setDuration(NORMAL).setInterpolator(ease).start();
+                toneFor(card, item);
             };
             item.onFail = () -> {
                 if (pulse != null) pulse.cancel();
@@ -1114,6 +1224,13 @@ public class IosHome extends Activity {
         }
     }
 
+    /** Обложка выбранной карточки догрузилась: фон перекрашивается в её цвет. */
+    private void toneFor(View card, FeedItem item) {
+        if (card != focused || zone != CARDS) return;
+        int t = coverTone(item.image);
+        if (t != 0) washColor(t);
+    }
+
     /** Убирает содержимое дальней карточки: обложку отдаём сборщику, рамка и подписи остаются. */
     private void emptyCard(FrameLayout card, FeedItem item) {
         if (card.getChildCount() == 0) return;
@@ -1141,12 +1258,43 @@ public class IosHome extends Activity {
         feed.picturesAround(list, at);
     }
 
+    /** Цвет обложки для подсветки фона: насыщенные точки весят больше, итог приглушён на треть,
+     *  чтобы фон жил вместе с карточкой, но не спорил с ней. 0 — обложки ещё нет. */
+    static int coverTone(Bitmap b) {
+        if (b == null || b.isRecycled()) return 0;
+        Bitmap s = Bitmap.createScaledBitmap(b, 24, 14, true);
+        float r = 0, g = 0, bl = 0, wsum = 0;
+        float[] hsv = new float[3];
+        for (int y = 0; y < s.getHeight(); y++) for (int x = 0; x < s.getWidth(); x++) {
+            int c = s.getPixel(x, y);
+            Color.colorToHSV(c, hsv);
+            float w = 0.05f + hsv[1] * hsv[2] * (hsv[2] > 0.15f ? 1f : 0.2f);
+            r += Color.red(c) * w; g += Color.green(c) * w; bl += Color.blue(c) * w; wsum += w;
+        }
+        if (s != b) s.recycle();
+        int avg = Color.rgb(Math.round(r / wsum), Math.round(g / wsum), Math.round(bl / wsum));
+        Color.colorToHSV(avg, hsv);
+        hsv[1] = Math.min(0.75f, hsv[1] * 0.67f);
+        hsv[2] = Math.max(0.55f, Math.min(0.9f, hsv[2] * 1.4f));
+        return Color.HSVToColor(hsv);
+    }
+
+    /** Тонкая, почти невидимая линия по краю выбранной карточки, как у окон macOS: отделяет её от фона без «рамки». */
+    private Drawable hairline() {
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(0x00000000);
+        d.setCornerRadius(px(26));
+        d.setStroke(Math.max(1, px(1.5f)), 0x4DFFFFFF);
+        return d;
+    }
+
     /** Пока лента в фокусе, остальные карточки притушены, а уехавшие влево прячутся за доком. */
     private void dimCards(View on, int position) {
         for (int k = 0; k < cardViews.size(); k++) {
             View c = cardViews.get(k);
             boolean lit = c == on;
             c.animate().alpha(on == null || lit ? 1f : 0.5f).setDuration(FAST).start();
+            if (c instanceof FrameLayout) c.setForeground(lit ? hairline() : null);
             TextView[] l = cardLabels.get(c);
             if (l != null) {
                 l[0].animate().alpha(lit ? 1f : on == null ? LABEL_REST : LABEL_DIM).setDuration(FAST).start();
@@ -1221,6 +1369,18 @@ public class IosHome extends Activity {
         Integer mark = a == null ? null : WORD.get(a.pkg);
         if (mark != null) {
             wordmark.setImageResource(mark);
+            // Логотипы в шапке одного оптического веса: YouTube не должен быть «громче» пиктограммы ВК.
+            if (wordRef == 0) {
+                List<Float> all = new ArrayList<>();
+                for (int res : WORD.values()) all.add(wordArea(res));
+                Collections.sort(all);
+                wordRef = all.get(all.size() / 2);
+            }
+            float area = wordArea(mark), k = area > 0 ? Math.max(0.8f, Math.min(1.2f, (float) Math.sqrt(wordRef / area))) : 1f;
+            wordmark.setPivotX(0);
+            wordmark.setPivotY(px(38));
+            wordmark.setScaleX(k);
+            wordmark.setScaleY(k);
             wordmark.setImageTintList(mark == R.drawable.word_vk ? null : ColorStateList.valueOf(a.logo.accent));
             wordmark.setVisibility(View.VISIBLE);
             title.setText("");
@@ -1346,9 +1506,11 @@ public class IosHome extends Activity {
                 float w = item.poster ? POSTER_W : CARD_W;
                 lazyCards(i);
                 cardsLayer.animate().translationX(-px(i * (w + CARD_GAP))).setDuration(NORMAL).setInterpolator(ease).start();
-                next.animate().scaleX(1.03f).scaleY(1.03f).setDuration(FAST).setInterpolator(ease).start();
+                next.animate().scaleX(1.04f).scaleY(1.04f).setDuration(FAST).setInterpolator(ease).start();
                 dimCards(next, i);
-                spotAt(dock.get(selected).logo.accent, MAIN_X + w / 2f, CARDS_Y + CARD_H / 2f, item.poster ? 900 : 1500);
+                int tone = coverTone(item.image);
+                washColor(tone != 0 ? tone : dock.get(selected).logo.accent);
+                spotAt(tone != 0 ? tone : dock.get(selected).logo.accent, MAIN_X + w / 2f, CARDS_Y + CARD_H / 2f, item.poster ? 900 : 1500);
             } else {
                 paintPill(next, true);
                 Object[] tag = (Object[]) next.getTag();

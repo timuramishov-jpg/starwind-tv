@@ -385,6 +385,37 @@ final class IosFeed {
 
     interface ExitSink { void done(String iso, String city); }
     interface ProbeSink { void done(int avg, int spread, int lost); }
+    interface SpeedSink { void done(float mbit); }
+    private long downloadAt;
+
+    void download(boolean force, SpeedSink sink) {
+        long now = SystemClock.elapsedRealtime();
+        if (!force && downloadAt != 0 && now - downloadAt < 600_000L) return;
+        if (downloadAt != 0 && now - downloadAt < 20_000L) return;
+        downloadAt = now;
+        pool.execute(() -> {
+            float mbit = -1;
+            try {
+                HttpURLConnection c = (HttpURLConnection) new URL("https://dl.google.com/android/repository/platform-tools-latest-darwin.zip").openConnection();
+                c.setConnectTimeout(5000);
+                c.setReadTimeout(8000);
+                c.setRequestProperty("Range", "bytes=0-4194303");
+                long t0 = SystemClock.elapsedRealtime(), got = 0;
+                try (InputStream in = c.getInputStream()) {
+                    byte[] buf = new byte[32768];
+                    int n;
+                    while ((n = in.read(buf)) > 0 && got < 4194304) got += n;
+                }
+                long ms = Math.max(1, SystemClock.elapsedRealtime() - t0);
+                mbit = got * 8f / ms / 1000f;
+                Log.i(TAG, "download " + got + " bytes in " + ms + " ms");
+            } catch (Exception e) {
+                Log.w(TAG, "download: " + e);
+            }
+            final float m = mbit;
+            main.post(() -> sink.done(m));
+        });
+    }
     private long probeAt;
 
     void resetProbe() { probeAt = 0; }
