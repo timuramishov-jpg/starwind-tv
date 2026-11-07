@@ -52,7 +52,7 @@ final class IosVpn {
     /** Экран VPN: три узкие карточки, как афиши. Тумблер, связь (страна и отклик), смена сервера. */
     void showVpn(IosHome.App a) {
         IosHome.FeedItem[] all = vpnItems(a);
-        for (int i = 0; i < all.length; i++) h.addCard(all[i], i);
+        for (int i = 0; i < all.length; i++) h.cards.add(all[i], i);
         if (h.vpnOn()) { checkExit(); checkSpeed(); checkDownload(false); }
     }
 

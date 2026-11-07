@@ -79,11 +79,11 @@ public class IosHome extends Activity {
     // Все цвета — из IosPalette: одна система на весь телевизор.
     static final int INK = IosPalette.INK, INK_2 = IosPalette.SECONDARY, ICON_REST = IosPalette.GRAY1, GROUND = IosPalette.BLACK,
             PANEL = IosPalette.GRAY6, PILL = IosPalette.GRAY6, ROW_ON = IosPalette.INK, ROW_ON_TEXT = IosPalette.ON_LIGHT, SCRIM = IosPalette.SCRIM;
-    private static final float DOCK_CX = 95, DOCK_CELL = 116, DOCK_LOGO = 96, DOCK_REST = 0.875f, MAIN_X = 236,
+    static final float DOCK_CX = 95, DOCK_CELL = 116, DOCK_LOGO = 96, DOCK_REST = 0.875f, MAIN_X = 236,
             TITLE_Y = 170, PILL_Y = 300, CARDS_Y = 300, CARD_W = 880, CARD_H = 495, CARD_GAP = IosPalette.S4, EDGE_X = IosPalette.EDGE,
             HEADER_Y = 1180, APPS_Y = 1280, APPS_SCROLL = 1090;
     private static final int MAX_DOCK = 7;
-    private static final int DOCK = 0, CARDS = 1, APPS = 2, TOP = 3;
+    static final int DOCK = 0, CARDS = 1, APPS = 2, TOP = 3;
     private static final String[] DEFAULT_DOCK = {"com.yandex.tv.ytplayer", "com.vk.tv", "ru.rutube.app.tv", "ru.kinopoisk.yandex.tv", "su.happ.proxyutility"};
     private static final String[] SKIP = {"com.cvte.", "com.mediatek.", "com.android.", "com.gathin.tvhome",
             "com.tim.adbmenu", "com.yandex.tv.home", "com.yandex.tv.settings", "com.yandex.tv.setupwizard",
@@ -148,7 +148,7 @@ public class IosHome extends Activity {
     final List<View> dockViews = new ArrayList<>(), appViews = new ArrayList<>(), cardViews = new ArrayList<>(),
             topViews = new ArrayList<>();
     private final Set<String> hidden = new HashSet<>();
-    private final PathInterpolator ease = new PathInterpolator(0.2f, 0f, 0f, 1f);
+    final PathInterpolator ease = new PathInterpolator(0.2f, 0f, 0f, 1f);
 
     SharedPreferences prefs;
     FrameLayout root, dockLayer, content, cardsLayer, appsLayer, overlay;
@@ -156,9 +156,9 @@ public class IosHome extends Activity {
     private ImageView weatherIcon;
     private boolean restored;
     /** Три длительности на весь экран, кривая одна: ease. */
-    private static final int FAST = 160, NORMAL = 260, SLOW = 420;
+    static final int FAST = 160, NORMAL = 260, SLOW = 420;
     private static final int CARD_CLIP = 20, CLEAN = IosPalette.TEAL;
-    private static final int MENU_W = 620, MENU_ROW = 78, POSTER_W = 330;
+    static final int MENU_W = 620, MENU_ROW = 78, POSTER_W = 330;
     LinearLayout menuPanel;
     private final Map<String, Integer> cardMemory = new HashMap<>();
     private final List<ObjectAnimator> drift = new ArrayList<>();
@@ -170,7 +170,7 @@ public class IosHome extends Activity {
     private TextView caption, captionSub;
     final Map<View, TextView[]> cardLabels = new HashMap<>();
     /** Подписи карточек: в покое, у соседей выбранной. */
-    private static final float LABEL_REST = 0.66f, LABEL_DIM = 0.55f;
+    static final float LABEL_REST = 0.66f, LABEL_DIM = 0.55f;
     IosFeed feed;
     private final Map<String, String> feedShown = new HashMap<>();
     private ImageView washA, washB, spot;
@@ -183,7 +183,7 @@ public class IosHome extends Activity {
     private float scroll = 0;
     private boolean moving, washOnA, okDown, okLong;
     private long okDownAt;
-    private View focused;
+    View focused;
     final List<Runnable> menuActions = new ArrayList<>();
     final List<TextView> menuViews = new ArrayList<>();
     int menuIndex;
@@ -215,6 +215,7 @@ public class IosHome extends Activity {
     final IosSearch search = new IosSearch(this);
     boolean superDispatch(KeyEvent e) { return super.dispatchKeyEvent(e); }
     final IosInputs inputs = new IosInputs(this);
+    final IosCards cards = new IosCards(this);
     final IosSettings settings = new IosSettings(this);
     int px(float v) { return Math.round(v * s); }
     boolean overlayOpen() { return overlay.getVisibility() == View.VISIBLE; }
@@ -310,6 +311,7 @@ public class IosHome extends Activity {
             reload();
         }
         vpn.refreshVpn();
+        IosMemory.autoClean(this);
         loadAllFeeds();
         autoVpn();
         if (!prefs.getBoolean("hint_seen", false)) handler.postDelayed(this::showHint, 2500);
@@ -352,6 +354,7 @@ public class IosHome extends Activity {
         lastVpn = on;
         feed.expire();
         vpn.refreshVpn();
+        IosMemory.autoClean(this);
         loadAllFeeds();
     }
 
@@ -385,7 +388,7 @@ public class IosHome extends Activity {
         super.onTrimMemory(level);
         if (level < TRIM_MEMORY_UI_HIDDEN || trimmed) return;
         trimmed = true;
-        for (View c : cardViews) if (c instanceof FrameLayout && c.getTag() instanceof FeedItem) emptyCard((FrameLayout) c, (FeedItem) c.getTag());
+        for (View c : cardViews) if (c instanceof FrameLayout && c.getTag() instanceof FeedItem) cards.empty((FrameLayout) c, (FeedItem) c.getTag());
         feed.trim();
         Log.i("IosHome", "trim " + level);
     }
@@ -393,7 +396,7 @@ public class IosHome extends Activity {
     private void untrim() {
         if (!trimmed) return;
         trimmed = false;
-        if (zone == CARDS || !cardViews.isEmpty()) lazyCards(zone == CARDS ? index : 0);
+        if (zone == CARDS || !cardViews.isEmpty()) cards.lazy(zone == CARDS ? index : 0);
     }
 
     @Override protected void onNewIntent(Intent intent) {
@@ -499,7 +502,7 @@ public class IosHome extends Activity {
         glow.animate().alpha(0f).setDuration(SLOW).start();
     }
 
-    private void washColor(int color) {
+    void washColor(int color) {
         if (color == washNow) return;
         washNow = color;
         ImageView on = washOnA ? washB : washA, off = washOnA ? washA : washB;
@@ -532,7 +535,7 @@ public class IosHome extends Activity {
         return t;
     }
 
-    private FrameLayout.LayoutParams at(float x, float y, float w, float h) {
+    FrameLayout.LayoutParams at(float x, float y, float w, float h) {
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(w <= 0 ? -2 : px(w), h <= 0 ? -2 : px(h));
         lp.leftMargin = px(x);
         lp.topMargin = px(y);
@@ -820,22 +823,8 @@ public class IosHome extends Activity {
         ActivityManager am = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
         ActivityManager.MemoryInfo before = new ActivityManager.MemoryInfo();
         am.getMemoryInfo(before);
-        // Кинопоиск после выгрузки спрашивает «кто смотрит»: метла его не трогает.
-        Set<String> keep = new HashSet<>(Arrays.asList(getPackageName(), HAPP, SOTA, IosFeed.KINOPOISK, "com.android.systemui",
-                "com.android.providers.tv", "com.android.bluetooth", "ru.yandex.androidkeyboard.tv", "com.mediatek.tvinput",
-                "com.mediatek.tv.service", "com.cvte.tv.api.impl", "com.cvte.tv.globalui", "com.yandex.tv.services.platform"));
-        int n = 0;
-        String problem = null;
-        for (ApplicationInfo ai : getPackageManager().getInstalledApplications(0)) {
-            if (keep.contains(ai.packageName) || ai.packageName.startsWith("com.android.") && (ai.flags & ApplicationInfo.FLAG_SYSTEM) != 0) continue;
-            try {
-                am.killBackgroundProcesses(ai.packageName);
-                n++;
-            } catch (RuntimeException e) {
-                problem = e.getClass().getSimpleName();
-                Log.w("IosHome", "clean " + ai.packageName + ": " + e);
-            }
-        }
+        int n = IosMemory.killBackground(this, null);
+        String problem = n == 0 ? "none" : null;
         feed.trim();
         System.gc();
         final int count = n;
@@ -980,7 +969,7 @@ public class IosHome extends Activity {
         }
         List<FeedItem> items = feed.cached(a.pkg);
         subtitle.setText("");
-        for (int i = 0; i < items.size(); i++) addCard(items.get(i), i);
+        for (int i = 0; i < items.size(); i++) cards.add(items.get(i), i);
         if (items.isEmpty()) {
             // Сервис не ответил: говорим об этом, а не показываем пустоту.
             String err = feed.error(a.pkg);
@@ -1008,152 +997,6 @@ public class IosHome extends Activity {
         });
     }
 
-    /** Карточка ленты. Сама рамка и подписи создаются всегда, а обложка, плашка длительности
-     *  и «дыхание» — только у карточек рядом с выбранной (fillCard): так длинная лента почти ничего не весит. */
-    void addCard(FeedItem item, int i) {
-        FrameLayout card = new FrameLayout(this);
-        GradientDrawable bg = new GradientDrawable();
-        bg.setColor(PILL);
-        bg.setCornerRadius(px(IosPalette.R_CARD));
-        card.setBackground(bg);
-        card.setClipToOutline(true);
-        card.setTag(item);
-        float w = item.poster ? POSTER_W : CARD_W, x = MAIN_X + i * (w + CARD_GAP);
-        cardsLayer.addView(card, at(x, CARDS_Y, w, CARD_H));
-        cardViews.add(card);
-        // Подпись под каждой карточкой: в покое приглушена, у выбранной яркая и с описанием.
-        TextView name = text(item.poster ? IosPalette.CALLOUT : IosPalette.HEADLINE, medium, INK);
-        name.setText(item.title == null ? "" : item.title);
-        name.setSingleLine(true);
-        name.setEllipsize(TextUtils.TruncateAt.END);
-        name.setAlpha(LABEL_REST);
-        cardsLayer.addView(name, at(x + 4, CARDS_Y + CARD_H + 26, w - 8, 0));
-        TextView sub = text(item.poster ? IosPalette.FOOTNOTE : IosPalette.CALLOUT, regular, INK_2);
-        sub.setText(item.subtitle == null ? "" : item.subtitle);
-        sub.setSingleLine(true);
-        sub.setEllipsize(TextUtils.TruncateAt.END);
-        sub.setAlpha(0f);
-        cardsLayer.addView(sub, at(x + 4, CARDS_Y + CARD_H + (item.poster ? 66 : 74), w - 8, 0));
-        cardLabels.put(card, new TextView[]{name, sub});
-        if (i < NEAR_CARDS) fillCard(card, item, true);
-    }
-
-    private static final int NEAR_CARDS = 6;
-
-    private void fillCard(FrameLayout card, FeedItem item, boolean breathe) {
-        if (card.getChildCount() > 0) return;
-        int accent = dock.isEmpty() ? INK_2 : dock.get(selected).logo.accent;
-        GradientDrawable bg = (GradientDrawable) card.getBackground();
-        ImageView pic = new ImageView(this);
-        pic.setScaleType(ImageView.ScaleType.CENTER_CROP);
-        card.addView(pic, new FrameLayout.LayoutParams(-1, -1));
-        if (item.image != null) {
-            pic.setImageBitmap(item.image);
-            item.onImage = () -> { pic.setImageBitmap(item.image); toneFor(card, item); };
-        } else {
-            // Пока обложка грузится, карточка мягко дышит.
-            final ObjectAnimator pulse = breathe ? ObjectAnimator.ofFloat(card, "alpha", 1f, 0.55f) : null;
-            if (pulse != null) {
-                pulse.setDuration(SLOW * 2);
-                pulse.setRepeatCount(ValueAnimator.INFINITE);
-                pulse.setRepeatMode(ValueAnimator.REVERSE);
-                pulse.start();
-                card.setTag(R.id.pulse, pulse);
-            }
-            item.onImage = () -> {
-                if (pulse != null) { pulse.cancel(); card.setAlpha(1f); }
-                pic.setAlpha(0f);
-                pic.setImageBitmap(item.image);
-                pic.animate().alpha(1f).setDuration(NORMAL).setInterpolator(ease).start();
-                toneFor(card, item);
-            };
-            item.onFail = () -> {
-                if (pulse != null) pulse.cancel();
-                card.setAlpha(1f);
-                bg.setColor(IosPalette.tint(accent));
-                TextView t = text(item.poster ? IosPalette.HEADLINE : IosPalette.TITLE, semibold, INK);
-                t.setText(item.title);
-                t.setGravity(Gravity.CENTER);
-                t.setMaxLines(4);
-                t.setEllipsize(TextUtils.TruncateAt.END);
-                t.setPadding(px(IosPalette.S4), px(IosPalette.S4), px(IosPalette.S4), px(IosPalette.S4));
-                card.addView(t, new FrameLayout.LayoutParams(-1, -1));
-            };
-        }
-        if (item.duration != null && !item.duration.isEmpty()) {
-            TextView d = text(IosPalette.FOOTNOTE, semibold, INK);
-            d.setText(item.duration);
-            d.setPadding(px(12), px(4), px(12), px(4));
-            GradientDrawable g = new GradientDrawable();
-            g.setColor(IosPalette.SCRIM_STRONG);
-            g.setCornerRadius(px(IosPalette.R_BADGE));
-            d.setBackground(g);
-            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2);
-            lp.gravity = Gravity.BOTTOM | Gravity.RIGHT;
-            lp.rightMargin = lp.bottomMargin = px(IosPalette.S2);
-            card.addView(d, lp);
-        }
-        if (item.fresh) {
-            TextView n = text(IosPalette.FOOTNOTE, semibold, IosPalette.ON_LIGHT);
-            n.setText("новое");
-            n.setPadding(px(12), px(4), px(12), px(4));
-            GradientDrawable g = new GradientDrawable();
-            g.setColor(INK);
-            g.setCornerRadius(px(IosPalette.R_BADGE));
-            n.setBackground(g);
-            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2);
-            lp.gravity = Gravity.TOP | Gravity.LEFT;
-            lp.leftMargin = lp.topMargin = px(IosPalette.S2);
-            card.addView(n, lp);
-        }
-    }
-
-    /** Обложка выбранной карточки догрузилась: фон перекрашивается в её цвет. */
-    private void toneFor(View card, FeedItem item) {
-        if (card != focused || zone != CARDS) return;
-        int t = IosArt.coverTone(item.image);
-        if (t != 0) washColor(t);
-    }
-
-    /** Убирает содержимое дальней карточки: обложку отдаём сборщику, рамка и подписи остаются. */
-    private void emptyCard(FrameLayout card, FeedItem item) {
-        if (card.getChildCount() == 0) return;
-        Object pulse = card.getTag(R.id.pulse);
-        if (pulse instanceof ObjectAnimator) ((ObjectAnimator) pulse).cancel();
-        card.setTag(R.id.pulse, null);
-        card.removeAllViews();
-        item.onImage = null;
-        item.onFail = null;
-        if (item.urls != null && item.urls.length > 0) item.image = null;
-    }
-
-    /** Обложки и содержимое живут только у карточек рядом с выбранной. */
-    private void lazyCards(int at) {
-        List<FeedItem> list = new ArrayList<>();
-        for (int k = 0; k < cardViews.size(); k++) {
-            View c = cardViews.get(k);
-            if (!(c.getTag() instanceof FeedItem)) continue;
-            FeedItem it = (FeedItem) c.getTag();
-            list.add(it);
-            int far = Math.abs(k - at);
-            if (far <= NEAR_CARDS) fillCard((FrameLayout) c, it, false);
-            else if (far > NEAR_CARDS + 2) emptyCard((FrameLayout) c, it);
-        }
-        feed.picturesAround(list, at);
-    }
-
-    /** Цвет обложки для подсветки фона: насыщенные точки весят больше, итог приглушён на треть,
-     *  чтобы фон жил вместе с карточкой, но не спорил с ней. 0 — обложки ещё нет. */
-
-    /** Тонкая, почти невидимая линия по краю выбранной карточки, как у окон macOS: отделяет её от фона без «рамки». */
-    private Drawable hairline() {
-        GradientDrawable d = new GradientDrawable();
-        d.setColor(0x00000000);
-        d.setCornerRadius(px(IosPalette.R_CARD));
-        d.setStroke(Math.max(1, px(1.5f)), IosPalette.HAIRLINE);
-        return d;
-    }
-
     private final android.view.animation.LinearInterpolator linear = new android.view.animation.LinearInterpolator();
     private final Runnable settle = () -> {
         if (zone != CARDS || focused == null || !(focused.getTag() instanceof FeedItem) || dock.isEmpty()) return;
@@ -1162,30 +1005,6 @@ public class IosHome extends Activity {
         washColor(color);
         spotAt(color, MAIN_X + (item.poster ? POSTER_W : CARD_W) / 2f, CARDS_Y + CARD_H / 2f, item.poster ? 900 : 1500);
     };
-    private View litCard;
-    private Drawable line;
-
-    /** Пока лента в фокусе, остальные карточки притушены, а уехавшие влево прячутся за доком. */
-    private void dimCards(View on, int position) {
-        if (line == null) line = hairline();
-        if (on != null && litCard != null && cardViews.contains(litCard)) {
-            // Внутри ленты меняются только две карточки: прежняя гаснет, новая загорается.
-            paintCard(litCard, false, true);
-            paintCard(on, true, true);
-        } else for (View c : cardViews) paintCard(c, c == on, on != null);
-        litCard = on;
-    }
-
-    private void paintCard(View c, boolean lit, boolean inFeed) {
-        c.animate().alpha(!inFeed || lit ? 1f : 0.5f).setDuration(FAST).start();
-        if (c instanceof FrameLayout) c.setForeground(lit ? line : null);
-        TextView[] l = cardLabels.get(c);
-        if (l != null) {
-            l[0].animate().alpha(lit ? 1f : inFeed ? LABEL_DIM : LABEL_REST).setDuration(FAST).start();
-            l[1].animate().alpha(lit ? 1f : 0f).setDuration(FAST).start();
-        }
-    }
-
     // ---------- Пульт в телефоне, поиск, входы HDMI ----------
 
     private IosRemote remote;
@@ -1384,7 +1203,7 @@ public class IosHome extends Activity {
         cardsLayer.removeAllViews();
         cardViews.clear();
         cardLabels.clear();
-        litCard = null;
+        cards.lit = null;
         cardsLayer.setTranslationX(0);
         cardsLayer.animate().cancel();
         cardsLayer.setTranslationY(0);
@@ -1437,7 +1256,7 @@ public class IosHome extends Activity {
         if (z == TOP) paintButton(v, false);
         if (z == CARDS) {
             if (v.getTag() instanceof FeedItem) {
-                dimCards(null, 0);
+                cards.dim(null, 0);
                 cardsLayer.animate().translationX(0).setDuration(NORMAL).setInterpolator(ease).start();
             }
             else paintPill(v, false);
@@ -1498,12 +1317,12 @@ public class IosHome extends Activity {
             if (next.getTag() instanceof FeedItem) {
                 FeedItem item = (FeedItem) next.getTag();
                 float w = item.poster ? POSTER_W : CARD_W;
-                lazyCards(i);
+                cards.lazy(i);
                 // Зажатая стрелка: ровное линейное скольжение, шаг в шаг с повтором кнопки.
                 cardsLayer.animate().translationX(-px(i * (w + CARD_GAP))).setDuration(holding ? 120 : NORMAL)
                         .setInterpolator(holding ? linear : ease).start();
                 next.animate().scaleX(1.04f).scaleY(1.04f).setDuration(FAST).setInterpolator(ease).start();
-                dimCards(next, i);
+                cards.dim(next, i);
                 // Цвет фона по обложке — когда лента остановилась, а не на каждом шаге.
                 handler.removeCallbacks(settle);
                 handler.postDelayed(settle, holding ? 180 : 0);
