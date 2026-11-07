@@ -557,7 +557,7 @@ public class IosHome extends Activity {
         TextView head = text(34, medium, INK);
         head.setText("Приложения");
         section.addView(head);
-        content.addView(section, at(MAIN_X, HEADER_Y, 0, 0));
+        content.addView(section, at(MAIN_X, HEADER_Y, 1200, 56));
         appsLayer = layer();
         content.addView(appsLayer, new FrameLayout.LayoutParams(-1, -1));
 
@@ -882,7 +882,8 @@ public class IosHome extends Activity {
         name.setEllipsize(TextUtils.TruncateAt.END);
         name.setGravity(Gravity.CENTER);
         name.setAlpha(LABEL_REST);
-        appsLayer.addView(name, at(appX(i), appY(i) + appH + 18, appW, 0));
+        // Высота задана явно: ниже края экрана «по содержимому» превращается в ноль, и подпись пропадает.
+        appsLayer.addView(name, at(appX(i), appY(i) + appH + 16, appW, 40));
         appLabels.add(name);
         return card;
     }
