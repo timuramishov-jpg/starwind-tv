@@ -30,7 +30,7 @@ body{margin:0;color:var(--ink);font:17px/1.35 -apple-system,BlinkMacSystemFont,"
 header{display:flex;align-items:baseline;gap:12px;margin:4px 4px 0}
 header .clock{font-size:22px;font-weight:600;font-variant-numeric:tabular-nums}
 header .date{font-size:15px;color:var(--secondary)}
-h1{font-size:34px;font-weight:700;letter-spacing:-.4px;margin:14px 4px 16px}
+h1{font-size:34px;font-weight:700;letter-spacing:-.4px;margin:10px 4px 18px}
 h2{font-size:13px;font-weight:500;color:var(--secondary);margin:26px 6px 10px}
 .tab{display:none}.tab.on{display:block}
 .card{background:var(--gray6);border-radius:var(--r-card);overflow:hidden}
@@ -46,23 +46,24 @@ svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-l
 
 /* Ряд приложений, как док телевизора: серые логотипы, цветной — под пальцем. */
 .dock{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
-.app{background:var(--gray6);border-radius:var(--r-card);padding:0;aspect-ratio:1.25;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:var(--secondary);font-size:12px;font-weight:500}
-.app .logo{position:relative;width:44%;aspect-ratio:1}
-.app img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;transition:opacity .2s}
-.app img.c{opacity:0}
-.app:active img.c,.app.lit img.c{opacity:1}.app:active img.m,.app.lit img.m{opacity:0}
-.app span{max-width:92%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.app{background:var(--gray6);border-radius:var(--r-card);padding:0;aspect-ratio:1.25;display:flex;align-items:center;justify-content:center}
+.app img{width:46%;aspect-ratio:1;object-fit:contain}
+.app.lit{box-shadow:inset 0 0 0 1px var(--hairline)}
 
 /* Крестовина: тёмный круг, ОК в центре, свет под нажатой стороной. */
-.pad{position:relative;width:min(80vw,310px);aspect-ratio:1;margin:22px auto 10px;border-radius:50%;background:var(--gray6);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
-.pad button{position:absolute;background:none;color:var(--secondary);width:30%;height:30%;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center}
-.pad button:active{color:var(--ink);background:radial-gradient(closest-side,color-mix(in srgb,var(--glow) 45%,transparent),transparent);transform:none}
-.pad .u{left:35%;top:3%}.pad .d{left:35%;bottom:3%}.pad .l{left:3%;top:35%}.pad .rt{right:3%;top:35%}
-.pad .ok{left:31%;top:31%;width:38%;height:38%;background:var(--gray5);color:var(--ink);font-size:18px;font-weight:600}
-.pad .ok:active{background:var(--gray4)}
+/* Кликпад как у пульта Apple TV: тёмное кольцо, точки направлений, центральная кнопка без надписи. */
+.pad{position:relative;width:min(78vw,300px);aspect-ratio:1;margin:22px auto 18px;border-radius:50%;background:var(--gray6);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+.pad button{position:absolute;background:none;width:32%;height:32%;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center}
+.pad button:not(.ok)::after{content:"";width:7px;height:7px;border-radius:50%;background:var(--gray1);transition:background .15s}
+.pad button:not(.ok):active{background:radial-gradient(closest-side,color-mix(in srgb,var(--glow) 40%,transparent),transparent);transform:none}
+.pad button:not(.ok):active::after{background:var(--ink)}
+.pad .u{left:34%;top:2%}.pad .d{left:34%;bottom:2%}.pad .l{left:2%;top:34%}.pad .rt{right:2%;top:34%}
+.pad .ok{left:30%;top:30%;width:40%;height:40%;background:var(--gray5);box-shadow:inset 0 0 0 1px rgba(255,255,255,.06)}
+.pad .ok:active{background:var(--gray4);transform:scale(.97)}
 .keys{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
-.keys button{background:var(--gray6);color:var(--ink);font-weight:500;font-size:13px;padding:14px 4px;display:flex;flex-direction:column;align-items:center;gap:6px;border-radius:var(--r-card)}
-.keys button svg{color:var(--secondary)}
+.keys button{background:var(--gray6);color:var(--secondary);padding:0;height:64px;display:flex;align-items:center;justify-content:center;border-radius:var(--r-card)}
+.keys button:active{color:var(--ink)}
+.keys button svg{width:26px;height:26px}
 
 .list>*{display:flex;align-items:center;gap:12px;width:100%;text-align:left;background:none;border-radius:0;border-top:.5px solid var(--gray4);padding:13px 16px;font-weight:400;color:var(--ink)}
 .list>*:first-child{border-top:0}
@@ -99,25 +100,24 @@ nav button:active{transform:none}
 </head>
 <body>
 <div id="glow"></div>
-<header><span class="clock" id="clock"></span><span class="date" id="date"></span></header>
 <h1 id="title">Пульт</h1>
 
 <section class="tab on" id="remote">
   <div class="dock" id="dock"></div>
   <div class="pad">
-    <button class="u" data-key="DPAD_UP" aria-label="Вверх"><svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>
-    <button class="l" data-key="DPAD_LEFT" aria-label="Влево"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
-    <button class="ok" data-key="DPAD_CENTER">ОК</button>
-    <button class="rt" data-key="DPAD_RIGHT" aria-label="Вправо"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
-    <button class="d" data-key="DPAD_DOWN" aria-label="Вниз"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
+    <button class="u" data-key="DPAD_UP" aria-label="Вверх"></button>
+    <button class="l" data-key="DPAD_LEFT" aria-label="Влево"></button>
+    <button class="ok" data-key="DPAD_CENTER" aria-label="ОК"></button>
+    <button class="rt" data-key="DPAD_RIGHT" aria-label="Вправо"></button>
+    <button class="d" data-key="DPAD_DOWN" aria-label="Вниз"></button>
   </div>
   <div class="keys">
-    <button data-key="BACK"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg>Назад</button>
-    <button onclick="go('home',{})"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg>Домой</button>
-    <button data-key="MEDIA_PLAY_PAUSE"><svg viewBox="0 0 24 24"><path d="M5 5l8 7-8 7z"/><path d="M16 6v12M20 6v12"/></svg>Пауза</button>
-    <button onclick="go('vol',{d:'down'})"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M17 12h4"/></svg>Тише</button>
-    <button onclick="go('vol',{d:'mute'})"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M17 9l5 6M22 9l-5 6"/></svg>Без звука</button>
-    <button onclick="go('vol',{d:'up'})"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M17 12h4M19 10v4"/></svg>Громче</button>
+    <button data-key="BACK" aria-label="Назад"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg></button>
+    <button onclick="go('home',{})" aria-label="Домой"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg></button>
+    <button data-key="MEDIA_PLAY_PAUSE" aria-label="Пауза"><svg viewBox="0 0 24 24"><path d="M5 5l8 7-8 7z"/><path d="M16 6v12M20 6v12"/></svg></button>
+    <button onclick="go('vol',{d:'down'})" aria-label="Тише"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M17 12h4"/></svg></button>
+    <button onclick="go('vol',{d:'mute'})" aria-label="Без звука"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M17 9l5 6M22 9l-5 6"/></svg></button>
+    <button onclick="go('vol',{d:'up'})" aria-label="Громче"><svg viewBox="0 0 24 24"><path d="M4 10v4h4l5 4V6L8 10z"/><path d="M17 12h4M19 10v4"/></svg></button>
   </div>
   <h2>Напечатать на телевизоре</h2>
   <div class="card"><div class="row"><input type="text" id="tx" placeholder="Текст в поле на экране" enterkeyhint="send"><button onclick="typeText()">Ввести</button></div>
@@ -193,9 +193,6 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 function mb(n){return n>=1024?(n/1024).toFixed(1).replace('.',',')+' ГБ':n+' МБ'}
 function glow(c){document.documentElement.style.setProperty('--glow',c)}
 
-function tick(){const d=new Date();$('clock').textContent=d.toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'});
-  const s=d.toLocaleDateString('ru',{weekday:'long',day:'numeric',month:'long'});$('date').textContent=s[0].toUpperCase()+s.slice(1)}
-tick();setInterval(tick,10000);
 
 const tabGlow={remote:null,apps:'#0a84ff',tv:'#30d158',files:'#ff9f0a'};
 let lastAccent='#ff9f0a';
@@ -219,7 +216,8 @@ $('q').addEventListener('keydown',e=>{if(e.key==='Enter')go('search',{q:val('q')
 // Док: те же логотипы, что на телевизоре, серые в покое и цветные под пальцем; свет — цветом приложения.
 fetch(url('apps')).then(r=>r.json()).then(l=>{l.slice(0,8).forEach(x=>{
   const b=document.createElement('button');b.className='app';
-  b.innerHTML='<div class=logo><img class=m alt="" src="'+url('logo',{p:x.pkg})+'"><img class=c alt="" src="'+url('logo',{p:x.pkg,c:1})+'"></div><span>'+esc(x.label)+'</span>';
+  b.setAttribute('aria-label',x.label);
+  b.innerHTML='<img alt="" src="'+url('logo',{p:x.pkg,c:1})+'">';
   b.onclick=()=>{lastAccent=x.accent||lastAccent;glow(lastAccent);document.querySelectorAll('.app').forEach(a=>a.classList.toggle('lit',a===b));go('app',{p:x.pkg})};
   $('dock').appendChild(b)})});
 
