@@ -102,7 +102,7 @@ release() {
   [ -f "$APK" ] || die "сначала tv deploy"
   gh auth status > /dev/null 2>&1 || die "войди в GitHub: gh auth login"
   # Телевизор качает обновления без входа, поэтому хранилище открытое: в нём только APK, ключей там нет.
-  gh repo view timuramishov-jpg/tv-home > /dev/null 2>&1 || gh repo create timuramishov-jpg/tv-home --public \
+  gh repo view timuramishov-jpg/tv-home > /dev/null 2>&1 || gh repo create timuramishov-jpg/tv-home --public --add-readme \
     -d "Обновления лаунчера Starwind (только APK)" > /dev/null || die "не создалось хранилище tv-home на GitHub"
   CODE=$(( $(git rev-list --count HEAD) + 100 ))
   cp "$APK" "$DIR/tvhome-$CODE.apk"
