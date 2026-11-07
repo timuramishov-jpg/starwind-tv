@@ -317,6 +317,9 @@ case "${1:-}" in
     online
     [ "${2:-}" = off ] || { say "tv adb off: выключить отладку. Включить обратно: Настройки лаунчера, Отладка по сети"; exit 0; }
     T 'settings put global adb_enabled 0' ; say "Отладка выключена. Включить: Настройки лаунчера, Отладка по сети" ;;
+  agent)
+    # Копия скрипта: агент не сломается, когда tv pull обновит файлы под ним.
+    A=$(mktemp -t starwind-agent); cp "$R/starwind/agent.sh" "$A"; exec bash "$A" ;;
   backup) online; backup && say "Настройки лаунчера в $DIR/backup" || die "копии на телевизоре пока нет: лаунчер делает её, когда уходишь с главного экрана" ;;
   slim) online; T 'for p in com.yandex.tv.input.efir com.yandex.tv.videoplayer com.yandex.devices.farm.companion com.yandex.tv.home; do pm disable-user --user 0 $p; done' | grep -c disabled-user ;;
   rollback)
@@ -340,6 +343,7 @@ tv aurora        поставить Aurora Store (Google Play без серви�
 tv install F.apk поставить любое приложение
 tv slim          отключить лишнее Яндекса и его оболочку
 tv backup        забрать копию настроек лаунчера в backup/
+tv agent         Claude сам отдаёт команды телевизору (окно оставить открытым)
 tv rollback      вернуть оболочку Яндекса
 tv reboot        перезагрузить телевизор
 H
