@@ -78,6 +78,7 @@ check() {
   say "== Оболочка Яндекса: $(T 'pm list packages -d | grep -c com.yandex.tv.home' | tr -d '\r' | sed 's/1/выключена/;s/0/ВКЛЮЧЕНА/')"
   say "== VPN: $(T 'dumpsys connectivity | grep -c "VPN CONNECTED"' | tr -d '\r' | sed 's/^0$/выключен/;s/^[1-9].*/включён/')"
   say "== Ключи в лаунчере: $(T "logcat -d -s IosConfig:* | tail -1" | sed 's/.*keys/принято/')"
+  say "== Лаунчер занимает: $(T "dumpsys meminfo $PKG | grep -E 'TOTAL PSS|TOTAL:' | head -1" | awk '{for(i=1;i<=NF;i++) if($i ~ /^[0-9]+$/){printf "%d МБ", $i/1024; exit}}')"
   say "== Свободно памяти: $(T 'dumpsys meminfo | grep "Free RAM"' | sed 's/ *Free RAM: *//;s/ (.*//')"
   say "== Падения:"; T 'logcat -b crash -d | grep -E "FATAL|Process:" | tail -4'
 }

@@ -59,8 +59,8 @@ final class IosFeed {
 
     private static final String SCOPE = "https://www.googleapis.com/auth/youtube.readonly";
     private static final long FRESH_MS = 10 * 60 * 1000L, RETRY_MS = 20 * 1000L;
-    static final int MAX_ITEMS = 15;
-    private static final int POOL = 50, AHEAD = 6, TARGET_W = 880;
+    static final int MAX_ITEMS = 30;
+    private static final int POOL = 50, AHEAD = 6, TARGET_W = 880, POSTER_W = 330;
     private static final String TAG = "IosFeed";
     private static final Pattern HEX32 = Pattern.compile("[0-9a-f]{32}");
     static final String YOUTUBE = "com.yandex.tv.ytplayer", RUTUBE = "ru.rutube.app.tv", VK = "com.vk.tv", KINOPOISK = "ru.kinopoisk.yandex.tv", ZONA = "ru.zonaplayer.app";
@@ -249,31 +249,38 @@ final class IosFeed {
         if (files != null) for (File f : files) if (f.lastModified() < old) f.delete();
     }
 
-    private static Bitmap decode(byte[] b) {
+    /** Обложка ровно под карточку: 16 бит на точку и не шире самой карточки (афиша 330, широкая 880). */
+    static Bitmap decode(byte[] b, int target) {
         BitmapFactory.Options o = new BitmapFactory.Options();
         o.inJustDecodeBounds = true;
         BitmapFactory.decodeByteArray(b, 0, b.length, o);
         o.inJustDecodeBounds = false;
         o.inSampleSize = 1;
-        while (o.outWidth / (o.inSampleSize * 2) >= TARGET_W) o.inSampleSize *= 2;
+        while (o.outWidth / (o.inSampleSize * 2) >= target) o.inSampleSize *= 2;
         o.inPreferredConfig = Bitmap.Config.RGB_565;
-        return BitmapFactory.decodeByteArray(b, 0, b.length, o);
+        Bitmap got = BitmapFactory.decodeByteArray(b, 0, b.length, o);
+        if (got != null && got.getWidth() > target * 1.15f) {
+            Bitmap fit = Bitmap.createScaledBitmap(got, target, Math.round(got.getHeight() * (float) target / got.getWidth()), true);
+            if (fit != got) got.recycle();
+            got = fit;
+        }
+        return got;
     }
 
-    private Bitmap image(String url) {
+    private Bitmap image(String url, int target) {
         Bitmap hit = memory.get(url);
         if (hit != null) return hit;
-        Bitmap b = imageFromDiskOrNet(url);
+        Bitmap b = imageFromDiskOrNet(url, target);
         if (b != null) memory.put(url, b);
         return b;
     }
 
-    private Bitmap imageFromDiskOrNet(String url) {
+    private Bitmap imageFromDiskOrNet(String url, int target) {
         File cached = new File(dir, "i" + Integer.toHexString(url.hashCode()));
         try {
             if (cached.exists()) {
                 try (FileInputStream in = new FileInputStream(cached)) {
-                    Bitmap b = decode(read(in));
+                    Bitmap b = decode(read(in), target);
                     if (b != null) return b;
                 }
             }
@@ -286,7 +293,7 @@ final class IosFeed {
                 return null;
             }
             byte[] b = read(c.getInputStream());
-            Bitmap bmp = decode(b);
+            Bitmap bmp = decode(b, target);
             if (bmp != null) try (FileOutputStream out = new FileOutputStream(cached)) { out.write(b); }
             return bmp;
         } catch (Exception | OutOfMemoryError e) {
@@ -314,7 +321,7 @@ final class IosFeed {
                 Bitmap got = null;
                 for (int round = 0; round < 2 && got == null; round++) {
                     for (String url : it.urls) {
-                        got = image(url);
+                        got = image(url, it.poster ? POSTER_W : TARGET_W);
                         if (got != null) break;
                     }
                 }

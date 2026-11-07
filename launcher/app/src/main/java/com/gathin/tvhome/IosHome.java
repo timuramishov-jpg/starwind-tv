@@ -120,6 +120,8 @@ public class IosHome extends Activity {
         Runnable onImage;
         boolean fetching;
         boolean poster;
+        /** Вышло меньше суток назад: в ленте метка «новое». */
+        boolean fresh;
         Intent open;
         Runnable action, onFail;
         String duration;
@@ -325,7 +327,9 @@ public class IosHome extends Activity {
         int boot = Settings.Global.getInt(getContentResolver(), Settings.Global.BOOT_COUNT, 0);
         if (prefs.getInt("vpn_boot", -1) == boot) return;
         prefs.edit().putInt("vpn_boot", boot).apply();
-        for (long delay : new long[]{3000, 10000, 22000}) handler.postDelayed(() -> { if (!vpnOn()) vpnCommand(true); }, delay);
+        // VPN держим включённым, только если ты сам его не выключал.
+        for (long delay : new long[]{3000, 10000, 22000})
+            handler.postDelayed(() -> { if (!vpnOn() && !prefs.getBoolean("vpn_user_off", false)) vpnCommand(true); }, delay);
     }
 
     @Override protected void onPause() {
@@ -823,6 +827,7 @@ public class IosHome extends Activity {
     }
 
     private void vpnCommand(boolean connect) {
+        prefs.edit().putBoolean("vpn_user_off", !connect).apply();
         Intent i = new Intent(Intent.ACTION_VIEW, Uri.parse("happ://" + (connect ? "connect" : "disconnect") + "_without_ui"))
                 .setClassName(HAPP, HAPP + ".feature.deeplink.DeeplinkInterceptorActivity")
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
@@ -1010,14 +1015,42 @@ public class IosHome extends Activity {
         });
     }
 
+    /** Карточка ленты. Сама рамка и подписи создаются всегда, а обложка, плашка длительности
+     *  и «дыхание» — только у карточек рядом с выбранной (fillCard): так длинная лента почти ничего не весит. */
     private void addCard(FeedItem item, int i) {
-        int accent = dock.isEmpty() ? INK_2 : dock.get(selected).logo.accent;
         FrameLayout card = new FrameLayout(this);
         GradientDrawable bg = new GradientDrawable();
         bg.setColor(PILL);
         bg.setCornerRadius(px(26));
         card.setBackground(bg);
         card.setClipToOutline(true);
+        card.setTag(item);
+        float w = item.poster ? POSTER_W : CARD_W, x = MAIN_X + i * (w + CARD_GAP);
+        cardsLayer.addView(card, at(x, CARDS_Y, w, CARD_H));
+        cardViews.add(card);
+        // Подпись под каждой карточкой: в покое приглушена, у выбранной яркая и с описанием.
+        TextView name = text(item.poster ? 28 : 34, medium, INK);
+        name.setText(item.title == null ? "" : item.title);
+        name.setSingleLine(true);
+        name.setEllipsize(TextUtils.TruncateAt.END);
+        name.setAlpha(LABEL_REST);
+        cardsLayer.addView(name, at(x + 4, CARDS_Y + CARD_H + 26, w - 8, 0));
+        TextView sub = text(item.poster ? 22 : 26, regular, INK_2);
+        sub.setText(item.subtitle == null ? "" : item.subtitle);
+        sub.setSingleLine(true);
+        sub.setEllipsize(TextUtils.TruncateAt.END);
+        sub.setAlpha(0f);
+        cardsLayer.addView(sub, at(x + 4, CARDS_Y + CARD_H + (item.poster ? 66 : 74), w - 8, 0));
+        cardLabels.put(card, new TextView[]{name, sub});
+        if (i < NEAR_CARDS) fillCard(card, item, true);
+    }
+
+    private static final int NEAR_CARDS = 6;
+
+    private void fillCard(FrameLayout card, FeedItem item, boolean breathe) {
+        if (card.getChildCount() > 0) return;
+        int accent = dock.isEmpty() ? INK_2 : dock.get(selected).logo.accent;
+        GradientDrawable bg = (GradientDrawable) card.getBackground();
         ImageView pic = new ImageView(this);
         pic.setScaleType(ImageView.ScaleType.CENTER_CROP);
         card.addView(pic, new FrameLayout.LayoutParams(-1, -1));
@@ -1026,13 +1059,13 @@ public class IosHome extends Activity {
             item.onImage = () -> pic.setImageBitmap(item.image);
         } else {
             // Пока обложка грузится, карточка мягко дышит.
-            // Дышат только первые карточки: дальние за краем экрана, анимация там лишь грузит процессор.
-            final ObjectAnimator pulse = i < 6 ? ObjectAnimator.ofFloat(card, "alpha", 1f, 0.55f) : null;
+            final ObjectAnimator pulse = breathe ? ObjectAnimator.ofFloat(card, "alpha", 1f, 0.55f) : null;
             if (pulse != null) {
                 pulse.setDuration(SLOW * 2);
                 pulse.setRepeatCount(ValueAnimator.INFINITE);
                 pulse.setRepeatMode(ValueAnimator.REVERSE);
                 pulse.start();
+                card.setTag(R.id.pulse, pulse);
             }
             item.onImage = () -> {
                 if (pulse != null) { pulse.cancel(); card.setAlpha(1f); }
@@ -1066,37 +1099,44 @@ public class IosHome extends Activity {
             lp.rightMargin = lp.bottomMargin = px(16);
             card.addView(d, lp);
         }
-        card.setTag(item);
-        float w = item.poster ? POSTER_W : CARD_W, x = MAIN_X + i * (w + CARD_GAP);
-        cardsLayer.addView(card, at(x, CARDS_Y, w, CARD_H));
-        cardViews.add(card);
-        // Подпись под каждой карточкой: в покое приглушена, у выбранной яркая и с описанием.
-        TextView name = text(item.poster ? 28 : 34, medium, INK);
-        name.setText(item.title == null ? "" : item.title);
-        name.setSingleLine(true);
-        name.setEllipsize(TextUtils.TruncateAt.END);
-        name.setAlpha(LABEL_REST);
-        cardsLayer.addView(name, at(x + 4, CARDS_Y + CARD_H + 26, w - 8, 0));
-        TextView sub = text(item.poster ? 22 : 26, regular, INK_2);
-        sub.setText(item.subtitle == null ? "" : item.subtitle);
-        sub.setSingleLine(true);
-        sub.setEllipsize(TextUtils.TruncateAt.END);
-        sub.setAlpha(0f);
-        cardsLayer.addView(sub, at(x + 4, CARDS_Y + CARD_H + (item.poster ? 66 : 74), w - 8, 0));
-        cardLabels.put(card, new TextView[]{name, sub});
+        if (item.fresh) {
+            TextView n = text(22, semibold, 0xFF000000);
+            n.setText("новое");
+            n.setPadding(px(12), px(4), px(12), px(4));
+            GradientDrawable g = new GradientDrawable();
+            g.setColor(INK);
+            g.setCornerRadius(px(10));
+            n.setBackground(g);
+            FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(-2, -2);
+            lp.gravity = Gravity.TOP | Gravity.LEFT;
+            lp.leftMargin = lp.topMargin = px(16);
+            card.addView(n, lp);
+        }
     }
 
-    /** В длинной ленте обложки живут только рядом с выбранной карточкой: так 40 карточек не съедают память. */
+    /** Убирает содержимое дальней карточки: обложку отдаём сборщику, рамка и подписи остаются. */
+    private void emptyCard(FrameLayout card, FeedItem item) {
+        if (card.getChildCount() == 0) return;
+        Object pulse = card.getTag(R.id.pulse);
+        if (pulse instanceof ObjectAnimator) ((ObjectAnimator) pulse).cancel();
+        card.setTag(R.id.pulse, null);
+        card.removeAllViews();
+        item.onImage = null;
+        item.onFail = null;
+        if (item.urls != null && item.urls.length > 0) item.image = null;
+    }
+
+    /** Обложки и содержимое живут только у карточек рядом с выбранной. */
     private void lazyCards(int at) {
         List<FeedItem> list = new ArrayList<>();
-        for (View c : cardViews) if (c.getTag() instanceof FeedItem) list.add((FeedItem) c.getTag());
         for (int k = 0; k < cardViews.size(); k++) {
             View c = cardViews.get(k);
             if (!(c.getTag() instanceof FeedItem)) continue;
             FeedItem it = (FeedItem) c.getTag();
-            if (it.urls == null || it.urls.length == 0 || Math.abs(k - at) <= 9) continue;
-            ImageView pic = (ImageView) ((FrameLayout) c).getChildAt(0);
-            if (pic.getDrawable() != null) { pic.setImageDrawable(null); it.image = null; }
+            list.add(it);
+            int far = Math.abs(k - at);
+            if (far <= NEAR_CARDS) fillCard((FrameLayout) c, it, false);
+            else if (far > NEAR_CARDS + 2) emptyCard((FrameLayout) c, it);
         }
         feed.picturesAround(list, at);
     }
@@ -1325,8 +1365,19 @@ public class IosHome extends Activity {
 
     // ---------- Пульт ----------
 
+    /** Фон замирает, пока жмёшь кнопки, и плывёт снова через 2 секунды покоя: листанию весь процессор. */
+    private final Runnable driftOn = () -> {
+        if (!hasWindowFocus()) return;
+        for (ObjectAnimator a : drift) if (a.isPaused()) a.resume();
+    };
+
     @Override public boolean dispatchKeyEvent(KeyEvent e) {
         int key = e.getKeyCode();
+        if (e.getAction() == KeyEvent.ACTION_DOWN) {
+            for (ObjectAnimator a : drift) if (a.isRunning()) a.pause();
+            handler.removeCallbacks(driftOn);
+            handler.postDelayed(driftOn, 2000);
+        }
         if (e.getAction() == KeyEvent.ACTION_DOWN && e.getRepeatCount() == 0) Log.i("IosHome", "key " + key + " " + KeyEvent.keyCodeToString(key) + " scan " + e.getScanCode());
         boolean ok = key == KeyEvent.KEYCODE_DPAD_CENTER || key == KeyEvent.KEYCODE_ENTER
                 || key == KeyEvent.KEYCODE_NUMPAD_ENTER || key == KeyEvent.KEYCODE_BUTTON_A;
