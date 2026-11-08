@@ -315,12 +315,14 @@ gh repo clone timuramishov-jpg/starwind-tv ~/Documents/Claude/cleanyourtv</pre>
     <li>Если архив устроен иначе — положить руками четыре файла в <code>launcher/app/src/main/res/font/</code>:
       <code>sf_light.ttf</code>, <code>sf_regular.ttf</code>, <code>sf_medium.ttf</code>, <code>sf_semibold.ttf</code>.</li>
   </ol>
-  <p>Скруглённые цифры заставки берутся с самого Мака (<code>/System/Library/Fonts/SFNSRounded.ttf</code>), значки шапки
-    рисуются из SF Symbols (нужно <code>xcode-select --install</code>). Без них подставятся готовые из проекта.</p>
-  <div class="note"><b>Можно пропустить</b>Без архива сборка тоже пройдёт — с файлами шрифтов, которые уже лежат в проекте.</div>
+  <p class="small">Скруглённые цифры заставки и значки шапки берутся с самого Мака (нужно <code>xcode-select --install</code>), иначе — готовые из проекта.</p>
+  <div class="note"><b>Можно пропустить</b>Без архива сборка тоже пройдёт: поставится свободный шрифт-замена <b>Inter</b>
+    (с кириллицей, выглядит почти так же). Положите архив SF позже — следующий <code>tv deploy</code> переключит шрифт.</div>
 
+</section>
+<section class="chapter">
   <!-- ===================== ШАГ 4 ===================== -->
-  <div class="kicker" style="margin-top:9mm">Шаг 4</div>
+  <div class="kicker">Шаг 4</div>
   <h1>Ключи сервисов (по желанию)</h1>
   <p>Нужны для лент YouTube и Кинопоиска. Без них всё работает, просто эти две ленты будут пустыми. ВК, Рутуб и погода
     ключей не требуют.</p>
@@ -533,10 +535,13 @@ QUIET=1 tv deploy   <span class="c"># тихо: не уводит телевиз
       <code>agent/out/</code>. Код передаётся пакетом <code>starwind.bundle</code>. Папку <code>~/Documents/Claude</code>
       нужно подключить к приложению Claude на Маке.</td></tr>
   </table>
+  <p>В корне проекта лежит <code>AGENTS.md</code> — инструкция именно для ИИ: карта проекта, команды, правила и как
+    проверять работу. Claude, Codex, Gemini и Cursor читают её сами (через <code>CLAUDE.md</code> / <code>GEMINI.md</code>).
+    Папка <code>upstream/</code> — исходный CleanYourTV, для Starwind не нужна.</p>
   <h2>С чего начать разговор</h2>
   <pre>Это мой проект Starwind TV: свой домашний экран для телевизора на Яндекс ТВ.
 Проект — ~/Documents/Claude/cleanyourtv, ветка main.
-Прочитай starwind/docs/DEVELOPMENT.md, ARCHITECTURE.md и DESIGN.md.
+Прочитай AGENTS.md в корне, потом starwind/docs/DEVELOPMENT.md.
 После правок — bash starwind/test/run.sh, ставь на телевизор через tv deploy
 (QUIET=1, если я смотрю), проверяй через tv smoke.
 Задача: …</pre>

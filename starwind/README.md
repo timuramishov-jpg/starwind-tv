@@ -9,7 +9,7 @@
 | [`test/`](test) | Тесты без Android: дизайн-система, пульт, навигация, тексты, разбор лент |
 | [`vendor/tdlib/`](vendor/tdlib) | Библиотека Telegram (TDLib) для armeabi-v7a |
 | [`agent.sh`](agent.sh) | Агент для ИИ-помощника: очередь заданий на Маке |
-| [`icons.swift`](icons.swift), [`fallback/`](fallback) | Значки SF Symbols и запасные PNG |
+| [`icons.swift`](icons.swift), [`fallback/`](fallback) | Значки SF Symbols; запасные PNG и шрифт-замена Inter (если нет SF Pro) |
 | [`art/`](art) | Векторные исходники |
 | [`route-on.sh`](route-on.sh) | VPN Happ только для YouTube |
 

@@ -121,5 +121,7 @@
 | `starwind/test/` | Тесты без Android (Java): палитра, сетка, пульт, навигация, тексты, разбор лент |
 | `starwind/vendor/tdlib/` | Нативная библиотека Telegram |
 | `starwind/art/` | Векторные исходники (знак Telegram) |
-| `tools/tv.py`, `tools/b64push.py` | Связь с телевизором по adb без установленного adb (из CleanYourTV) |
+| `tools/tv.py`, `tools/b64push.py` | Связь с телевизором по adb без установленного adb (из CleanYourTV; остальное в `tools/` — наследие) |
+| `upstream/` | Исходные материалы CleanYourTV — для Starwind не нужны |
+| `AGENTS.md` (+ `CLAUDE.md`, `GEMINI.md`) | Инструкция для ИИ-помощников |
 | `.github/workflows/starwind.yml` | Тесты на GitHub при каждом пуше (без Android SDK, только JDK 17) |

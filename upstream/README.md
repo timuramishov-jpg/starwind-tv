@@ -1,3 +1,7 @@
+> **Это исходный CleanYourTV** (https://github.com/Gathin23/cleanyourtv), на котором вырос Starwind. Здесь собраны его
+> материалы: примеры устройств, аддоны, темы, документация, переводы. Для Starwind они не нужны — см. [корневой README](../README.md).
+> Скрипты upstream в `tools/` рассчитаны на прежнее расположение этих папок.
+
 <p align="center">
   <a href="https://cleanyour.tv"><img src="https://raw.githubusercontent.com/Gathin23/cleanyourtv/main/docs/banner.png" alt="CleanYourTV. Your TV, minus the ads. Strip the bloatware from any Android TV or Google TV over Wi-Fi and replace the ad-filled home screen with a clean launcher that looks like an Apple TV. No root, no cable, nothing uninstalled, and a one-line restore." width="800"></a>
 </p>
@@ -175,7 +179,7 @@ do), pair it once with the stock `adb`. Then either run `adb tcpip 5555` to open
 usually lasts only until the TV reboots, or keep it closed: point `TV_ADB_BINARY` at that same
 `adb` and `TV_HOST` at the port the Wireless debugging screen shows, and the tools reach the TV
 through the paired connection with nothing listening on 5555
-([tools/native-adb.md](tools/native-adb.md)). [Troubleshooting](docs/TROUBLESHOOTING.md#connecting)
+([tools/native-adb.md](../tools/native-adb.md)). [Troubleshooting](docs/TROUBLESHOOTING.md#connecting)
 has both, with the pairing steps.
 
 ```bash
@@ -193,25 +197,25 @@ tools/theme.sh themes/aurora                                 # push a theme; --r
 
 | Tool | What it does |
 |---|---|
-| [`tools/tv.py`](tools/tv.py) | Pure-Python ADB client: shell, batch, push, pull, reboot, and screenshots, optionally pressing remote keys first. Works where the stock `adb` binary is blocked. Optional [paired Google ADB backend](tools/native-adb.md) for encrypted Wireless debugging. |
-| [`tools/docker-build.sh`](tools/docker-build.sh) | Builds the launcher or an add-on in Docker (JDK 17, Android SDK 34), so this computer needs nothing but Docker. Install the result with `SKIP_BUILD=1`. [Guide](tools/docker-build.md). |
-| [`tools/b64push.py`](tools/b64push.py) | Uploads large files such as APKs in base64 chunks and verifies the checksum. |
-| [`tools/relay.py`](tools/relay.py) | Forwards a local port to the TV's ADB port, for assistants whose sandbox can't reach your network. Listens on this computer only. [Guide](tools/relay.md). |
-| [`tools/disable.sh`](tools/disable.sh), [`restore.sh`](tools/restore.sh) | Apply or undo a debloat list, the undo from the state recorded before the change. |
-| [`tools/recovery.py`](tools/recovery.py) | Writes the record `disable.sh` needs to undo itself, and prints the restore batch. |
-| [`tools/check.py`](tools/check.py) | Compares the TV with the list that was applied, for what a firmware update undid; `--fix` puts it back. |
-| [`tools/match.py`](tools/match.py) | Reads a saved `pm list packages` and prints, for each package, how many lists in `examples/` disable it, how many keep it commented out, and their most common note; Android's core packages show as `never`. Offline, changes nothing (`tools/venv/bin/python -I tools/match.py packages.txt`). |
-| [`tools/adb-closed.py`](tools/adb-closed.py) | Checks that the TV's network ADB port is closed once debugging is off: exits 0 when the TV refuses the connection, 1 while it is still open, 2 when nothing answered or the check itself could not run. No `nc` needed. |
-| [`tools/philips-api.py`](tools/philips-api.py) | Philips only: checks that the JointSpace control API Home Assistant uses still answers, before and after a debloat (`tools/venv/bin/python -I tools/philips-api.py <tv ip>`). Port 1926 over HTTPS first, then 1925; reads only what answers without pairing. |
-| [`tools/privacy.py`](tools/privacy.py) | Audits the TV for voice, ACR and telemetry candidates and prints the evidence for each; `--write` turns the findings into a list `disable.sh` and `restore.sh` already understand. |
-| [`tools/theme.sh`](tools/theme.sh), [`theme_restart.py`](tools/theme_restart.py) | Push a folder from [`themes/`](themes/) to the launcher and restart Home. |
-| [`tools/manage.py`](tools/manage.py) | List every add-on, theme and switch with its screenshot, see what is on the TV, and install, update or remove one by running its creator's own script. |
-| [`tools/bench.py`](tools/bench.py) | Measures the launcher that answers HOME: key latency, how far the focus moved, janky frames, cold start, return to Home, and the idle CPU and PSS it costs. Changes nothing on the TV and writes the raw per-key numbers to JSON; no extra install. |
-| [`tools/trace.py`](tools/trace.py), [`trace_report.py`](tools/trace_report.py) | Records Perfetto traces of the launcher (return to Home, cold start, D-pad) and reports where its time goes, per run and before against after. Optional: needs [`requirements-perf.txt`](tools/requirements-perf.txt). [Guide](tools/trace.md). |
-| [`tools/flamechart.py`](tools/flamechart.py) | Draws a before/after flame chart from those traces, for a pull request: one lane per thread on a shared time scale, the work a change targets in magenta with its total. Optional, like the trace tools. [Guide](tools/flamechart.md). |
-| [`tools/screendiff.py`](tools/screendiff.py) | Compares a before and an after screenshot pixel by pixel, leaving out the clock or anything you mask, and writes the pair with your Wi-Fi name blurred. Optional, like the trace tools. [Guide](tools/screendiff.md). |
-| [`tools/race_calendar.py`](tools/race_calendar.py) | Writes this season's F1 calendar into a theme for race-weekend mode, from the free Jolpica API. |
-| [`launcher/build-and-install.sh`](launcher/build-and-install.sh) | Builds a shrunk release (about 572 KB), installs it, switches Home, and rolls back if Home does not land on it. |
+| [`tools/tv.py`](../tools/tv.py) | Pure-Python ADB client: shell, batch, push, pull, reboot, and screenshots, optionally pressing remote keys first. Works where the stock `adb` binary is blocked. Optional [paired Google ADB backend](../tools/native-adb.md) for encrypted Wireless debugging. |
+| [`tools/docker-build.sh`](../tools/docker-build.sh) | Builds the launcher or an add-on in Docker (JDK 17, Android SDK 34), so this computer needs nothing but Docker. Install the result with `SKIP_BUILD=1`. [Guide](../tools/docker-build.md). |
+| [`tools/b64push.py`](../tools/b64push.py) | Uploads large files such as APKs in base64 chunks and verifies the checksum. |
+| [`tools/relay.py`](../tools/relay.py) | Forwards a local port to the TV's ADB port, for assistants whose sandbox can't reach your network. Listens on this computer only. [Guide](../tools/relay.md). |
+| [`tools/disable.sh`](../tools/disable.sh), [`restore.sh`](../tools/restore.sh) | Apply or undo a debloat list, the undo from the state recorded before the change. |
+| [`tools/recovery.py`](../tools/recovery.py) | Writes the record `disable.sh` needs to undo itself, and prints the restore batch. |
+| [`tools/check.py`](../tools/check.py) | Compares the TV with the list that was applied, for what a firmware update undid; `--fix` puts it back. |
+| [`tools/match.py`](../tools/match.py) | Reads a saved `pm list packages` and prints, for each package, how many lists in `examples/` disable it, how many keep it commented out, and their most common note; Android's core packages show as `never`. Offline, changes nothing (`tools/venv/bin/python -I tools/match.py packages.txt`). |
+| [`tools/adb-closed.py`](../tools/adb-closed.py) | Checks that the TV's network ADB port is closed once debugging is off: exits 0 when the TV refuses the connection, 1 while it is still open, 2 when nothing answered or the check itself could not run. No `nc` needed. |
+| [`tools/philips-api.py`](../tools/philips-api.py) | Philips only: checks that the JointSpace control API Home Assistant uses still answers, before and after a debloat (`tools/venv/bin/python -I tools/philips-api.py <tv ip>`). Port 1926 over HTTPS first, then 1925; reads only what answers without pairing. |
+| [`tools/privacy.py`](../tools/privacy.py) | Audits the TV for voice, ACR and telemetry candidates and prints the evidence for each; `--write` turns the findings into a list `disable.sh` and `restore.sh` already understand. |
+| [`tools/theme.sh`](../tools/theme.sh), [`theme_restart.py`](../tools/theme_restart.py) | Push a folder from [`themes/`](themes/) to the launcher and restart Home. |
+| [`tools/manage.py`](../tools/manage.py) | List every add-on, theme and switch with its screenshot, see what is on the TV, and install, update or remove one by running its creator's own script. |
+| [`tools/bench.py`](../tools/bench.py) | Measures the launcher that answers HOME: key latency, how far the focus moved, janky frames, cold start, return to Home, and the idle CPU and PSS it costs. Changes nothing on the TV and writes the raw per-key numbers to JSON; no extra install. |
+| [`tools/trace.py`](../tools/trace.py), [`trace_report.py`](../tools/trace_report.py) | Records Perfetto traces of the launcher (return to Home, cold start, D-pad) and reports where its time goes, per run and before against after. Optional: needs [`requirements-perf.txt`](../tools/requirements-perf.txt). [Guide](../tools/trace.md). |
+| [`tools/flamechart.py`](../tools/flamechart.py) | Draws a before/after flame chart from those traces, for a pull request: one lane per thread on a shared time scale, the work a change targets in magenta with its total. Optional, like the trace tools. [Guide](../tools/flamechart.md). |
+| [`tools/screendiff.py`](../tools/screendiff.py) | Compares a before and an after screenshot pixel by pixel, leaving out the clock or anything you mask, and writes the pair with your Wi-Fi name blurred. Optional, like the trace tools. [Guide](../tools/screendiff.md). |
+| [`tools/race_calendar.py`](../tools/race_calendar.py) | Writes this season's F1 calendar into a theme for race-weekend mode, from the free Jolpica API. |
+| [`launcher/build-and-install.sh`](../launcher/build-and-install.sh) | Builds a shrunk release (about 572 KB), installs it, switches Home, and rolls back if Home does not land on it. |
 
 The scripts never leave the TV without a Home app: they only disable a stock launcher they recognise,
 and skip the Home app in a list until another launcher answers HOME. Your own lists can live outside
@@ -267,7 +271,7 @@ entry is applied; `FORCE_HOME=1` (`$env:FORCE_HOME`) disables it anyway.
 
 "Which of these packages is listening?" has no honest one-line answer: a permission scan shows fifty
 system packages with `RECORD_AUDIO` that record nothing, and ACR clients see the screen with no audio
-permission at all. [`tools/privacy.py`](tools/privacy.py) reports what the TV actually says, with the
+permission at all. [`tools/privacy.py`](../tools/privacy.py) reports what the TV actually says, with the
 evidence for each voice, ACR and telemetry candidate:
 `TV_HOST=192.168.1.50 tools/venv/bin/python -I tools/privacy.py`, and `--write` turns them into a normal
 debloat list. What the audit cannot do is prove intent: [docs/privacy.md](docs/privacy.md) explains why.
@@ -276,12 +280,12 @@ debloat list. What the audit cannot do is prove intent: [docs/privacy.md](docs/p
 
 A small native home screen for Android TV: **about 572 KB**, plain Java, built for TVs with 1 GB of RAM.
 No blur, no video, no network permission, no background services. The **TV** needs Android 8.0 (API 26)
-or newer, the `minSdk` in [`launcher/app/build.gradle`](launcher/app/build.gradle); what is left on an older
+or newer, the `minSdk` in [`launcher/app/build.gradle`](../launcher/app/build.gradle); what is left on an older
 set is in [Troubleshooting](docs/TROUBLESHOOTING.md).
 
 | What | How it works |
 |---|---|
-| **Configure** | Dock order, hidden apps, Live TV app, 4 to 7 tiles per row, reduced motion. All in [`config.xml`](launcher/app/src/main/res/values/config.xml) |
+| **Configure** | Dock order, hidden apps, Live TV app, 4 to 7 tiles per row, reduced motion. All in [`config.xml`](../launcher/app/src/main/res/values/config.xml) |
 | **Settings on the TV** | Hold OK on Settings for launcher settings. Optional `launcher_settings_button` makes a normal click open them directly; TV settings remain on the settings page and their app tile. |
 | **Themes** | Background, wallpaper and layout from a `config.json` pushed over Wi-Fi, no rebuild. Twenty-six ship in [`themes/`](themes/), the built-in `default/` included |
 | **31 languages** | Follows the TV's language, with a fully mirrored right-to-left layout for Hebrew |
@@ -528,5 +532,5 @@ The people whose work is in this repo:
 
 ## Licence
 
-MIT, see [`LICENSE`](LICENSE). The Outfit typeface is under the SIL Open Font License, see
+MIT, see [`LICENSE`](../LICENSE). The Outfit typeface is under the SIL Open Font License, see
 `launcher/FONT-LICENSE-OFL.txt`.

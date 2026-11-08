@@ -1,7 +1,7 @@
 # Разработка
 
 Как продолжать проект — самому или с любым ИИ-помощником (Claude, ChatGPT/Codex, Gemini, Cursor…). Для ИИ коротко:
-**прочитай этот файл, [ARCHITECTURE.md](ARCHITECTURE.md) и [DESIGN.md](DESIGN.md), работай в ветке `starwind`,
+**начни с [`AGENTS.md`](../../AGENTS.md) в корне, затем этот файл, [ARCHITECTURE.md](ARCHITECTURE.md) и [DESIGN.md](DESIGN.md); работай в ветке `starwind` (на GitHub — `main`),
 после правок — `bash starwind/test/run.sh`, ставь на телевизор через `tv deploy`.**
 
 ## Стек

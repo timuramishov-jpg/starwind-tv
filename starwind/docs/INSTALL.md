@@ -24,14 +24,15 @@
    Лучше закрепить этот адрес за телевизором в настройках роутера (резервирование DHCP), чтобы он не менялся.
 4. При первом подключении с Мака телевизор спросит «Разрешить отладку?» — нажать «Разрешить» и отметить «Всегда».
 
-Подробнее о подключении и частых проблемах — [`docs/TROUBLESHOOTING.md`](../../docs/TROUBLESHOOTING.md#connecting)
-(из CleanYourTV) и [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+Подробнее о подключении и частых проблемах — [TROUBLESHOOTING.md](TROUBLESHOOTING.md) и, глубже,
+[`upstream/docs/TROUBLESHOOTING.md`](../../upstream/docs/TROUBLESHOOTING.md) (из CleanYourTV).
 
 ## Шаг 2. Мак: забрать проект и подготовить инструменты
 
 ```bash
 mkdir -p ~/Documents/Claude
 git clone https://github.com/timuramishov-jpg/starwind-tv.git ~/Documents/Claude/cleanyourtv
+# репозиторий закрытый: нужен доступ (владелец добавляет логин GitHub в Settings → Collaborators) или архив проекта
 ~/Documents/Claude/cleanyourtv/starwind/tv setup
 ```
 
@@ -55,7 +56,8 @@ git clone https://github.com/timuramishov-jpg/starwind-tv.git ~/Documents/Claude
 - Значки шапки рисуются из SF Symbols на Маке (`starwind/icons.swift`, нужен `xcode-select --install`);
   без Swift используются готовые из `starwind/fallback/`.
 
-Без архива сборка всё равно пройдёт — с прежними файлами шрифтов из репозитория.
+Без архива сборка всё равно пройдёт: `tv deploy` поставит шрифт-замену **Inter** (свободная лицензия OFL, с кириллицей,
+лежит в `starwind/fallback/fonts`). Выглядит почти так же; положите архив SF позже — следующий `tv deploy` переключит.
 
 ## Шаг 4. Ключи сервисов (необязательно)
 
@@ -103,7 +105,7 @@ git clone https://github.com/timuramishov-jpg/starwind-tv.git ~/Documents/Claude
 ```
 
 `tv rollback` возвращает оболочку Яндекса домашним экраном. Полная очистка Android TV по правилам CleanYourTV — в
-[`PROMPT.md`](../../PROMPT.md) (на этом телевизоре понадобился только `tv slim`).
+[`upstream/PROMPT.md`](../../upstream/PROMPT.md) (на этом телевизоре понадобился только `tv slim`).
 
 ## Шаг 7. Приложения
 

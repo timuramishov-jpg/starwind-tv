@@ -42,7 +42,13 @@ P
 
 fonts() {
   Z=$(ls "$DIR"/SF-NF*.zip 2>/dev/null | head -1)
-  [ -n "$Z" ] || { say "Нет архива SF, останутся старые шрифты"; return; }
+  F="$R/launcher/app/src/main/res/font"
+  if [ -z "$Z" ]; then
+    # Нет архива Apple: если шрифтов SF ещё нет (свежая копия проекта) — ставим замену Inter (свободная, с кириллицей).
+    ls "$F"/sf_regular.ttf > /dev/null 2>&1 && { say "Нет архива SF, остаются прежние шрифты"; return; }
+    cp "$R/starwind/fallback/fonts/"sf_*.ttf "$F/" && say "Нет архива SF — шрифт-замена Inter (см. INSTALL.md, шаг 3)"
+    return
+  fi
   python3 - "$Z" "$R/launcher/app/src/main/res/font" <<'P'
 import zipfile,sys
 z=zipfile.ZipFile(sys.argv[1])

@@ -10,6 +10,18 @@
 |---|---|---|---|
 | ![](starwind/docs/img/remote-1-pult.jpg) | ![](starwind/docs/img/remote-2-tools.jpg) | ![](starwind/docs/img/remote-3-accounts.jpg) | ![](starwind/docs/img/remote-4-status.jpg) |
 
+## С чего начать
+
+| Кто вы | Что открыть |
+|---|---|
+| Хотите повторить на своём телевизоре | [**Учебник PDF «с нуля»**](starwind/docs/Starwind-tutorial.pdf) — 20 страниц по шагам со снимками экрана; то же текстом — [INSTALL.md](starwind/docs/INSTALL.md) |
+| Уже установили, разбираетесь | [Как пользоваться](starwind/docs/USAGE.md), [пульт](starwind/docs/REMOTE.md), [если что-то не так](starwind/docs/TROUBLESHOOTING.md) |
+| ИИ-помощник (Claude, ChatGPT/Codex, Gemini, Cursor) | [**AGENTS.md**](AGENTS.md) — карта проекта, команды, правила, проверка |
+| Разработчик | [Разработка](starwind/docs/DEVELOPMENT.md), [устройство](starwind/docs/ARCHITECTURE.md), [дизайн-система](starwind/docs/DESIGN.md) |
+
+Всё для Starwind — в `launcher/` (приложение), `starwind/` (инструменты, тесты, документация) и `tools/tv.py`.
+Папка `upstream/` — исходный CleanYourTV, для Starwind не нужна.
+
 ## Что внутри
 
 - **Главный экран** (`com.gathin.tvhome`, класс `IosHome`): вертикальный док сервисов слева, справа — живая лента
@@ -56,6 +68,6 @@ git clone https://github.com/timuramishov-jpg/starwind-tv.git ~/Documents/Claude
 ## Основа
 
 Проект вырос из открытого [CleanYourTV](https://github.com/Gathin23/cleanyourtv) (очистка Android TV от лишнего и свой
-лаунчер). Исходный README того проекта — в [README.cleanyourtv.md](README.cleanyourtv.md); его инструменты (`tools/`)
-используются для связи с телевизором по adb. Вся работа Starwind — в ветке `starwind` (здесь она основная):
+лаунчер). Всё исходное от того проекта (README, примеры устройств, аддоны, темы, документация) — в папке
+[`upstream/`](upstream); его adb-инструменты (`tools/tv.py`, `tools/b64push.py`) используются для связи с телевизором. Вся работа Starwind — в ветке `starwind` (здесь она основная):
 папка [`starwind/`](starwind) и классы `Ios*`/`Tg*` (классы старого лаунчера CleanYourTV удалены) в [`launcher/app/src/main/java/com/gathin/tvhome`](launcher/app/src/main/java/com/gathin/tvhome).
