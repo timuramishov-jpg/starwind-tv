@@ -68,7 +68,8 @@ git clone https://github.com/timuramishov-jpg/starwind-tv.git ~/Documents/Claude
 {
   "installed": { "client_id": "….apps.googleusercontent.com", "client_secret": "…" },
   "api_key": "AIza…",
-  "kinopoisk_key": "…"
+  "kinopoisk_key": "…",
+  "twitch_client_id": "…"
 }
 ```
 
@@ -77,6 +78,7 @@ git clone https://github.com/timuramishov-jpg/starwind-tv.git ~/Documents/Claude
 | `installed.client_id`, `installed.client_secret` | Вход в YouTube на телевизоре (лента подписок) | [Google Cloud Console](https://console.cloud.google.com/): проект → APIs & Services → включить **YouTube Data API v3** → Credentials → OAuth client ID, тип **TVs and Limited Input devices**; скачанный JSON как раз имеет вид `{"installed": …}` |
 | `api_key` | Популярное YouTube и поиск без входа | Там же: Credentials → API key |
 | `kinopoisk_key` | Лента и поиск Кинопоиска | [kinopoiskapiunofficial.tech](https://kinopoiskapiunofficial.tech) — бесплатный ключ после регистрации |
+| `twitch_client_id` | Лента Twitch по аккаунту | [dev.twitch.tv/console/apps](https://dev.twitch.tv/console/apps) → Register Your Application: название любое, OAuth Redirect URL `http://localhost`, категория любая, **Client Type — Public** (нужна двухфакторная защита в аккаунте Twitch). Скопировать Client ID. Можно не класть в файл, а ввести в пульте: «Аккаунты» → Twitch |
 
 Без ключей лаунчер работает: ленты YouTube и Кинопоиска будут пустыми, остальное — как обычно.
 Передать ключи заново: `tv keys`. Рутуб, погода (Open‑Meteo) и ВК ключей не требуют.
@@ -118,6 +120,7 @@ git clone https://github.com/timuramishov-jpg/starwind-tv.git ~/Documents/Claude
 | Happ | VPN для всего телевизора (лаунчер управляет им из меню и пульта) | `su.happ.proxyutility` |
 | ВК Видео, Рутуб | Ленты в доке | `com.vk.tv`, `ru.rutube.app.tv` |
 | Зона | Фильмы | `ru.zonaplayer.app` |
+| Twitch | Эфиры и записи, лента по аккаунту ([USAGE.md](USAGE.md#twitch)) | `tv.twitch.android.app` — через Aurora Store (`tv aurora`) |
 
 ## Шаг 8. Пульт в телефоне
 

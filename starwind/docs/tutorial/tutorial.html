@@ -330,7 +330,8 @@ gh repo clone timuramishov-jpg/starwind-tv ~/Documents/Claude/cleanyourtv</pre>
   <pre>{
   "installed": { "client_id": "….apps.googleusercontent.com", "client_secret": "…" },
   "api_key": "AIza…",
-  "kinopoisk_key": "…"
+  "kinopoisk_key": "…",
+  "twitch_client_id": "…"
 }</pre>
   <table>
     <tr><th style="width:28%">Ключ</th><th>Где взять</th></tr>
@@ -340,6 +341,9 @@ gh repo clone timuramishov-jpg/starwind-tv ~/Documents/Claude/cleanyourtv</pre>
       <code>{"installed": …}</code> — скопируйте его блок в файл.</td></tr>
     <tr><td><code>api_key</code> (популярное и поиск)</td><td>Там же: Credentials → Create credentials → API key.</td></tr>
     <tr><td><code>kinopoisk_key</code></td><td><a href="https://kinopoiskapiunofficial.tech">kinopoiskapiunofficial.tech</a> — бесплатный ключ после регистрации.</td></tr>
+    <tr><td><code>twitch_client_id</code> (лента Twitch)</td><td><a href="https://dev.twitch.tv/console/apps">dev.twitch.tv/console/apps</a> → Register Your Application:
+      название любое, OAuth Redirect URL <code>http://localhost</code>, <b>Client Type — Public</b> (в аккаунте Twitch нужна
+      двухфакторная защита). Можно не класть в файл, а ввести в пульте: «Аккаунты» → Twitch.</td></tr>
   </table>
   <div class="note warn"><b>Ключи — никогда не в git</b>Файл лежит только в рабочей папке. <code>tv deploy</code> передаёт
     ключи на телевизор по сети, в программу они не попадают. Передать заново: <code>tv keys</code>.</div>
@@ -402,13 +406,14 @@ tv lighten    <span class="c"># запретить фоновую работу �
   <ul>
     <li>с Мака: <code>tv install файл.apk</code>;</li>
     <li>с телефона: пульт → «Инструменты» → «Отправить на телевизор» (APK ставится сразу);</li>
-    <li>магазины: <code>tv aurora</code> (Aurora Store — Google Play без аккаунта) или RuStore.</li>
+    <li>магазины: <code>tv aurora</code> (Aurora Store — Google Play без аккаунта; так ставится Twitch) или RuStore.</li>
   </ul>
   <table>
     <tr><th>Приложение</th><th>Зачем</th><th>Пакет</th></tr>
     <tr><td>Happ</td><td>VPN для всего телевизора; лаунчер управляет им из меню и пульта</td><td><code>su.happ.proxyutility</code></td></tr>
     <tr><td>ВК Видео, Рутуб</td><td>Ленты в доке</td><td><code>com.vk.tv</code>, <code>ru.rutube.app.tv</code></td></tr>
     <tr><td>Зона</td><td>Фильмы</td><td><code>ru.zonaplayer.app</code></td></tr>
+    <tr><td>Twitch</td><td>Эфиры подписок и записи; лаунчер сам поставит его в док</td><td><code>tv.twitch.android.app</code></td></tr>
   </table>
   <p class="small">Порядок дока меняется прямо на телевизоре: кнопка «Меню» на приложении → «Переместить» (см. снимок в главе 1).</p>
   <p><b>VPN.</b> В Happ добавить свою подписку (ссылку от поставщика VPN). Включается тумблером в меню Wi‑Fi на телевизоре или на
@@ -435,7 +440,7 @@ tv lighten    <span class="c"># запретить фоновую работу �
       (появляется само, когда на телевизоре открыта клавиатура), «Открыть на телевизоре» — ссылка YouTube, ВК, Рутуб, Telegram, любой сайт; VPN.</td></tr>
     <tr><td><b>Инструменты</b></td><td>Снимок и запись экрана, заставка, освободить память, файлы на телевизоре (фильмы, APK,
       загрузки), настройки телевизора тумблерами и списками, очистка кэша, перезагрузка.</td></tr>
-    <tr><td><b>Аккаунты</b></td><td>YouTube — войти/выйти (код на экране телевизора), Telegram — ключ, вход по QR, пароль, Яндекс.</td></tr>
+    <tr><td><b>Аккаунты</b></td><td>YouTube и Twitch — войти/выйти кодом на экране телевизора (для Twitch сначала Client ID), Telegram — ключ, вход по QR, пароль, Яндекс.</td></tr>
     <tr><td><b>Состояние</b></td><td>Процессор, память, температура, сеть, место; кто занимает память; все приложения — остановить, очистить, отключить, удалить.</td></tr>
   </table>
   <p><b>Снимки и запись в «Фото» (iPhone).</b> Страница по <code>http://</code> не может сама сохранять в «Фото», поэтому
@@ -570,6 +575,7 @@ QUIET=1 tv deploy   <span class="c"># тихо: не уводит телевиз
     <tr><td>На пульте нет поля ввода</td><td>Включена ли своя клавиатура (Инструменты → «Своя клавиатура»)? В YouTube поля нет — там поиск лупой пульта.</td></tr>
     <tr><td>Ленты YouTube / Кинопоиска пустые</td><td>Нет ключей (шаг 4, потом <code>tv keys</code>). Подписки YouTube — войти: пульт → Аккаунты → YouTube.</td></tr>
     <tr><td>Экран подвисает</td><td>Не хватает памяти: <code>tv lighten</code>, плитка «Очистить память». <code>tv report</code> покажет, кто занимает память.</td></tr>
+    <tr><td>Twitch: «Нужен Client ID»</td><td>Шаг 4: своё приложение на dev.twitch.tv (тип Public), Client ID — в пульт.</td></tr>
     <tr><td>Telegram «Нет VPN»</td><td>Так задумано — включить Happ.</td></tr>
     <tr><td>Telegram «Ключ не подошёл»</td><td>api_id — число, api_hash — 32 символа (a–f, 0–9).</td></tr>
     <tr><td><code>UPDATE_INCOMPATIBLE</code> при установке</td><td>Сборка подписана другим ключом (потерян <code>starwind.jks</code>). Согласиться на переустановку — настройки вернутся из копии.</td></tr>
