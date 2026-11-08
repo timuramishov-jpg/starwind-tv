@@ -20,13 +20,13 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
 
-/** Обновление лаунчера без мака: берёт последний релиз из GitHub (timuramishov-jpg/tv-home),
+/** Обновление лаунчера без мака: берёт последний релиз из GitHub (репозиторий релизов задан при сборке, releases_repo),
  *  тег вида v42 — номер сборки. Новее установленного — скачивает и ставит через системный установщик,
  *  телевизор один раз спросит «Установить?». Обычный путь через мак (tv deploy) тоже работает. */
 public class IosUpdate extends BroadcastReceiver {
     interface Sink { void done(String message); }
 
-    static final String REPO = "timuramishov-jpg/tv-home";
+    static String repo(Context c) { return c.getString(R.string.releases_repo); }
     private static final String TAG = "IosUpdate";
 
     static int installed(Context c) {
@@ -43,7 +43,13 @@ public class IosUpdate extends BroadcastReceiver {
         new Thread(() -> {
             String say;
             try {
-                JSONObject r = new JSONObject(text("https://api.github.com/repos/" + REPO + "/releases/latest"));
+                if (repo(app).isEmpty()) {
+                    // Собрано без своего репозитория релизов (на Маке не вошли в GitHub) — чужие сборки сюда не встанут.
+                    String none = "Обновление из меню не настроено — стоит версия " + installed(app);
+                    main.post(() -> sink.done(none));
+                    return;
+                }
+                JSONObject r = new JSONObject(text("https://api.github.com/repos/" + repo(app) + "/releases/latest"));
                 int remote = Integer.parseInt(r.getString("tag_name").replaceAll("\\D", ""));
                 int mine = installed(app);
                 String apk = null;

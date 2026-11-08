@@ -7,6 +7,14 @@ DIR="${STARWIND_HOME:-$HOME/Documents/Claude}"
 SELF="$0"; while [ -L "$SELF" ]; do L=$(readlink "$SELF"); case "$L" in /*) SELF="$L" ;; *) SELF="$(dirname "$SELF")/$L" ;; esac; done
 R="$(cd "$(dirname "$SELF")/.." && pwd)"
 # Адрес телевизора: переменная TV_IP, иначе файл $DIR/tv-ip (его пишет tv setup), иначе адрес первого телевизора.
+# Открытый репозиторий релизов (только APK) — отсюда телевизор обновляется из меню. У каждого владельца свой:
+# по умолчанию <свой логин GitHub>/tv-home, задать явно — файлом $DIR/releases-repo или переменной STARWIND_RELEASES.
+releases() {
+  [ -n "${STARWIND_RELEASES:-}" ] && { echo "$STARWIND_RELEASES"; return; }
+  [ -f "$DIR/releases-repo" ] && { tr -d ' \n' < "$DIR/releases-repo"; return; }
+  local me; me=$(gh api user -q .login 2>/dev/null) && [ -n "$me" ] && { echo "$me/tv-home"; return; }
+  echo ""   # не вошли в GitHub (gh auth login) — обновление из меню будет выключено
+}
 TV="${TV_IP:-$(cat "$DIR/tv-ip" 2>/dev/null || echo 192.168.31.237)}"
 SECRETS="$DIR/secrets.json"
 PKG=com.gathin.tvhome
@@ -106,12 +114,14 @@ release() {
   [ -f "$APK" ] || die "сначала tv deploy"
   gh auth status > /dev/null 2>&1 || die "войди в GitHub: gh auth login"
   # Телевизор качает обновления без входа, поэтому хранилище открытое: в нём только APK, ключей там нет.
-  gh repo view timuramishov-jpg/tv-home > /dev/null 2>&1 || gh repo create timuramishov-jpg/tv-home --public --add-readme \
-    -d "Обновления лаунчера Starwind (только APK)" > /dev/null || die "не создалось хранилище tv-home на GitHub"
+  local REL; REL=$(releases)
+  [ -n "$REL" ] || die "не знаю, куда выкладывать: gh auth login (или файл $DIR/releases-repo)"
+  gh repo view "$REL" > /dev/null 2>&1 || gh repo create "$REL" --public --add-readme \
+    -d "Обновления лаунчера Starwind (только APK)" > /dev/null || die "не создалось хранилище $REL на GitHub"
   CODE=$(( $(git rev-list --count HEAD) + 100 ))
   cp "$APK" "$DIR/tvhome-$CODE.apk"
-  gh release view "v$CODE" -R timuramishov-jpg/tv-home > /dev/null 2>&1 && { rm -f "$DIR/tvhome-$CODE.apk"; say "Сборка v$CODE уже выложена"; return 0; }
-  gh release create "v$CODE" "$DIR/tvhome-$CODE.apk" -R timuramishov-jpg/tv-home -t "Лаунчер, сборка $CODE" -n "$(git log -1 --format=%s)" \
+  gh release view "v$CODE" -R "$REL" > /dev/null 2>&1 && { rm -f "$DIR/tvhome-$CODE.apk"; say "Сборка v$CODE уже выложена"; return 0; }
+  gh release create "v$CODE" "$DIR/tvhome-$CODE.apk" -R "$REL" -t "Лаунчер, сборка $CODE" -n "$(git log -1 --format=%s)" \
     && say "Выложено: v$CODE. На телевизоре: шестерёнка → Обновить лаунчер"
   rm -f "$DIR/tvhome-$CODE.apk"
 }
@@ -148,6 +158,7 @@ deploy() {
   signing
   say "== Тесты пульта"; bash "$R/starwind/test/run.sh" > "$DIR/test.log" 2>&1 || { tail -5 "$DIR/test.log"; die "тесты пульта не прошли, ничего не ставлю"; }
   say "== Сборка"
+  STARWIND_RELEASES=$(releases); export STARWIND_RELEASES
   (cd launcher && ./gradlew assembleRelease --console=plain > "$DIR/build.log" 2>&1) || { tail -30 "$DIR/build.log"; die "сборка не прошла, лог в build.log"; }
   APK=launcher/app/build/outputs/apk/release/app-release.apk
   "$PY" -I tools/b64push.py "$APK" /data/local/tmp/tvhome.apk || die "загрузка"

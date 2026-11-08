@@ -28,6 +28,9 @@ android {
         // Номер сборки = число коммитов: по нему обновление с GitHub понимает, что новее.
         versionCode starwindBuild()
         versionName '4.' + starwindBuild()
+        // Откуда «Обновить лаунчер» берёт сборки: свой открытый репозиторий релизов у каждого владельца
+        // (сборки подписаны его ключом — чужие на его телевизор не встанут). Задаёт tv deploy.
+        resValue 'string', 'releases_repo', System.getenv('STARWIND_RELEASES') ?: ''
     }
 
     // Свой ключ подписи: путь и пароль даёт tv deploy (ключ лежит в ~/Documents/Claude, не в git).
