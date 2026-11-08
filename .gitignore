@@ -37,3 +37,6 @@ launcher/app/src/main/res/drawable-nodpi/top_remote.png
 launcher/app/src/main/res/drawable-nodpi/w_*.png
 # Библиотека Telegram: копирует tv deploy из ~/Documents/Claude/tg/o23 (контрольные суммы — в starwind/tv).
 launcher/app/src/main/jniLibs/
+starwind/docs/tutorial/*.ttf
+starwind/docs/tutorial/*.pdf
+starwind/docs/tutorial/img

@@ -1,0 +1,616 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Starwind TV — учебник с нуля</title>
+<style>
+@font-face { font-family: SF; src: url(sf_regular.ttf); font-weight: 400; }
+@font-face { font-family: SF; src: url(sf_light.ttf); font-weight: 300; }
+@font-face { font-family: SF; src: url(sf_medium.ttf); font-weight: 500; }
+@font-face { font-family: SF; src: url(sf_semibold.ttf); font-weight: 600; }
+:root {
+  --ink: #1c1c1e; --ink2: #48484a; --ink3: #8e8e93; --line: #e5e5ea; --bg2: #f2f2f7;
+  --red: #ff3b30; --blue: #007aff; --green: #34c759; --orange: #ff9500; --indigo: #5856d6;
+}
+@page { size: A4; margin: 16mm 16mm 18mm 16mm; }
+@page :first { margin: 0; }
+* { box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { font-family: SF, Inter, sans-serif; color: var(--ink); font-size: 10.4pt; line-height: 1.5; margin: 0; background: #fff; }
+h1 { font-size: 24pt; font-weight: 600; letter-spacing: -0.4pt; margin: 0 0 4mm; line-height: 1.15; }
+h2 { font-size: 14pt; font-weight: 600; margin: 7mm 0 2.5mm; }
+h3 { font-size: 11.5pt; font-weight: 600; margin: 5mm 0 1.5mm; }
+p { margin: 0 0 2.6mm; }
+ul, ol { margin: 0 0 3mm; padding-left: 5.5mm; }
+li { margin: 0 0 1.3mm; }
+a { color: var(--blue); text-decoration: none; }
+code { font-family: "DejaVu Sans Mono", monospace; font-size: 8.6pt; background: var(--bg2); padding: 0.3mm 1.2mm; border-radius: 1mm; }
+pre { font-family: "DejaVu Sans Mono", monospace; font-size: 8.4pt; line-height: 1.5; background: #1c1c1e; color: #f2f2f7;
+      padding: 3.5mm 4mm; border-radius: 2.5mm; margin: 0 0 3.5mm; white-space: pre-wrap; break-inside: avoid; }
+pre .c { color: #8e8e93; }
+table { width: 100%; border-collapse: collapse; margin: 0 0 4mm; font-size: 9.4pt; break-inside: auto; }
+th { text-align: left; font-weight: 600; color: var(--ink2); border-bottom: 1.2pt solid var(--ink); padding: 1.6mm 2mm 1.6mm 0; }
+td { border-bottom: 0.6pt solid var(--line); padding: 1.6mm 2mm 1.6mm 0; vertical-align: top; }
+tr { break-inside: avoid; }
+td code, th code { font-size: 8.2pt; }
+.chapter { break-before: page; }
+.kicker { font-size: 9pt; font-weight: 600; letter-spacing: 1.2pt; text-transform: uppercase; color: var(--red); margin-bottom: 2mm; }
+.lead { font-size: 12pt; color: var(--ink2); font-weight: 300; margin-bottom: 5mm; }
+figure { margin: 0 0 4.5mm; break-inside: avoid; }
+figure img { width: 100%; display: block; border-radius: 2.5mm; }
+figcaption { font-size: 8.6pt; color: var(--ink3); margin-top: 1.4mm; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; }
+.three { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 3mm; }
+.phones { display: grid; grid-template-columns: repeat(5, 1fr); gap: 2.5mm; }
+.phones img { border-radius: 2mm; }
+.note { border-left: 1.2mm solid var(--blue); background: #eef5ff; padding: 3mm 4mm; border-radius: 0 2mm 2mm 0; margin: 0 0 4mm; break-inside: avoid; }
+.warn { border-left-color: var(--orange); background: #fff5e6; }
+.ok { border-left-color: var(--green); background: #eefaf1; }
+.note b:first-child { display: block; margin-bottom: 0.8mm; }
+.step { display: grid; grid-template-columns: 9mm 1fr; gap: 3mm; margin: 0 0 3mm; break-inside: avoid; }
+.step .n { width: 8mm; height: 8mm; border-radius: 4mm; background: var(--ink); color: #fff; font-weight: 600; font-size: 10pt;
+           display: flex; align-items: center; justify-content: center; margin-top: 0.4mm; }
+.toc { columns: 2; column-gap: 8mm; font-size: 10.4pt; }
+.toc div { break-inside: avoid; padding: 1.2mm 0; border-bottom: 0.6pt solid var(--line); display: flex; justify-content: space-between; }
+.toc span { color: var(--ink3); }
+.scheme { font-family: "DejaVu Sans Mono", monospace; font-size: 7.2pt; line-height: 1.35; background: var(--bg2); color: var(--ink);
+          padding: 4mm; border-radius: 2.5mm; white-space: pre; margin-bottom: 4mm; }
+.small { font-size: 9pt; color: var(--ink2); }
+
+/* Обложка */
+.cover { height: 297mm; width: 210mm; background: #000; color: #fff; position: relative; overflow: hidden; }
+.cover .glow { position: absolute; left: -40mm; top: -60mm; width: 220mm; height: 200mm;
+  background: radial-gradient(closest-side, rgba(255,69,58,0.55), rgba(255,69,58,0)); }
+.cover .in { position: relative; padding: 26mm 20mm 0; }
+.cover .brand { font-size: 11pt; font-weight: 600; letter-spacing: 2pt; text-transform: uppercase; color: #ff453a; }
+.cover h1 { font-size: 40pt; margin: 6mm 0 4mm; letter-spacing: -1pt; }
+.cover .sub { font-size: 14pt; font-weight: 300; color: #d1d1d6; max-width: 150mm; line-height: 1.4; }
+.cover .shot { position: absolute; left: 20mm; right: 20mm; top: 118mm; }
+.cover .shot img { width: 100%; border-radius: 3mm; border: 0.4mm solid #3a3a3c; }
+.cover .foot { position: absolute; left: 20mm; right: 20mm; bottom: 18mm; display: flex; justify-content: space-between;
+  font-size: 9.5pt; color: #8e8e93; }
+</style>
+</head>
+<body>
+
+<!-- ===================== ОБЛОЖКА ===================== -->
+<section class="cover">
+  <div class="glow"></div>
+  <div class="in">
+    <div class="brand">Starwind TV</div>
+    <h1>Свой домашний экран<br>для телевизора на Яндекс ТВ</h1>
+    <div class="sub">Пошаговый учебник с нуля: от включения отладки на телевизоре до пульта в телефоне, своего плеера
+      Telegram и обновлений из меню. Без root и прошивки — всё обратимо.</div>
+  </div>
+  <div class="shot"><img src="img/tv-home.jpg"></div>
+  <div class="foot"><span>Проект Тимура · сделан вместе с Claude</span><span>Версия от 8 ноября 2026 · сборка 5656+</span></div>
+</section>
+
+<!-- ===================== СОДЕРЖАНИЕ ===================== -->
+<section>
+  <div class="kicker">Содержание</div>
+  <h1>Что внутри учебника</h1>
+  <div class="toc">
+    <div>1. Что получится</div>
+    <div>2. Как это устроено</div>
+    <div>3. Что понадобится</div>
+    <div>4. Шаг 1. Отладка на телевизоре</div>
+    <div>5. Шаг 2. Мак и проект</div>
+    <div>6. Шаг 3. Шрифты SF Pro</div>
+    <div>7. Шаг 4. Ключи сервисов</div>
+    <div>8. Шаг 5. Первая установка</div>
+    <div>9. Шаг 6. Убрать Яндекс</div>
+    <div>10. Шаг 7. Приложения и VPN</div>
+    <div>11. Шаг 8. Пульт в телефоне</div>
+    <div>12. Шаг 9. Telegram</div>
+    <div>13. Шаг 10. Обновления</div>
+    <div>14. Каждый день: команды</div>
+    <div>15. Дорабатывать с ИИ</div>
+    <div>16. Если что-то не так</div>
+    <div>17. Как всё вернуть</div>
+    <div>18. Что хранить отдельно</div>
+  </div>
+
+  <h2>Как читать</h2>
+  <p>Учебник написан для двух людей: для друга, который повторяет всё на своём телевизоре, и для владельца — на будущее
+    (новый Мак, второй телевизор, сброс телевизора). Шаги 1–5 обязательны и занимают около часа, остальные — по желанию.</p>
+  <div class="note"><b>Главное правило</b>Ничего на телевизоре не прошивается и не удаляется. Свой экран ставится как
+    обычное приложение, лишнее от Яндекса только выключается. Одна команда <code>tv rollback</code> возвращает всё как было.</div>
+  <div class="note warn"><b>Модель телевизора</b>Всё проверено на <b>StarWind SW-LED43SG300</b> (Яндекс ТВ, Android 11,
+    1 ГБ памяти). На других телевизорах с Яндекс ТВ / Android TV 8+ почти всё работает так же; могут отличаться пункты
+    системного меню и имена пакетов Яндекса (шаг 6).</div>
+  <p class="small">Все команды в учебнике набираются в программе «Терминал» на Маке (Программы → Утилиты → Терминал).
+    Строки, начинающиеся с <code>#</code>, — пояснения, их набирать не нужно.</p>
+</section>
+
+<!-- ===================== 1. ЧТО ПОЛУЧИТСЯ ===================== -->
+<section class="chapter">
+  <div class="kicker">Глава 1</div>
+  <h1>Что получится</h1>
+  <p class="lead">Домашний экран в стиле Apple TV вместо оболочки Яндекса, пульт в телефоне и свой плеер видео из Telegram.</p>
+
+  <figure><img src="img/tv-home.jpg"><figcaption>Главный экран: слева — док сервисов, справа — живая лента выбранного сервиса
+    (здесь — подписки YouTube), вверху — часы, погода и значки поиска, пульта, источников, Wi‑Fi и настроек.</figcaption></figure>
+  <div class="two">
+    <figure><img src="img/tv-home-2.jpg"><figcaption>Листаешь док — логотип загорается цветом сервиса, свет расходится по
+      экрану, лента меняется (Кинопоиск).</figcaption></figure>
+    <figure><img src="img/tv-apps.jpg"><figcaption>Последний пункт дока — все приложения и плитка «Очистить память».</figcaption></figure>
+  </div>
+  <div class="two">
+    <figure><img src="img/tv-settings.jpg"><figcaption>Настройки — боковая панель: тумблеры для «вкл/выкл», стрелки для выбора.</figcaption></figure>
+    <figure><img src="img/tv-search.jpg"><figcaption>Поиск сразу по YouTube, Рутубу и Кинопоиску.</figcaption></figure>
+  </div>
+  <div class="two">
+    <figure><img src="img/tv-saver.jpg"><figcaption>Семь заставок: циферблаты, большие цифры, карта мира, афиши, фото дня.</figcaption></figure>
+    <figure><img src="img/tg-home.jpg"><figcaption>Свой клиент Telegram: каналы и видео из постов по ссылке с телефона.</figcaption></figure>
+  </div>
+  <div class="two">
+    <figure><img src="img/tv-app-menu.jpg"><figcaption>Меню приложения (кнопка «Меню» или долгое ОК): открыть, лента,
+      переместить в доке, убрать из дока, скрыть.</figcaption></figure>
+    <figure><img src="img/tv-update.jpg"><figcaption>Обновление из меню телевизора — без Мака (глава 13).</figcaption></figure>
+  </div>
+</section>
+
+<section class="chapter">
+  <h2 style="margin-top:0">Пульт в телефоне</h2>
+  <p>Веб-страница, которую отдаёт сам телевизор. На iPhone сохраняется на экран «Домой» как приложение. Работает в любом
+    приложении на телевизоре: кнопки, кликпад, ввод текста, ссылки, снимок и запись экрана, файлы, настройки.</p>
+  <div class="phones">
+    <figure><img src="img/remote-1-pult.jpg"><figcaption>Пульт</figcaption></figure>
+    <figure><img src="img/remote-2-tools.jpg"><figcaption>Инструменты</figcaption></figure>
+    <figure><img src="img/remote-2b-tools-settings.jpg"><figcaption>Настройки ТВ</figcaption></figure>
+    <figure><img src="img/remote-3-accounts.jpg"><figcaption>Аккаунты</figcaption></figure>
+    <figure><img src="img/remote-4-status.jpg"><figcaption>Состояние</figcaption></figure>
+  </div>
+  <h2>Ещё</h2>
+  <ul>
+    <li><b>Своя экранная клавиатура</b> в том же стиле; текст можно печатать с телефона — поле на пульте появляется само.</li>
+    <li><b>Таймер сна</b>, <b>блокировка рекламы</b> (частный DNS AdGuard), <b>быстрые анимации</b>, очистка кэша и памяти.</li>
+    <li><b>VPN</b> (приложение Happ) — тумблер и страна прямо в меню и на пульте.</li>
+    <li><b>Обновление из меню</b> телевизора — без Мака, из своего репозитория на GitHub.</li>
+    <li><b>Единая дизайн-система</b>: цвета iOS, шрифт SF Pro, фиксированные размеры. Тесты не дают собрать сборку с
+      цветом или отступом мимо системы.</li>
+  </ul>
+  <div class="two">
+    <figure><img src="img/tv-keyboard.jpg"><figcaption>Своя клавиатура.</figcaption></figure>
+    <figure><img src="img/tv-wifi.jpg"><figcaption>Wi‑Fi и VPN в одном экране.</figcaption></figure>
+  </div>
+</section>
+
+<!-- ===================== 2. КАК УСТРОЕНО ===================== -->
+<section class="chapter">
+  <div class="kicker">Глава 2</div>
+  <h1>Как это устроено</h1>
+  <p class="lead">Мак собирает программу и ставит её на телевизор по домашней сети. Дальше телевизор живёт сам.</p>
+<div class="scheme"> Мак                                Телевизор (Android, без root)                Телефон
+┌──────────────────────┐ adb :5555 ┌─────────────────────────────────────────┐
+│ команда tv           │──────────▶│ com.gathin.tvhome · одно приложение     │
+│   сборка, тесты,     │           │   главный экран, меню, ленты, заставки  │
+│   установка, ключи,  │           │   своя клавиатура                       │
+│   журналы, проверка  │           │   Telegram (отдельный процесс)          │
+└──────────────────────┘           │   сервер пульта (от имени системы)      │◀─ HTTP :8687 ─ пульт
+                                   └─────────────────────────────────────────┘
+     │ релизы APK                          ▲
+     ▼                                     │ «Обновить лаунчер»
+ GitHub  &lt;логин&gt;/tv-home ──────────────────┘</div>
+  <ul>
+    <li><b>Отладка по сети (adb).</b> Мак общается с телевизором по протоколу разработчиков Android на порту 5555. Так
+      ставятся приложения и выдаются права. Root не нужен.</li>
+    <li><b>Одно приложение.</b> Весь экран — приложение <code>com.gathin.tvhome</code> (выросло из открытого проекта
+      CleanYourTV, экран переписан с нуля). Оно назначается домашним экраном вместо Яндекса.</li>
+    <li><b>Сервер пульта</b> запускается от имени системной оболочки — поэтому не умирает, когда YouTube съедает память,
+      и мгновенно нажимает кнопки.</li>
+    <li><b>Ключи не в программе.</b> Ключи YouTube, Кинопоиска и Telegram передаются на телевизор отдельно и не попадают ни в
+      APK, ни в git.</li>
+    <li><b>Telegram — только через VPN.</b> Если туннеля нет, клиент ставит сеть на паузу.</li>
+  </ul>
+  <h2>Где что лежит на Маке</h2>
+  <table>
+    <tr><th style="width:42%">Путь</th><th>Что</th></tr>
+    <tr><td><code>~/Documents/Claude/</code></td><td>Рабочая папка: ключи, ключ подписи, снимки, журналы, копии настроек</td></tr>
+    <tr><td><code>~/Documents/Claude/cleanyourtv/</code></td><td>Сам проект (репозиторий git)</td></tr>
+    <tr><td><code>~/Documents/Claude/tv</code></td><td>Команда управления (ссылка на <code>cleanyourtv/starwind/tv</code>)</td></tr>
+    <tr><td><code>~/Documents/Claude/tv-ip</code></td><td>Адрес телевизора</td></tr>
+    <tr><td><code>cleanyourtv/starwind/docs/</code></td><td>Подробная документация (этот учебник — её выжимка)</td></tr>
+  </table>
+</section>
+
+<!-- ===================== 3. ЧТО ПОНАДОБИТСЯ ===================== -->
+<section class="chapter">
+  <div class="kicker">Глава 3</div>
+  <h1>Что понадобится</h1>
+  <table>
+    <tr><th style="width:24%"></th><th>Требования</th></tr>
+    <tr><td><b>Телевизор</b></td><td>Яндекс ТВ или Android TV, Android 8+, процессор ARM. Проверено на StarWind SW-LED43SG300.</td></tr>
+    <tr><td><b>Мак</b></td><td>macOS 12 или новее (Apple Silicon или Intel), около 5 ГБ свободного места.</td></tr>
+    <tr><td><b>Сеть</b></td><td>Мак, телевизор и телефон — в одной домашней Wi‑Fi сети.</td></tr>
+    <tr><td><b>Телефон</b></td><td>Любой с браузером. Иконка на экране «Домой» и сохранение снимков в «Фото» — на iPhone.</td></tr>
+    <tr><td><b>GitHub</b></td><td>Бесплатный аккаунт на github.com: чтобы получить проект и для обновлений из меню.</td></tr>
+    <tr><td><b>Необязательно</b></td><td>Ключи YouTube и Кинопоиска (ленты), ключ Telegram API (свой клиент Telegram), подписка VPN для Happ.</td></tr>
+  </table>
+  <h2>Сколько времени</h2>
+  <table>
+    <tr><th>Этап</th><th style="width:22%">Время</th></tr>
+    <tr><td>Отладка на телевизоре, Мак, первая установка (шаги 1–5)</td><td>около часа, из них 20–30 минут — загрузка инструментов</td></tr>
+    <tr><td>Ключи YouTube и Кинопоиска</td><td>15–20 минут</td></tr>
+    <tr><td>Telegram (ключ API)</td><td>от 10 минут до нескольких часов (с российским номером сайт капризничает)</td></tr>
+    <tr><td>Пульт в телефоне</td><td>1 минута</td></tr>
+  </table>
+  <div class="note"><b>Не программист? Не страшно</b>Всё сводится к копированию команд в Терминал. Если что-то пошло не
+    так — глава 16 и глава 15 (как попросить ИИ-помощника разобраться самому).</div>
+</section>
+
+<!-- ===================== ШАГ 1 ===================== -->
+<section class="chapter">
+  <div class="kicker">Шаг 1</div>
+  <h1>Отладка по сети на телевизоре</h1>
+  <p class="lead">Разрешаем Маку ставить программы на телевизор. Делается один раз пультом от телевизора.</p>
+
+  <div class="step"><div class="n">1</div><div><b>Режим разработчика.</b> Настройки → Устройство → Об устройстве → семь раз
+    нажать ОК на строке «Сборка». Появится «Вы стали разработчиком». На других прошивках ищите «Об устройстве» и номер сборки.</div></div>
+  <div class="step"><div class="n">2</div><div><b>Включить отладку.</b> Настройки → Устройство → Для разработчиков →
+    включить <b>Отладка по USB</b> и, если есть, <b>Отладка по сети</b>. На SW-LED43SG300 порт 5555 открывается сразу.</div></div>
+  <div class="step"><div class="n">3</div><div><b>Узнать адрес.</b> Настройки → Сеть → Wi‑Fi → своя сеть: адрес вида
+    <code>192.168.1.50</code>. Запишите его.</div></div>
+  <div class="step"><div class="n">4</div><div><b>Закрепить адрес в роутере</b> (резервирование DHCP, раздел «LAN» / «DHCP»
+    в настройках роутера). Иначе через неделю адрес сменится и Мак телевизор не найдёт.</div></div>
+  <div class="step"><div class="n">5</div><div><b>При первом подключении</b> телевизор спросит «Разрешить отладку по USB?»
+    с отпечатком ключа — выбрать <b>«Всегда разрешать с этого компьютера»</b> и «ОК». То же окно появится один раз
+    и для самого лаунчера (он тоже подключается к отладке, чтобы чистить кэш и память) — тоже разрешить.</div></div>
+
+  <div class="note warn"><b>Осторожно с системным меню</b>Не нажимайте ОК «вслепую» в системных настройках: однажды цепочка
+    нажатий выключила телевизору Wi‑Fi, и он пропал из сети. Если такое случилось — включить Wi‑Fi пультом от телевизора.</div>
+  <div class="note"><b>Проверка</b>После шага 2 команда <code>~/Documents/Claude/tv check</code> должна показать модель
+    телевизора и что сейчас на экране. «Телевизор не отвечает» — смотрите главу 16.</div>
+</section>
+
+<!-- ===================== ШАГ 2 ===================== -->
+<section class="chapter">
+  <div class="kicker">Шаг 2</div>
+  <h1>Мак: инструменты и проект</h1>
+
+  <h2>2.1 Homebrew</h2>
+  <p>Менеджер программ для Мака. Если ещё нет — открыть <a href="https://brew.sh">brew.sh</a>, скопировать оттуда одну
+    команду в Терминал, ввести пароль Мака. После установки Homebrew напишет две команды «Next steps» — выполнить их.</p>
+  <pre><span class="c"># проверка: должна напечатать версию</span>
+brew --version</pre>
+
+  <h2>2.2 Получить проект</h2>
+  <p>Репозиторий <code>timuramishov-jpg/starwind-tv</code> закрытый. Два способа:</p>
+  <ul>
+    <li><b>Доступ к репозиторию</b> (удобнее — будут приходить обновления). Тимур добавляет ваш логин GitHub:
+      репозиторий → Settings → Collaborators → Add people. Вы принимаете приглашение из письма.</li>
+    <li><b>Архив.</b> Тимур присылает папку проекта архивом — распакуйте её в <code>~/Documents/Claude/cleanyourtv</code>
+      и пропустите <code>git clone</code> ниже.</li>
+  </ul>
+  <pre><span class="c"># GitHub CLI и вход (откроется браузер, войти своим аккаунтом)</span>
+brew install gh
+gh auth login            <span class="c"># GitHub.com → HTTPS → Login with a web browser</span>
+
+<span class="c"># забрать проект</span>
+mkdir -p ~/Documents/Claude
+gh repo clone timuramishov-jpg/starwind-tv ~/Documents/Claude/cleanyourtv</pre>
+
+  <h2>2.3 Подготовить Мак одной командой</h2>
+  <pre>~/Documents/Claude/cleanyourtv/starwind/tv setup</pre>
+  <p><code>tv setup</code> один раз ставит Java 17, Android SDK (platform 34, build-tools 34), окружение Python для связи
+    с телевизором, спрашивает адрес телевизора (из шага 1) и создаёт короткую команду <code>~/Documents/Claude/tv</code>.
+    Это самый долгий шаг — 15–30 минут загрузки.</p>
+  <div class="note ok"><b>Проверка</b><code>~/Documents/Claude/tv check</code> — модель телевизора, домашний экран, память. Работает? Идём дальше.</div>
+  <p class="small">Удобно добавить команду в путь, чтобы писать просто <code>tv</code>:
+    <code>echo 'export PATH="$HOME/Documents/Claude:$PATH"' >> ~/.zshrc</code> и открыть новое окно Терминала.
+    Дальше в учебнике — коротко <code>tv …</code>.</p>
+</section>
+
+<!-- ===================== ШАГ 3 ===================== -->
+<section class="chapter">
+  <div class="kicker">Шаг 3</div>
+  <h1>Шрифты SF Pro</h1>
+  <p class="lead">Весь интерфейс рассчитан на шрифт Apple SF Pro. В репозиторий он не входит — лицензия Apple.</p>
+  <ol>
+    <li>Скачать шрифты бесплатно: <a href="https://developer.apple.com/fonts/">developer.apple.com/fonts</a> → SF Pro.</li>
+    <li>Положить архив в <code>~/Documents/Claude/</code> с именем вида <code>SF-NF-*.zip</code> (внутри —
+      <code>TTF/SFNS-*.ttf</code>). <code>tv deploy</code> сам возьмёт Light / Regular / Medium / Semibold и широкое
+      начертание для заставки.</li>
+    <li>Если архив устроен иначе — положить руками четыре файла в <code>launcher/app/src/main/res/font/</code>:
+      <code>sf_light.ttf</code>, <code>sf_regular.ttf</code>, <code>sf_medium.ttf</code>, <code>sf_semibold.ttf</code>.</li>
+  </ol>
+  <p>Скруглённые цифры заставки берутся с самого Мака (<code>/System/Library/Fonts/SFNSRounded.ttf</code>), значки шапки
+    рисуются из SF Symbols (нужно <code>xcode-select --install</code>). Без них подставятся готовые из проекта.</p>
+  <div class="note"><b>Можно пропустить</b>Без архива сборка тоже пройдёт — с файлами шрифтов, которые уже лежат в проекте.</div>
+
+  <!-- ===================== ШАГ 4 ===================== -->
+  <div class="kicker" style="margin-top:9mm">Шаг 4</div>
+  <h1>Ключи сервисов (по желанию)</h1>
+  <p>Нужны для лент YouTube и Кинопоиска. Без них всё работает, просто эти две ленты будут пустыми. ВК, Рутуб и погода
+    ключей не требуют.</p>
+  <p>Создайте файл <code>~/Documents/Claude/secrets.json</code>:</p>
+  <pre>{
+  "installed": { "client_id": "….apps.googleusercontent.com", "client_secret": "…" },
+  "api_key": "AIza…",
+  "kinopoisk_key": "…"
+}</pre>
+  <table>
+    <tr><th style="width:28%">Ключ</th><th>Где взять</th></tr>
+    <tr><td><code>installed</code> (вход в YouTube, лента подписок)</td><td><a href="https://console.cloud.google.com/">console.cloud.google.com</a>
+      → новый проект → APIs &amp; Services → Library → <b>YouTube Data API v3</b> → Enable. Затем Credentials → Create
+      credentials → OAuth client ID → тип <b>TVs and Limited Input devices</b>. Скачанный JSON уже имеет вид
+      <code>{"installed": …}</code> — скопируйте его блок в файл.</td></tr>
+    <tr><td><code>api_key</code> (популярное и поиск)</td><td>Там же: Credentials → Create credentials → API key.</td></tr>
+    <tr><td><code>kinopoisk_key</code></td><td><a href="https://kinopoiskapiunofficial.tech">kinopoiskapiunofficial.tech</a> — бесплатный ключ после регистрации.</td></tr>
+  </table>
+  <div class="note warn"><b>Ключи — никогда не в git</b>Файл лежит только в рабочей папке. <code>tv deploy</code> передаёт
+    ключи на телевизор по сети, в программу они не попадают. Передать заново: <code>tv keys</code>.</div>
+</section>
+
+<!-- ===================== ШАГ 5 ===================== -->
+<section class="chapter">
+  <div class="kicker">Шаг 5</div>
+  <h1>Первая установка</h1>
+  <pre>tv deploy</pre>
+  <p>Одна команда делает всё. По шагам:</p>
+  <table>
+    <tr><th style="width:6%">#</th><th>Что происходит</th></tr>
+    <tr><td>1</td><td>Проверяет, что телевизор в сети; готовит шрифты, значки, библиотеку Telegram (сверяет контрольные суммы).</td></tr>
+    <tr><td>2</td><td>Создаёт <b>ключ подписи</b> <code>~/Documents/Claude/starwind.jks</code> (один раз). Его нужно сохранить — см. главу 18.</td></tr>
+    <tr><td>3</td><td>Прогоняет тесты дизайн-системы и разборщиков лент. Не прошли — не собирает.</td></tr>
+    <tr><td>4</td><td>Собирает приложение (Gradle), загружает на телевизор и ставит.</td></tr>
+    <tr><td>5</td><td>Выдаёт права: системные настройки, таймер сна, заставка, установка обновлений, своя клавиатура, быстрые анимации.</td></tr>
+    <tr><td>6</td><td>Запускает сервер пульта, делает лаунчер домашним экраном, передаёт ключи.</td></tr>
+    <tr><td>7</td><td>Выкладывает сборку в ваш репозиторий релизов на GitHub (для обновлений из меню, глава 13).</td></tr>
+    <tr><td>8</td><td>Переходит на главный экран и показывает отчёт со снимком экрана.</td></tr>
+  </table>
+  <p>Первая сборка идёт 3–6 минут (Gradle скачивает зависимости), следующие — 1–2 минуты.</p>
+  <div class="note"><b>Что увидите на телевизоре</b>Окно «Разрешить отладку?» от самого лаунчера — разрешить «всегда».
+    Затем главный экран с доком. Пока нет ключей, ленты YouTube и Кинопоиска пустые — это нормально.</div>
+
+  <h2>Проверить, что всё работает</h2>
+  <pre>tv smoke</pre>
+  <p><code>tv smoke</code> сам пройдёт по экранам (главный, лента, док, настройки, поиск, приложения, заставка, Telegram),
+    снимет каждый в <code>~/Documents/Claude/smoke/&lt;время&gt;/</code>, замерит плавность и проверит, нет ли падений.
+    В конце — «РЕЗУЛЬТАТ: всё в порядке». Если на телевизоре в это время что-то смотрят, проверка не запустится
+    (<code>FORCE=1 tv smoke</code> — всё равно).</p>
+  <pre><span class="c">== Плавность (дока и ленты)</span>
+   99th percentile: 48ms        <span class="c"># худшие кадры; на этом железе база ~36 мс</span>
+<span class="c">== Пульт</span>
+   сервер пульта отвечает
+<span class="c">== Падения</span>
+   нет
+РЕЗУЛЬТАТ: всё в порядке</pre>
+</section>
+
+<!-- ===================== ШАГ 6 ===================== -->
+<section class="chapter">
+  <div class="kicker">Шаг 6</div>
+  <h1>Убрать Яндекс с глаз и разгрузить память</h1>
+  <p>На телевизоре всего ~1 ГБ памяти, и оболочка Яндекса держит её постоянно. Выключаем (не удаляем):</p>
+  <pre>tv slim       <span class="c"># выключить оболочку Яндекса, его эфир и видеоплеер</span>
+tv lighten    <span class="c"># запретить фоновую работу лишним приложениям</span></pre>
+  <p>Всё обратимо: <code>tv lighten off</code>, <code>tv rollback</code> (Яндекс снова домашний экран).</p>
+  <div class="note warn"><b>Другая модель телевизора</b><code>tv slim</code> выключает пакеты
+    <code>com.yandex.tv.home</code>, <code>com.yandex.tv.input.efir</code>, <code>com.yandex.tv.videoplayer</code>,
+    <code>com.yandex.devices.farm.companion</code>. На другой прошивке имена могут отличаться — посмотреть список:
+    <code>tv check</code> или попросить ИИ (глава 15). Системные службы Яндекса (<code>io.sdk</code>) выключить нельзя —
+    система их защищает, это нормально.</div>
+
+  <!-- ===================== ШАГ 7 ===================== -->
+  <div class="kicker" style="margin-top:6mm">Шаг 7</div>
+  <h1>Приложения и VPN</h1>
+  <p>Док по умолчанию: YouTube, ВК Видео, Рутуб, Кинопоиск, Зона (если стоит), Happ. Ставить приложения:</p>
+  <ul>
+    <li>с Мака: <code>tv install файл.apk</code>;</li>
+    <li>с телефона: пульт → «Инструменты» → «Отправить на телевизор» (APK ставится сразу);</li>
+    <li>магазины: <code>tv aurora</code> (Aurora Store — Google Play без аккаунта) или RuStore.</li>
+  </ul>
+  <table>
+    <tr><th>Приложение</th><th>Зачем</th><th>Пакет</th></tr>
+    <tr><td>Happ</td><td>VPN для всего телевизора; лаунчер управляет им из меню и пульта</td><td><code>su.happ.proxyutility</code></td></tr>
+    <tr><td>ВК Видео, Рутуб</td><td>Ленты в доке</td><td><code>com.vk.tv</code>, <code>ru.rutube.app.tv</code></td></tr>
+    <tr><td>Зона</td><td>Фильмы</td><td><code>ru.zonaplayer.app</code></td></tr>
+  </table>
+  <p class="small">Порядок дока меняется прямо на телевизоре: кнопка «Меню» на приложении → «Переместить» (см. снимок в главе 1).</p>
+  <p><b>VPN.</b> В Happ добавить свою подписку (ссылку от поставщика VPN). Включается тумблером в меню Wi‑Fi на телевизоре или на
+    пульте. <code>tv route on</code> — через VPN только YouTube и Google, <code>tv route off</code> — весь трафик.</p>
+</section>
+
+<!-- ===================== ШАГ 8 ===================== -->
+<section class="chapter">
+  <div class="kicker">Шаг 8</div>
+  <h1>Пульт в телефоне</h1>
+  <div class="step"><div class="n">1</div><div>На главном экране телевизора — значок телефона вверху справа (или Настройки →
+    «Пульт в телефоне»). Появится QR-код.</div></div>
+  <div class="step"><div class="n">2</div><div>Навести камеру телефона, открыть ссылку вида
+    <code>http://192.168.x.x:8687/?k=КЛЮЧ</code>.</div></div>
+  <div class="step"><div class="n">3</div><div>iPhone: «Поделиться» → «На экран „Домой“». Появится иконка Starwind, пульт
+    открывается как приложение. Ключ запоминается.</div></div>
+  <div class="note"><b>Пароля нет — так задумано</b>Пульт рассчитан на домашнюю сеть. Ключ <code>k</code> — случайная строка,
+    без него сервер ничего не делает. Не публикуйте ссылку с ключом.</div>
+
+  <h2>Что умеет</h2>
+  <table>
+    <tr><th style="width:24%">Вкладка</th><th>Что там</th></tr>
+    <tr><td><b>Пульт</b></td><td>Док сервисов, кликпад, назад / домой / пауза / громкость / выключить, поиск, поле ввода
+      (появляется само, когда на телевизоре открыта клавиатура), «Открыть на телевизоре» — ссылка YouTube, ВК, Рутуб, Telegram, любой сайт; VPN.</td></tr>
+    <tr><td><b>Инструменты</b></td><td>Снимок и запись экрана, заставка, освободить память, файлы на телевизоре (фильмы, APK,
+      загрузки), настройки телевизора тумблерами и списками, очистка кэша, перезагрузка.</td></tr>
+    <tr><td><b>Аккаунты</b></td><td>YouTube — войти/выйти (код на экране телевизора), Telegram — ключ, вход по QR, пароль, Яндекс.</td></tr>
+    <tr><td><b>Состояние</b></td><td>Процессор, память, температура, сеть, место; кто занимает память; все приложения — остановить, очистить, отключить, удалить.</td></tr>
+  </table>
+  <p><b>Снимки и запись в «Фото» (iPhone).</b> Страница по <code>http://</code> не может сама сохранять в «Фото», поэтому
+    есть быстрая команда «Starwind в Фото»: пульт → «Инструменты» → «Установить команду „Starwind в Фото“» → открыть файл →
+    «Добавить быструю команду», затем включить «Сразу сохранять в Фото». При первом сохранении разрешить доступ к Фото и
+    локальной сети.</p>
+  <p class="small">Включить телевизор с телефона нельзя: во сне он выключает Wi‑Fi. Выключить — можно (красная кнопка).</p>
+</section>
+
+<!-- ===================== ШАГ 9 ===================== -->
+<section class="chapter">
+  <div class="kicker">Шаг 9</div>
+  <h1>Telegram (по желанию)</h1>
+  <p class="lead">Свой клиент на официальной библиотеке Telegram (TDLib): видео из постов на большом экране, без переписки.</p>
+  <div class="step"><div class="n">1</div><div><b>Ключ API.</b> <a href="https://my.telegram.org">my.telegram.org</a> → войти
+    по номеру → «API development tools» → создать приложение (название любое, платформа Android). Взять <b>api_id</b>
+    (число) и <b>api_hash</b> (32 символа).</div></div>
+  <div class="note warn"><b>Российский номер</b>Сайт часто отвечает «ERROR» или «Too many attempts». Помогает VPN через
+    Казахстан или Узбекистан и пауза в несколько часов. Можно взять ключ у человека с другим номером — он не даёт доступа к
+    его аккаунту, входите вы своим.</div>
+  <div class="step"><div class="n">2</div><div><b>Ввести ключ</b> в пульте: «Аккаунты» → Telegram → api_id, api_hash →
+    «Сохранить». Ключ уходит прямо на телевизор, на Маке и в git его нет.</div></div>
+  <div class="step"><div class="n">3</div><div><b>Войти.</b> «На экран» — на телевизоре QR-код. На телефоне: Telegram →
+    Настройки → Устройства → Подключить устройство → навести камеру. Облачный пароль, если есть, пульт попросит отдельно.</div></div>
+  <div class="step"><div class="n">4</div><div><b>Смотреть.</b> В Telegram на телефоне «Поделиться» → «Копировать ссылку»
+    на пост с видео, в пульте «Открыть на телевизоре» → вставить. Или плитка Telegram в ряду приложений → «Мои каналы».</div></div>
+  <div class="two">
+    <figure><img src="img/tg-post.jpg"><figcaption>Видео поста карточками: длительность, качество, размер.</figcaption></figure>
+    <figure><img src="img/tg-player.jpg"><figcaption>Плеер: ОК — пауза, ←/→ — 10 с назад / 30 вперёд, Меню — звук и субтитры.</figcaption></figure>
+  </div>
+  <p class="small">Большие видео (1–2 ГБ) не скачиваются целиком: подкачивается кусок вокруг места просмотра, старт — за
+    несколько секунд. Задержитесь на карточке секунду перед ОК — начало и конец файла подготовятся заранее. Весь трафик
+    Telegram — только через VPN; если VPN выключен, клиент покажет «Нет VPN».</p>
+</section>
+
+<!-- ===================== ШАГ 10 ===================== -->
+<section class="chapter">
+  <div class="kicker">Шаг 10</div>
+  <h1>Обновления</h1>
+  <h2>С Мака</h2>
+  <pre>tv update      <span class="c"># забрать свежий код с GitHub</span>
+tv deploy      <span class="c"># собрать и поставить</span>
+QUIET=1 tv deploy   <span class="c"># тихо: не уводит телевизор с текущего экрана, можно во время просмотра</span></pre>
+  <h2>Из меню телевизора, без Мака</h2>
+  <p>Каждая сборка <code>tv deploy</code> выкладывается в <b>ваш</b> открытый репозиторий релизов
+    <code>&lt;ваш логин&gt;/tv-home</code> (создаётся сам, в нём только APK, без ключей). На телевизоре: шестерёнка →
+    «Обновить лаунчер». Телевизор скачает сборку и один раз спросит «Установить?» — выбрать «Установить».</p>
+  <figure><img src="img/tv-update.jpg"><figcaption>Обновление из меню: вверху «Скачал версию …, подтверди установку»,
+    системное окно — «Установить». Пульт перезапускается сам через пару секунд.</figcaption></figure>
+  <div class="note"><b>Почему у каждого свой репозиторий</b>Сборки подписаны ключом владельца (<code>starwind.jks</code>).
+    Сборка Тимура на ваш телевизор не встанет, и наоборот. Поэтому обновления — только из своего репозитория. Нужен лишь
+    вход <code>gh auth login</code> (шаг 2). Не вошли — пункт меню скажет «не настроено», остальное работает.</div>
+</section>
+
+<!-- ===================== КОМАНДЫ ===================== -->
+<section class="chapter">
+  <div class="kicker">Глава 14</div>
+  <h1>Каждый день: команды <code style="font-size:18pt">tv</code></h1>
+  <table>
+    <tr><th style="width:30%">Команда</th><th>Что делает</th></tr>
+    <tr><td><code>tv</code></td><td>Справка по всем командам</td></tr>
+    <tr><td><code>tv check</code></td><td>Состояние: домашний экран, что на экране, VPN, память, падения</td></tr>
+    <tr><td><code>tv report</code></td><td>То же плюс журнал лаунчера в <code>report.txt</code></td></tr>
+    <tr><td><code>tv smoke</code></td><td>Проверка всех экранов со снимками, плавность, падения</td></tr>
+    <tr><td><code>tv shot [имя]</code></td><td>Снимок экрана в <code>shots/</code></td></tr>
+    <tr><td><code>tv log [N]</code></td><td>Последние строки журнала</td></tr>
+    <tr><td><code>tv update</code> / <code>tv deploy</code></td><td>Забрать код / собрать и поставить (<code>QUIET=1</code> — тихо, <code>RELEASE=0</code> — без релиза)</td></tr>
+    <tr><td><code>tv release</code></td><td>Выложить собранное в релизы вручную</td></tr>
+    <tr><td><code>tv keys</code></td><td>Передать ключи из <code>secrets.json</code></td></tr>
+    <tr><td><code>tv install F.apk</code></td><td>Поставить приложение; <code>tv uninstall пакет</code> — удалить</td></tr>
+    <tr><td><code>tv aurora</code></td><td>Поставить Aurora Store</td></tr>
+    <tr><td><code>tv slim</code> / <code>tv rollback</code></td><td>Выключить оболочку Яндекса / вернуть её</td></tr>
+    <tr><td><code>tv lighten</code> / <code>tv lighten off</code></td><td>Разгрузить фон / вернуть</td></tr>
+    <tr><td><code>tv route on|off</code></td><td>VPN только для YouTube / для всего</td></tr>
+    <tr><td><code>tv backup</code></td><td>Копия настроек лаунчера в <code>backup/</code></td></tr>
+    <tr><td><code>tv agent</code></td><td>Режим для ИИ-помощника в облаке (глава 15)</td></tr>
+    <tr><td><code>tv reboot</code>, <code>tv adb off</code></td><td>Перезагрузить телевизор; выключить отладку по сети</td></tr>
+  </table>
+  <h2>Второй телевизор</h2>
+  <p>Каждому телевизору — свой адрес на один запуск: <code>TV_IP=192.168.1.60 tv deploy</code>. Город погоды — в
+    <code>IosWeather.java</code> (по умолчанию Москва).</p>
+</section>
+
+<!-- ===================== ИИ ===================== -->
+<section class="chapter">
+  <div class="kicker">Глава 15</div>
+  <h1>Дорабатывать с ИИ-помощником</h1>
+  <p class="lead">Весь проект написан ИИ (Claude) по требованиям владельца. Так же его удобно и продолжать.</p>
+  <h2>Два режима</h2>
+  <table>
+    <tr><th style="width:30%">Режим</th><th>Как</th></tr>
+    <tr><td><b>ИИ в Терминале Мака</b><br><span class="small">Claude Code, Codex CLI, Cursor</span></td><td>Запустить в папке
+      <code>~/Documents/Claude/cleanyourtv</code>. Помощник сам правит код и выполняет <code>tv …</code>. Самый простой путь.</td></tr>
+    <tr><td><b>ИИ в облаке</b><br><span class="small">Claude в приложении</span></td><td>Облако не видит домашнюю сеть. На Маке
+      запускается агент: <code>tv agent</code> (окно Терминала не закрывать; <code>tv agent install</code> — автозапуск).
+      ИИ кладёт скрипты в <code>~/Documents/Claude/agent/in/</code>, агент выполняет их рядом с телевизором и пишет ответ в
+      <code>agent/out/</code>. Код передаётся пакетом <code>starwind.bundle</code>. Папку <code>~/Documents/Claude</code>
+      нужно подключить к приложению Claude на Маке.</td></tr>
+  </table>
+  <h2>С чего начать разговор</h2>
+  <pre>Это мой проект Starwind TV: свой домашний экран для телевизора на Яндекс ТВ.
+Проект — ~/Documents/Claude/cleanyourtv, ветка main.
+Прочитай starwind/docs/DEVELOPMENT.md, ARCHITECTURE.md и DESIGN.md.
+После правок — bash starwind/test/run.sh, ставь на телевизор через tv deploy
+(QUIET=1, если я смотрю), проверяй через tv smoke.
+Задача: …</pre>
+  <h2>Правила проекта (помощник должен их знать)</h2>
+  <ol>
+    <li><b>Дизайн-система — закон.</b> Цвета, шрифты, отступы — только токены <code>IosPalette</code>; пульт — те же
+      значения ровно вдвое меньше. Тесты не пропустят нарушение.</li>
+    <li><b>Два состояния — тумблер, больше — выбор</b> стрелками на ТВ и списком на пульте.</li>
+    <li><b>Тексты по-русски и коротко.</b></li>
+    <li><b>Обновления — тихо</b> (<code>QUIET=1</code>), не прерывая просмотр. Не трогать экран, пока на нём что-то смотрят.</li>
+    <li><b>Ничего не удалять у системы</b> — только выключать, всё обратимо.</li>
+    <li><b>Ключи — не в git.</b></li>
+    <li><b>Память — главный ресурс</b> (~925 МБ на всё): без тяжёлых эффектов, обложки в размер, тяжёлое — в отдельные процессы.</li>
+  </ol>
+</section>
+
+<!-- ===================== ПРОБЛЕМЫ ===================== -->
+<section class="chapter">
+  <div class="kicker">Глава 16</div>
+  <h1>Если что-то не так</h1>
+  <table>
+    <tr><th style="width:34%">Проблема</th><th>Что сделать</th></tr>
+    <tr><td>«Телевизор не отвечает»</td><td>Включён и в той же сети? Не сменился адрес (<code>~/Documents/Claude/tv-ip</code>)? Отладка включена? Закрепите адрес в роутере.</td></tr>
+    <tr><td>Телевизор просит «Разрешить отладку?»</td><td>Разрешить и отметить «Всегда».</td></tr>
+    <tr><td>Пульт не открывается</td><td>Телефон в той же Wi‑Fi? Открыть QR заново. Не помогло — <code>QUIET=1 tv deploy</code> перезапустит сервер пульта.</td></tr>
+    <tr><td>На пульте нет поля ввода</td><td>Включена ли своя клавиатура (Инструменты → «Своя клавиатура»)? В YouTube поля нет — там поиск лупой пульта.</td></tr>
+    <tr><td>Ленты YouTube / Кинопоиска пустые</td><td>Нет ключей (шаг 4, потом <code>tv keys</code>). Подписки YouTube — войти: пульт → Аккаунты → YouTube.</td></tr>
+    <tr><td>Экран подвисает</td><td>Не хватает памяти: <code>tv lighten</code>, плитка «Очистить память». <code>tv report</code> покажет, кто занимает память.</td></tr>
+    <tr><td>Telegram «Нет VPN»</td><td>Так задумано — включить Happ.</td></tr>
+    <tr><td>Telegram «Ключ не подошёл»</td><td>api_id — число, api_hash — 32 символа (a–f, 0–9).</td></tr>
+    <tr><td><code>UPDATE_INCOMPATIBLE</code> при установке</td><td>Сборка подписана другим ключом (потерян <code>starwind.jks</code>). Согласиться на переустановку — настройки вернутся из копии.</td></tr>
+    <tr><td>«Обновить лаунчер»: «не настроено»</td><td>Сборка сделана без входа в GitHub: <code>gh auth login</code>, затем <code>tv deploy</code>.</td></tr>
+    <tr><td>Сборка падает</td><td>Журнал — <code>~/Documents/Claude/build.log</code>, тесты — <code>test.log</code>. Частое: нет Java 17 / SDK — <code>tv setup</code>.</td></tr>
+    <tr><td>Заставка не включается</td><td>Пульт → Инструменты → «Заставка через»; простой на главном экране должен быть дольше задержки.</td></tr>
+    <tr><td>Таймер сна не гасит экран</td><td><code>tv deploy</code> выдаёт права администратора; посмотреть, не было ли там ошибки.</td></tr>
+  </table>
+  <h2>Известные ограничения</h2>
+  <ul>
+    <li>Включить телевизор с телефона нельзя (во сне Wi‑Fi выключен).</li>
+    <li>Кнопку-шестерёнку на пульте телевизора перехватывает система Яндекса.</li>
+    <li>В YouTube текст с телефона не вводится — поиск идёт ссылкой.</li>
+    <li>Перемотка Telegram-видео в нескачанное место — обычно несколько секунд, иногда до 10–20.</li>
+  </ul>
+</section>
+
+<!-- ===================== ОТКАТ И ХРАНЕНИЕ ===================== -->
+<section class="chapter">
+  <div class="kicker">Глава 17</div>
+  <h1>Как всё вернуть</h1>
+  <pre>tv lighten off     <span class="c"># вернуть фоновую работу приложениям</span>
+tv rollback        <span class="c"># включить оболочку Яндекса и сделать её домашним экраном</span>
+tv uninstall com.gathin.tvhome   <span class="c"># по желанию — удалить сам лаунчер</span>
+tv adb off         <span class="c"># выключить отладку по сети</span></pre>
+  <p>После этого телевизор такой же, как из коробки. Сброс к заводским настройкам не нужен.</p>
+
+  <div class="kicker" style="margin-top:9mm">Глава 18</div>
+  <h1>Что хранить отдельно</h1>
+  <p>Этих файлов нет в git — сохраните их в личное облако (iCloud Drive) или менеджер паролей.</p>
+  <table>
+    <tr><th style="width:38%">Файл</th><th>Зачем</th><th style="width:30%">Если потерять</th></tr>
+    <tr><td><code>~/Documents/Claude/starwind.jks</code>, <code>starwind.pass</code>, <code>starwind.alias</code></td><td>Подпись сборок</td>
+      <td>Новая сборка не встанет поверх: переустановка (настройки вернутся из копии)</td></tr>
+    <tr><td><code>~/Documents/Claude/secrets.json</code></td><td>Ключи YouTube и Кинопоиска</td><td>Создать новые (шаг 4)</td></tr>
+    <tr><td>Ключ Telegram API</td><td>Свой клиент Telegram</td><td>Взять тот же на my.telegram.org</td></tr>
+    <tr><td>Архив шрифтов SF</td><td>Шрифты интерфейса</td><td>Скачать заново (шаг 3)</td></tr>
+  </table>
+  <h2>Подробнее</h2>
+  <p>В проекте, папка <code>starwind/docs/</code>: <code>INSTALL.md</code> (установка), <code>USAGE.md</code>
+    (как пользоваться), <code>REMOTE.md</code> (пульт и его запросы), <code>TELEGRAM.md</code>, <code>DESIGN.md</code>
+    (дизайн-система), <code>ARCHITECTURE.md</code> (устройство), <code>DEVELOPMENT.md</code> (разработка),
+    <code>TROUBLESHOOTING.md</code>, <code>HISTORY.md</code> (почему сделано так).</p>
+  <div class="note ok"><b>Удачи!</b>Если застряли — откройте ИИ-помощника в папке проекта и опишите, что видите на экране.
+    Большинство проблем он решит сам, прочитав документацию.</div>
+</section>
+
+</body>
+</html>
