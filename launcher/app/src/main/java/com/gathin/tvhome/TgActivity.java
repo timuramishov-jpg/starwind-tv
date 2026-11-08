@@ -193,12 +193,18 @@ public final class TgActivity extends Activity {
                     long c = playChat, m = playMsg;
                     playChat = 0;
                     sub.setText("Открываю видео…");
-                    tg.send(new TdApi.GetMessage(c, m), r -> {
+                    // Сначала канал: после перезапуска процесса TDLib не знает чат и на GetMessage отвечает «Chat not found».
+                    tg.send(new TdApi.GetChat(c), ignored -> tg.send(new TdApi.GetMessage(c, m), r -> {
                         Item it = r instanceof TdApi.Message ? itemOf((TdApi.Message) r) : null;
-                        if (it == null) { sub.setText("Видео не открылось"); return; }
+                        if (it == null) {
+                            sub.setText("Видео не открылось" + (r instanceof TdApi.Error ? ": " + ((TdApi.Error) r).message : ""));
+                            android.util.Log.w("TgActivity", "play " + c + "/" + m + ": " + r);
+                            showHome();
+                            return;
+                        }
                         play(it);
                         finish();
-                    });
+                    }));
                     break;
                 }
                 String want = page + ":" + link + ":" + channelId;
@@ -256,7 +262,7 @@ public final class TgActivity extends Activity {
         Runnable channels = () -> loadChannels(cont);
         if (recent.isEmpty()) { channels.run(); return; }
         for (long[] r : recent) {
-            tg.send(new TdApi.GetMessage(r[0], r[1]), m -> {
+            tg.send(new TdApi.GetChat(r[0]), ig -> tg.send(new TdApi.GetMessage(r[0], r[1]), m -> {
                 if (m instanceof TdApi.Message) {
                     Item it = itemOf((TdApi.Message) m);
                     if (it != null) cont.add(it);
@@ -269,7 +275,7 @@ public final class TgActivity extends Activity {
                     cont.addAll(sorted);
                     channels.run();
                 }
-            });
+            }));
         }
     }
 
