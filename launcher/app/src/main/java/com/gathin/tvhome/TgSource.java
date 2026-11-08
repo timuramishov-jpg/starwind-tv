@@ -61,7 +61,9 @@ final class TgSource extends MediaDataSource {
             }
             ensureDownloading(position);
             synchronized (lock) { try { lock.wait(400); } catch (InterruptedException e) { throw new IOException(e); } }
-            if (System.currentTimeMillis() - waitedSince > 120_000) throw new IOException("Telegram не отдаёт видео");
+            long waited = System.currentTimeMillis() - waitedSince;
+            if (waited > 5000 && waited % 5000 < 450) Log.i(TAG, "waiting at " + position + " (" + length + " B), ready " + ready);
+            if (waited > 120_000) throw new IOException("Telegram не отдаёт видео");
         }
         throw new IOException("closed");
     }
@@ -76,7 +78,8 @@ final class TgSource extends MediaDataSource {
             tg.call(new TdApi.DeleteFile(fileId), 10_000);
             closeRaf();
         }
-        tg.call(new TdApi.DownloadFile(fileId, 32, position, 0, false), 10_000);
+        TdApi.Object d = tg.call(new TdApi.DownloadFile(fileId, 32, position, 0, false), 10_000);
+        Log.i(TAG, "download from " + position + " of " + size + ": " + (d instanceof TdApi.File ? "ok, prefix " + ((TdApi.File) d).local.downloadedPrefixSize + " offset " + ((TdApi.File) d).local.downloadOffset : d));
         requestedFrom = position;
     }
 

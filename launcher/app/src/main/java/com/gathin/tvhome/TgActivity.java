@@ -41,7 +41,7 @@ import java.util.Locale;
 public final class TgActivity extends Activity {
     private static final float EDGE = IosPalette.EDGE, GAP = IosPalette.S4;
     private static final int COLS = 4;
-    private static final float CARD_W = (1920 - 2 * EDGE - (COLS - 1) * GAP) / COLS, THUMB_H = CARD_W * 9 / 16, CARD_H = THUMB_H + 112;
+    private static final float CARD_W = (1920 - 2 * EDGE - (COLS - 1) * GAP) / COLS, THUMB_H = CARD_W * 9 / 16, CARD_H = THUMB_H + 124;
     private static final float TOP = 200, SECTION = 64;
 
     /** Одно видео: файл, облегчённые версии, откуда оно. */
@@ -518,7 +518,7 @@ public final class TgActivity extends Activity {
     private static String clean(String name) {
         if (name == null) return "";
         String n = name.replaceAll("(?i)\\.(mp4|mkv|mov|avi|webm|m4v)$", "").replace('_', ' ').trim();
-        return n.matches("(?i)(video|img|vid)[ -]?\\d.*") ? "" : n;
+        return n.matches("(?i)(video|img|vid)[ -]?\\d.*|mp4|mov|mkv|video") ? "" : n;
     }
 
     static String time(int s) {
@@ -623,7 +623,7 @@ public final class TgActivity extends Activity {
         meta.setSingleLine(true);
         meta.setEllipsize(TextUtils.TruncateAt.END);
         FrameLayout.LayoutParams ml = new FrameLayout.LayoutParams(px(CARD_W), -2);
-        ml.topMargin = px(THUMB_H + IosPalette.S3 + 2 * IosPalette.CALLOUT + IosPalette.S2 + 6);
+        ml.topMargin = px(THUMB_H + IosPalette.S3 + 2 * 32 + IosPalette.S2);
         card.addView(meta, ml);
         place(t, card);
     }
