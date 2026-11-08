@@ -64,8 +64,11 @@ final class IosFeed {
     private static final String TAG = "IosFeed";
     static final String YOUTUBE = "com.yandex.tv.ytplayer", RUTUBE = "ru.rutube.app.tv", VK = "com.vk.tv", KINOPOISK = "ru.kinopoisk.yandex.tv", ZONA = "ru.zonaplayer.app",
             /** Свой клиент Telegram — плитка в ряду приложений (без ленты и места в доке). */
-            TELEGRAM = "com.gathin.tvhome.telegram";
+            TELEGRAM = "com.gathin.tvhome.telegram",
+            /** Twitch: приложение для Android TV; лента — подписки в эфире и их записи (вход по коду, см. IosTwitch). */
+            TWITCH = "tv.twitch.android.app";
     final IosSources src = new IosSources(this);
+    final IosTwitch twitch;
     final Context context;
     final SharedPreferences prefs;
     // Потоки фоновые и с низким приоритетом, чтобы не отнимать процессор у интерфейса на слабом телевизоре.
@@ -95,6 +98,7 @@ final class IosFeed {
     IosFeed(Context context) {
         this.context = context;
         prefs = context.getSharedPreferences("ios_feed", Context.MODE_PRIVATE);
+        twitch = new IosTwitch(context, this);
         dir = new File(context.getCacheDir(), "feed");
         dir.mkdirs();
         pool.execute(this::prune);
@@ -110,7 +114,13 @@ final class IosFeed {
     }
 
     boolean signedIn() { return prefs.contains("refresh"); }
-    static boolean supports(String pkg) { return YOUTUBE.equals(pkg) || RUTUBE.equals(pkg) || VK.equals(pkg) || KINOPOISK.equals(pkg) || ZONA.equals(pkg); }
+    static boolean supports(String pkg) { return YOUTUBE.equals(pkg) || RUTUBE.equals(pkg) || VK.equals(pkg) || KINOPOISK.equals(pkg) || ZONA.equals(pkg) || TWITCH.equals(pkg); }
+
+    /** Лента по времени — новое сверху, без перемешивания: подписки YouTube и Twitch. Остальные (рекомендации, популярное)
+     *  при каждом возвращении домой показывают следующую порцию. */
+    boolean chronological(String pkg) {
+        return TWITCH.equals(pkg) || YOUTUBE.equals(pkg) && signedIn() && !"popular".equals(mode(YOUTUBE));
+    }
     List<IosHome.FeedItem> cached(String pkg) {
         List<IosHome.FeedItem> l = items.get(pkg);
         return l == null ? new ArrayList<>() : l;
@@ -124,6 +134,7 @@ final class IosFeed {
     void rotate(String pkg) {
         List<IosHome.FeedItem> pool = pools.get(pkg);
         if (pool == null || pool.isEmpty()) return;
+        if (chronological(pkg)) { window(pkg); return; }
         markShown(pkg, cached(pkg));
         for (IosHome.FeedItem it : cached(pkg)) { it.image = null; it.onImage = null; }
         window(pkg);
@@ -151,8 +162,9 @@ final class IosFeed {
         List<IosHome.FeedItem> pool = pools.get(pkg);
         Set<String> s = shown(pkg);
         List<IosHome.FeedItem> fresh = new ArrayList<>();
-        for (IosHome.FeedItem it : pool) if (!s.contains(it.title) && fresh.size() < MAX_ITEMS) fresh.add(it);
-        if (fresh.size() < Math.min(MAX_ITEMS, pool.size())) {
+        if (chronological(pkg)) fresh.addAll(pool.subList(0, Math.min(MAX_ITEMS, pool.size())));
+        else for (IosHome.FeedItem it : pool) if (!s.contains(it.title) && fresh.size() < MAX_ITEMS) fresh.add(it);
+        if (!chronological(pkg) && fresh.size() < Math.min(MAX_ITEMS, pool.size())) {
             for (IosHome.FeedItem it : pool) s.remove(it.title);
             fresh.clear();
             List<IosHome.FeedItem> mixed = new ArrayList<>(pool);
@@ -172,9 +184,30 @@ final class IosFeed {
         items.put(pkg, fresh);
     }
 
+    /** Вернулись на главный экран: для последнего открытого в каждой ленте запоминаем, сколько отсутствовали, —
+     *  по этому IosText.keepContinue решает, досмотрено ли. Считается один раз, по первому возвращению. */
+    void returned() {
+        long now = System.currentTimeMillis();
+        for (String pkg : new String[]{YOUTUBE, VK, RUTUBE, KINOPOISK, ZONA, TWITCH}) {
+            try {
+                JSONArray a = new JSONArray(prefs.getString("recent_" + pkg, "[]"));
+                if (a.length() == 0 || a.getJSONObject(0).has("away")) continue;
+                JSONObject j = a.getJSONObject(0);
+                j.put("away", now - j.optLong("at"));
+                prefs.edit().putString("recent_" + pkg, a.toString()).apply();
+                Log.i(TAG, "returned to " + pkg + " after " + (now - j.optLong("at")) / 1000 + " s, continue "
+                        + IosText.keepContinue(j.optLong("at"), now, j.optLong("away"), IosText.clockSeconds(j.optString("duration"))));
+                if (pools.containsKey(pkg)) window(pkg);
+            } catch (Exception e) {
+                Log.w(TAG, "returned: " + e);
+            }
+        }
+    }
+
     /** Открыл карточку — запоминаем её для ряда «Продолжить» (две последние на сервис). */
     void remember(String pkg, IosHome.FeedItem it) {
         if (it.open == null || it.title == null) return;
+        if (TWITCH.equals(pkg)) return;  // эфир не «продолжают», а записи Twitch помнит сам
         try {
             JSONArray old = new JSONArray(prefs.getString("recent_" + pkg, "[]")), now = new JSONArray();
             JSONObject j = new JSONObject();
@@ -196,10 +229,10 @@ final class IosFeed {
         List<IosHome.FeedItem> out = new ArrayList<>();
         try {
             JSONArray a = new JSONArray(prefs.getString("recent_" + pkg, "[]"));
-            long week = System.currentTimeMillis() - 7 * 24 * 3600_000L;
+            long now = System.currentTimeMillis();
             for (int i = 0; i < a.length(); i++) {
                 JSONObject j = a.getJSONObject(i);
-                if (j.optLong("at") < week) continue;
+                if (!IosText.keepContinue(j.optLong("at"), now, j.optLong("away", -1), IosText.clockSeconds(j.optString("duration")))) continue;
                 IosHome.FeedItem it = new IosHome.FeedItem();
                 it.title = j.getString("title");
                 it.subtitle = "Продолжить · " + ago(j.optLong("at"));
@@ -610,7 +643,7 @@ final class IosFeed {
             List<IosHome.FeedItem> out = null;
             String error = null;
             try {
-                out = YOUTUBE.equals(pkg) ? src.youtube() : RUTUBE.equals(pkg) ? src.rutubeOwn() : KINOPOISK.equals(pkg) ? src.kino() : ZONA.equals(pkg) ? src.zona() : src.channel(pkg);
+                out = TWITCH.equals(pkg) ? twitch.feed() : YOUTUBE.equals(pkg) ? src.youtube() : RUTUBE.equals(pkg) ? src.rutubeOwn() : KINOPOISK.equals(pkg) ? src.kino() : ZONA.equals(pkg) ? src.zona() : src.channel(pkg);
             } catch (Exception e) {
                 error = String.valueOf(e.getMessage());
                 Log.w(TAG, pkg + ": " + e);

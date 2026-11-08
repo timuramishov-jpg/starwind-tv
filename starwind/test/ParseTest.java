@@ -20,11 +20,35 @@ public final class ParseTest {
         if (!ok) failed++;
     }
 
+    private static String text(String name) throws Exception {
+        return new String(Files.readAllBytes(Paths.get("starwind/test/samples/" + name)), "UTF-8");
+    }
+
     private static JSONObject sample(String name) throws Exception {
         return new JSONObject(new String(Files.readAllBytes(Paths.get("starwind/test/samples/" + name)), "UTF-8"));
     }
 
     public static void main(String[] a) throws Exception {
+        List<IosParse.Entry> rss = IosParse.youtubeRss(text("youtube-rss.xml"));
+        check("YouTube RSS: битая запись пропущена", rss.size(), 2);
+        check("YouTube RSS: id", rss.get(0).id, "abcDEF12345");
+        check("YouTube RSS: название с &amp;", rss.get(0).title, "Большой выпуск: Tom & Jerry");
+        check("YouTube RSS: канал", rss.get(0).sub, "Канал Тест");
+        check("YouTube RSS: дата", rss.get(0).published > rss.get(1).published, true);
+        check("YouTube RSS: обложка", rss.get(0).urls[0], "https://i.ytimg.com/vi/abcDEF12345/sddefault.jpg");
+        List<IosParse.Entry> live = IosParse.twitchStreams(sample("twitch-streams.json"));
+        check("Twitch эфиры: без логина пропущен", live.size(), 1);
+        check("Twitch эфиры: логин", live.get(0).login, "streamer_one");
+        check("Twitch эфиры: подпись", live.get(0).sub, "Streamer One · Fortnite");
+        check("Twitch эфиры: зрители", live.get(0).viewers, 12345);
+        check("Twitch эфиры: обложка в размер", live.get(0).urls[0], "https://static-cdn.jtvnw.net/previews-ttv/live_user_streamer_one-880x495.jpg");
+        List<IosParse.Entry> vods = IosParse.twitchVideos(sample("twitch-videos.json"));
+        check("Twitch записи: идущий эфир без обложки пропущен", vods.size(), 1);
+        check("Twitch записи: длительность", IosText.clock(IosText.twitchSeconds(vods.get(0).duration)), "3:02:10");
+        check("Twitch записи: обложка", vods.get(0).urls[0], "https://static-cdn.jtvnw.net/cf_vods/x/thumb/thumb0-880x495.jpg");
+        String twErr;
+        try { IosParse.twitchStreams(new JSONObject("{\"error\":\"Unauthorized\",\"status\":401,\"message\":\"Invalid OAuth token\"}")); twErr = "нет ошибки"; } catch (Exception e) { twErr = e.getMessage(); }
+        check("Twitch: ошибка — текст Twitch", twErr, "Invalid OAuth token");
         List<IosParse.Entry> pop = IosParse.youtubeVideos(sample("youtube-popular.json"));
         check("YouTube: битый ролик пропущен", pop.size(), 2);
         check("YouTube: название", pop.get(0).title, "Обзор телевизора");

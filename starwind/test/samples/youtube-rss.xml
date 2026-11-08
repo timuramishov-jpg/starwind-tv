@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns:yt="http://www.youtube.com/xml/schemas/2015" xmlns:media="http://search.yahoo.com/mrss/" xmlns="http://www.w3.org/2005/Atom">
+ <link rel="self" href="http://www.youtube.com/feeds/videos.xml?channel_id=UCtest"/>
+ <id>yt:channel:test</id>
+ <yt:channelId>test</yt:channelId>
+ <title>Канал Тест</title>
+ <author><name>Канал Тест</name><uri>https://www.youtube.com/channel/UCtest</uri></author>
+ <published>2015-01-01T00:00:00+00:00</published>
+ <entry>
+  <id>yt:video:abcDEF12345</id>
+  <yt:videoId>abcDEF12345</yt:videoId>
+  <yt:channelId>UCtest</yt:channelId>
+  <title>Большой выпуск: Tom &amp; Jerry</title>
+  <link rel="alternate" href="https://www.youtube.com/watch?v=abcDEF12345"/>
+  <author><name>Канал Тест</name><uri>https://www.youtube.com/channel/UCtest</uri></author>
+  <published>2026-11-08T10:00:05+00:00</published>
+  <updated>2026-11-08T11:00:00+00:00</updated>
+  <media:group><media:title>Большой выпуск: Tom &amp; Jerry</media:title><media:thumbnail url="https://i2.ytimg.com/vi/abcDEF12345/hqdefault.jpg" width="480" height="360"/></media:group>
+ </entry>
+ <entry>
+  <id>yt:video:zzz</id>
+  <yt:videoId></yt:videoId>
+  <title>Битая запись</title>
+ </entry>
+ <entry>
+  <id>yt:video:xyz98765432</id>
+  <yt:videoId>xyz98765432</yt:videoId>
+  <title>Второй ролик</title>
+  <author><name>Канал Тест</name></author>
+  <published>2026-11-07T09:00:00+00:00</published>
+ </entry>
+</feed>

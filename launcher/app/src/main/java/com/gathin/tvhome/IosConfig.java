@@ -12,7 +12,7 @@ import android.util.Log;
  */
 public final class IosConfig extends BroadcastReceiver {
     static final String PREFS = "ios_keys";
-    static final String[] KEYS = {"yt_client_id", "yt_client_secret", "yt_api_key", "kino_key"};
+    static final String[] KEYS = {"yt_client_id", "yt_client_secret", "yt_api_key", "kino_key", "twitch_client_id"};
 
     @Override public void onReceive(Context c, Intent i) {
         SharedPreferences.Editor e = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit();

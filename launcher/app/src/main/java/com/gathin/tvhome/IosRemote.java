@@ -110,10 +110,10 @@ final class IosRemote {
     }
 
     /** Состояние для страницы: страна VPN и время таймера сна. */
-    void state(String place, long sleepAt, boolean youtube) {
+    void state(String place, long sleepAt, boolean youtube, String twitch) {
         prefs(context);
         new Thread(() -> {
-            try { write(new File(dir(), "state.json"), new JSONObject().put("place", place).put("sleepAt", sleepAt).put("youtube", youtube).toString()); }
+            try { write(new File(dir(), "state.json"), new JSONObject().put("place", place).put("sleepAt", sleepAt).put("youtube", youtube).put("twitch", twitch).toString()); }
             catch (Exception e) { Log.w(TAG, "state: " + e); }
         }, "remote-state").start();
     }

@@ -15,7 +15,8 @@ import java.util.regex.Pattern;
 final class IosParse {
     /** Одна позиция ленты, как её отдал сервис. */
     static final class Entry {
-        String id = "", title = "", sub = "", duration = "", year = "", rating = "";
+        String id = "", title = "", sub = "", duration = "", year = "", rating = "", login = "";
+        int viewers;
         String[] urls = new String[0];
         long published;
     }
@@ -179,5 +180,84 @@ final class IosParse {
             out.add(e);
         }
         return out;
+    }
+
+    private static final Pattern RSS_ENTRY = Pattern.compile("<entry>(.*?)</entry>", Pattern.DOTALL);
+
+    private static String tag(String xml, String name) {
+        Matcher m = Pattern.compile("<" + name + "(?:\\s[^>]*)?>(.*?)</" + name + ">", Pattern.DOTALL).matcher(xml);
+        return m.find() ? html(m.group(1).trim()) : "";
+    }
+
+    /** RSS канала YouTube (youtube.com/feeds/videos.xml?channel_id=…): 15 последних роликов, без ключа и квоты.
+     *  Длительности в нём нет — её добирают одним запросом videos.list. */
+    static List<Entry> youtubeRss(String xml) {
+        List<Entry> out = new ArrayList<>();
+        if (xml == null) return out;
+        Matcher m = RSS_ENTRY.matcher(xml);
+        while (m.find()) {
+            String e = m.group(1);
+            Entry v = new Entry();
+            v.id = tag(e, "yt:videoId");
+            v.title = tag(e, "title");
+            Matcher a = Pattern.compile("<author>.*?<name>(.*?)</name>", Pattern.DOTALL).matcher(e);
+            v.sub = a.find() ? html(a.group(1).trim()) : "";
+            v.published = IosText.when(tag(e, "published"));
+            if (v.id.isEmpty() || v.title.isEmpty()) continue;
+            v.urls = new String[]{"https://i.ytimg.com/vi/" + v.id + "/sddefault.jpg", "https://i.ytimg.com/vi/" + v.id + "/hqdefault.jpg"};
+            out.add(v);
+        }
+        return out;
+    }
+
+    /** Twitch: кто из подписок сейчас в эфире (helix/streams/followed). Ошибка — текст Twitch. */
+    static List<Entry> twitchStreams(JSONObject r) throws Exception {
+        JSONArray list = r.optJSONArray("data");
+        if (list == null) throw new Exception(twitchError(r));
+        List<Entry> out = new ArrayList<>();
+        for (int i = 0; i < list.length(); i++) {
+            JSONObject v = list.optJSONObject(i);
+            if (v == null || str(v, "user_login").isEmpty()) continue;
+            Entry e = new Entry();
+            e.id = str(v, "id");
+            e.login = str(v, "user_login");
+            e.title = str(v, "title").isEmpty() ? str(v, "user_name") : str(v, "title");
+            e.sub = str(v, "user_name") + (str(v, "game_name").isEmpty() ? "" : " · " + str(v, "game_name"));
+            e.viewers = v.optInt("viewer_count");
+            e.published = IosText.when(str(v, "started_at"));
+            String t = str(v, "thumbnail_url");
+            if (!t.isEmpty()) e.urls = new String[]{t.replace("{width}", "880").replace("{height}", "495")};
+            out.add(e);
+        }
+        return out;
+    }
+
+    /** Twitch: записи эфиров канала (helix/videos). Идущий сейчас эфир без обложки — пропускаем, он и так в ленте. */
+    static List<Entry> twitchVideos(JSONObject r) throws Exception {
+        JSONArray list = r.optJSONArray("data");
+        if (list == null) throw new Exception(twitchError(r));
+        List<Entry> out = new ArrayList<>();
+        for (int i = 0; i < list.length(); i++) {
+            JSONObject v = list.optJSONObject(i);
+            if (v == null || str(v, "id").isEmpty()) continue;
+            String t = str(v, "thumbnail_url");
+            if (t.isEmpty() || t.contains("_404/")) continue;
+            Entry e = new Entry();
+            e.id = str(v, "id");
+            e.login = str(v, "user_login");
+            e.title = str(v, "title");
+            e.sub = str(v, "user_name");
+            e.duration = str(v, "duration");
+            e.viewers = v.optInt("view_count");
+            e.published = IosText.when(str(v, "created_at"));
+            e.urls = new String[]{t.replace("%{width}", "880").replace("%{height}", "495")};
+            out.add(e);
+        }
+        return out;
+    }
+
+    static String twitchError(JSONObject r) {
+        String m = str(r, "message");
+        return m.isEmpty() ? "Пустой ответ Twitch" : m;
     }
 }

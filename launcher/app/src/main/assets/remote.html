@@ -216,6 +216,12 @@ nav button:active{transform:none}
     <div class="tgf" id="tgpass"><input type="password" id="tgp" placeholder="Облачный пароль" autocomplete="current-password"><button onclick="tgPass()">Войти</button></div>
     <button class="r" id="tgout" onclick="tgOut()">Выйти из Telegram на телевизоре</button>
   </div>
+  <h2>Twitch</h2>
+  <div class="card list">
+    <div><span class="name">Twitch<small id="tws">—</small></span><button class="s" id="twb" onclick="go('account',{a:'twitch'})">Войти</button></div>
+    <div class="tgf" id="twkey"><span class="name">Client ID<small>dev.twitch.tv → Your Console → Applications → своё приложение, тип Public</small></span></div>
+    <div class="tgf" id="twkey2"><input type="text" id="twid" placeholder="Client ID" autocomplete="off" autocapitalize="off" spellcheck="false"><button onclick="twKey()">Сохранить</button></div>
+  </div>
   <h2>YouTube</h2>
   <div class="card list">
     <div><span class="name">YouTube<small id="yts">—</small></span><button class="s" id="ytb" onclick="go('account',{a:'youtube'})">Войти</button></div>
@@ -360,6 +366,7 @@ async function state(){try{const s=await call('state');$('anim').checked=!!s.ani
   if(s.typing==='ime'&&fieldMode!=='ime')showField('ime');
   else if(s.typing!=='ime'&&fieldMode==='ime')hideField();
   if(s.tg)tgState(s.tg);
+  if(s.twitch!=null)twState(s.twitch);
   if(s.youtube!=null){$('yts').textContent=s.youtube?'Вошёл — лента подписок':'Не вошёл — показываю популярное';$('ytb').textContent=s.youtube?'Выйти':'Войти'}
   // Таймер идёт: показываем ближайшее значение списка, не меньше оставшегося.
   if(s.sleep!=null){const o=[...$('sleep').options].map(x=>+x.value);setPick('sleep',s.sleep?o.find(v=>v>=s.sleep)||o[o.length-1]:0)}}catch(e){}}
@@ -417,6 +424,12 @@ function tgState(t){const st=t.state||'closed';
   ['tgkey','tgkey2','tgkey3'].forEach(i=>$(i).classList.toggle('on',needKey));
   $('tgpass').classList.toggle('on',st==='password');
   $('tgout').style.display=st==='ready'||st==='novpn'?'':'none'}
+// Twitch: nokey — нужен Client ID (поле), out — вошли бы, in:имя — вошёл.
+function twState(t){const inn=t.indexOf('in:')===0;
+  $('tws').textContent=inn?'Вошёл как '+t.slice(3)+' — лента подписок':t==='nokey'?'Нужен Client ID своего приложения Twitch':'Не вошёл';
+  $('twb').textContent=inn?'Выйти':'Войти';$('twb').style.display=t==='nokey'?'none':'';
+  ['twkey','twkey2'].forEach(i=>$(i).classList.toggle('on',t==='nokey'))}
+async function twKey(){await go('twkey',{id:val('twid').trim()});$('twid').value=''}
 async function tgKey(){const id=val('tgid').trim(),hash=val('tghash').trim();await go('tg',{a:'key',id,hash});$('tghash').value=''}
 async function tgPass(){const p=$('tgp').value;$('tgp').value='';await go('tg',{a:'password',p})}
 async function tgOut(){if(confirm('Выйти из Telegram на телевизоре?'))await go('tg',{a:'logout'})}

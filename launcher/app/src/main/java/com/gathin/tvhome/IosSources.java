@@ -133,7 +133,106 @@ final class IosSources {
         if (!e.duration.isEmpty()) it.duration = f.iso(e.duration);
         return it;
     }
+    /** Подписки: все каналы (список кэшируется на 6 часов) → RSS каждого канала (без квоты) → новое сверху.
+     *  Раньше брали 25 случайных каналов из первых 50 — новые ролики остальных терялись. RSS не ответил — старый способ. */
     List<IosHome.FeedItem> subscriptions() throws Exception {
+        List<String> channels = channels();
+        List<IosParse.Entry> all = new ArrayList<>();
+        java.util.concurrent.ExecutorService rss = java.util.concurrent.Executors.newFixedThreadPool(6);
+        try {
+            List<Callable<List<IosParse.Entry>>> jobs = new ArrayList<>();
+            for (String ch : channels) jobs.add(() -> IosParse.youtubeRss(get("https://www.youtube.com/feeds/videos.xml?channel_id=" + ch)));
+            int ok = 0;
+            for (Future<List<IosParse.Entry>> done : rss.invokeAll(jobs, 40, java.util.concurrent.TimeUnit.SECONDS)) {
+                try { List<IosParse.Entry> got = done.get(); all.addAll(got); if (!got.isEmpty()) ok++; } catch (Exception ignored) { }
+            }
+            Log.i(TAG, "subscriptions: " + channels.size() + " channels, rss answered " + ok + ", videos " + all.size());
+            if (ok < Math.max(1, channels.size() / 3)) throw new Exception("RSS не отвечает (" + ok + " из " + channels.size() + ")");
+        } catch (Exception e) {
+            Log.w(TAG, "rss: " + e + " — беру по-старому");
+            return subscriptionsApi();
+        } finally {
+            rss.shutdownNow();
+        }
+        long month = System.currentTimeMillis() - 30L * 24 * 3600_000L;
+        Collections.sort(all, (a, b) -> Long.compare(b.published, a.published));
+        List<IosHome.FeedItem> out = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (IosParse.Entry e : all) {
+            if (out.size() >= 50) break;
+            if (e.published < month || !seen.add(e.id)) continue;
+            out.add(youtubeItem(e));
+        }
+        if (out.isEmpty()) throw new Exception("Подписки пусты");
+        return withDurations(out);
+    }
+
+    /** Все каналы подписок: постранично (1 единица квоты за страницу), раз в 6 часов. */
+    private List<String> channels() throws Exception {
+        long at = f.prefs.getLong("subs_at", 0);
+        String cached = f.prefs.getString("subs_ids", "");
+        if (!cached.isEmpty() && System.currentTimeMillis() - at < 6 * 3600_000L) return Arrays.asList(cached.split(","));
+        String token = accessToken(), page = "";
+        List<String> ids = new ArrayList<>();
+        for (int i = 0; i < 10; i++) {
+            JSONObject r = f.call("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&maxResults=50"
+                    + (page.isEmpty() ? "" : "&pageToken=" + page), null, token);
+            JSONArray list = r.optJSONArray("items");
+            if (list == null) {
+                if (!cached.isEmpty()) return Arrays.asList(cached.split(","));
+                throw new Exception(IosParse.error(r));
+            }
+            for (int k = 0; k < list.length(); k++)
+                ids.add(list.getJSONObject(k).getJSONObject("snippet").getJSONObject("resourceId").getString("channelId"));
+            page = r.optString("nextPageToken", "");
+            if (page.isEmpty()) break;
+        }
+        if (ids.isEmpty()) throw new Exception("Нет подписок");
+        f.prefs.edit().putString("subs_ids", android.text.TextUtils.join(",", ids)).putLong("subs_at", System.currentTimeMillis()).apply();
+        return ids;
+    }
+
+    static String get(String url) throws Exception {
+        java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+        c.setConnectTimeout(10000);
+        c.setReadTimeout(12000);
+        if (c.getResponseCode() >= 400) throw new Exception("HTTP " + c.getResponseCode());
+        try (java.io.InputStream in = c.getInputStream()) { return new String(IosFeed.read(in), java.nio.charset.StandardCharsets.UTF_8); }
+    }
+
+    /** Длительности одним запросом (1 единица квоты на 50 роликов) и отсев шортсов. Не ответил — повтор, потом как есть. */
+    private List<IosHome.FeedItem> withDurations(List<IosHome.FeedItem> out) {
+        for (int attempt = 0; attempt < 2; attempt++) {
+            try {
+                StringBuilder ids = new StringBuilder();
+                for (IosHome.FeedItem it : out) ids.append(ids.length() == 0 ? "" : ",").append(it.open.getData().getQueryParameter("v"));
+                JSONObject r = f.call("https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=" + ids + "&key=" + f.apiKey, null, null);
+                JSONArray d = r.optJSONArray("items");
+                if (d == null) throw new Exception(IosParse.error(r));
+                Map<String, String> len = new HashMap<>(), names = new HashMap<>();
+                for (int i = 0; i < d.length(); i++) len.put(d.getJSONObject(i).getString("id"), d.getJSONObject(i).getJSONObject("contentDetails").optString("duration"));
+                for (IosHome.FeedItem it : out) names.put(it.open.getData().getQueryParameter("v"), it.title);
+                Set<String> shorts = shortsAmong(len, names);
+                List<IosHome.FeedItem> keep = new ArrayList<>();
+                for (IosHome.FeedItem it : out) {
+                    String id = it.open.getData().getQueryParameter("v");
+                    if (shorts.contains(id) || !len.containsKey(id)) continue;  // нет в ответе — удалён или скрыт
+                    it.duration = f.iso(len.get(id));
+                    keep.add(it);
+                }
+                return keep;
+            } catch (Exception e) {
+                Log.w(TAG, "durations: " + e);
+            }
+        }
+        // Длительностей нет — шортсы не отличить по длине, убираем хотя бы помеченные.
+        List<IosHome.FeedItem> keep = new ArrayList<>();
+        for (IosHome.FeedItem it : out) if (!f.taggedShort(it.title)) keep.add(it);
+        return keep;
+    }
+
+    /** Старый способ — через API: 25 случайных каналов, по 4 последних ролика. */
+    List<IosHome.FeedItem> subscriptionsApi() throws Exception {
         String token = accessToken();
         JSONObject subs = f.call("https://www.googleapis.com/youtube/v3/subscriptions?part=snippet&mine=true&order=relevance&maxResults=50", null, token);
         JSONArray list = subs.optJSONArray("items");

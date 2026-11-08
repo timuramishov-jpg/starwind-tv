@@ -32,7 +32,7 @@ keys() {
   ARGS=$(python3 - "$SECRETS" <<'P'
 import json,sys,shlex
 d=json.load(open(sys.argv[1])); y=d.get("installed",{})
-m={"yt_client_id":y.get("client_id",""),"yt_client_secret":y.get("client_secret",""),"yt_api_key":d.get("api_key",""),"kino_key":d.get("kinopoisk_key","")}
+m={"yt_client_id":y.get("client_id",""),"yt_client_secret":y.get("client_secret",""),"yt_api_key":d.get("api_key",""),"kino_key":d.get("kinopoisk_key",""),"twitch_client_id":d.get("twitch_client_id","")}
 print(" ".join(f"--es {k} {shlex.quote(v)}" for k,v in m.items() if v))
 P
 )

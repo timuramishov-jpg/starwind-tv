@@ -308,11 +308,21 @@ public final class IosShell {
                 out.flush();
                 return;
             }
+            case "twkey": {
+                // Twitch: Client ID своего приложения с dev.twitch.tv — в ключи лаунчера (как tv keys), затем вход кодом на экране.
+                String id = orEmpty(a.get("id"), "").trim().toLowerCase(java.util.Locale.ROOT);
+                if (!id.matches("[a-z0-9]{20,40}")) { json = say("Client ID — 30 латинских букв и цифр с dev.twitch.tv"); break; }
+                sh("am broadcast -n " + PKG + "/.IosConfig --es twitch_client_id " + id);
+                sh("am start -n " + PKG + "/.IosHome --ez twitch_account true");
+                json = say("Ключ на телевизоре — там появится код входа");
+                break;
+            }
             case "account": {
                 // Аккаунты на телевизоре: экран управления открывается на самом телевизоре.
                 String which = orEmpty(a.get("a"), "");
                 if ("yandex".equals(which)) sh("am start -a com.yandex.tv.passport.MANAGE_ACCOUNTS -p com.yandex.tv.services");
                 else if ("youtube".equals(which)) sh("am start -n " + PKG + "/.IosHome --ez youtube_account true");
+                else if ("twitch".equals(which)) sh("am start -n " + PKG + "/.IosHome --ez twitch_account true");
                 json = say("Открываю на телевизоре");
                 break;
             }
@@ -514,7 +524,7 @@ public final class IosShell {
         String mode = sh("settings get global private_dns_mode").trim(), host = sh("settings get global private_dns_specifier").trim();
         long sleepAt = s.optLong("sleepAt");
         return new JSONObject().put("anim", "0.5".equals(anim)).put("dns", "hostname".equals(mode) && IosTools.DNS_HOST.equals(host))
-                .put("vpn", new File("/sys/class/net/tun0").exists()).put("place", s.optString("place")).put("youtube", s.optBoolean("youtube"))
+                .put("vpn", new File("/sys/class/net/tun0").exists()).put("place", s.optString("place")).put("youtube", s.optBoolean("youtube")).put("twitch", s.optString("twitch", "nokey"))
                 .put("typing", typingMode())
                 .put("yt", youTube() != null)
                 .put("tg", new JSONObject(orEmpty(read(DIR + "/tg.json"), "{\"state\":\"closed\"}")))

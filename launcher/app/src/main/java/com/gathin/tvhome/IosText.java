@@ -106,4 +106,45 @@ final class IosText {
         for (String w : PEOPLE) if (t.contains(w)) return true;
         return false;
     }
+
+    /** Длительность с карточки обратно в секунды: 1:54 → 114, 1:02:03 → 3723; не число — 0. */
+    static int clockSeconds(String c) {
+        if (c == null || !c.matches("\\d+(:\\d{1,2}){1,2}")) return 0;
+        int s = 0;
+        for (String p : c.split(":")) s = s * 60 + Integer.parseInt(p);
+        return s;
+    }
+
+    /** Длительность записи Twitch: 1h2m3s → 3723. */
+    static int twitchSeconds(String d) {
+        Matcher m = Pattern.compile("(?:(\\d+)h)?(?:(\\d+)m)?(?:(\\d+)s)?").matcher(d == null ? "" : d);
+        if (d == null || d.isEmpty() || !m.matches()) return 0;
+        int s = 0;
+        for (int k = 1; k <= 3; k++) s = s * 60 + (m.group(k) == null ? 0 : Integer.parseInt(m.group(k)));
+        return s;
+    }
+
+    /** Сколько смотрят эфир: 850 зрителей, 1,2 тыс. зрителей, 15 тыс. зрителей. */
+    static String viewers(int n) {
+        if (n >= 10_000) return n / 1000 + " тыс. зрителей";
+        if (n >= 1000) return String.format(Locale.ROOT, "%.1f", n / 1000.0).replace('.', ',').replace(",0", "") + " тыс. зрителей";
+        int t = n % 100, u = n % 10;
+        return n + (t >= 11 && t <= 14 ? " зрителей" : u == 1 ? " зритель" : u >= 2 && u <= 4 ? " зрителя" : " зрителей");
+    }
+
+    static final long CONTINUE_FOR = 12 * 3600_000L, PEEK = 90_000L;
+    static final int CONTINUE_FROM = 15 * 60;
+
+    /** Держать ли карточку в «Продолжить». Лаунчер не видит, что смотрят внутри YouTube, поэтому судим по времени:
+     *  открыто больше 12 часов назад — нет; короткое видео (меньше 15 минут) — досмотрено, нет; после открытия на главный
+     *  экран вернулись через полторы минуты — передумали, нет; пропадали дольше самого видео (досмотрели или смотрели
+     *  другое) — нет. away — сколько отсутствовали после открытия, -1 — ещё не возвращались. */
+    static boolean keepContinue(long openedAt, long now, long away, int durationSec) {
+        if (now - openedAt > CONTINUE_FOR || now < openedAt) return false;
+        if (durationSec > 0 && durationSec < CONTINUE_FROM) return false;
+        if (away < 0) return true;
+        if (away < PEEK) return false;
+        long limit = durationSec > 0 ? (long) (durationSec * 850L) : 3 * 3600_000L;
+        return away < limit;
+    }
 }

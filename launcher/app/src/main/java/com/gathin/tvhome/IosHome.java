@@ -91,8 +91,11 @@ public class IosHome extends Activity {
             "com.yandex.devices.", "org.chromium", "com.yandex.tv.live", "com.yandex.tv.input"};
     private static final Map<String, int[]> BRAND = new HashMap<>();
     private static final Map<String, Integer> WORD = new HashMap<>();
+    /** Свой цвет сервиса при значке из самого приложения (рисованного логотипа нет): Twitch — фиолетовый. */
+    private static final Map<String, Integer> ACCENT = new HashMap<>();
     private static final int ZONA_PINK = IosPalette.PINK;
     static {
+        ACCENT.put(IosFeed.TWITCH, IosPalette.PURPLE);
         WORD.put("com.yandex.tv.ytplayer", R.drawable.word_youtube);
         WORD.put("com.vk.tv", R.drawable.word_vk);
         WORD.put("su.happ.proxyutility", R.drawable.word_happ);
@@ -288,6 +291,9 @@ public class IosHome extends Activity {
         super.onResume();
         // Сервер пульта живёт отдельно от лаунчера; проверяем, что он запущен, и обновляем для него данные.
         if (remote != null) { remote.ensureShell(); publishRemote(); }
+        // Вернулись домой после открытого видео: сколько отсутствовали — по этому «Продолжить» решает, досмотрено ли.
+        // На каждом возвращении (а не только после onPause): систему могли выгрузить лаунчер, пока шло видео.
+        if (feed != null) feed.returned();
         wake();
         root.setAlpha(1f);
         untrim();
@@ -401,6 +407,16 @@ public class IosHome extends Activity {
         if (intent.getBooleanExtra("youtube_account", false)) {
             intent.removeExtra("youtube_account");
             handler.postDelayed(() -> { if (feed.signedIn()) { feed.signOut(); reload(); note("Вышел из YouTube"); } else startYouTubeSignIn(); }, 300);
+            return;
+        }
+        // Пульт: «Аккаунты → Twitch» — так же.
+        if (intent.getBooleanExtra("twitch_account", false)) {
+            intent.removeExtra("twitch_account");
+            handler.postDelayed(() -> {
+                if (feed.twitch.signedIn()) { feed.twitch.signOut(); reload(); note("Вышел из Twitch"); }
+                else if (!feed.twitch.hasKey()) note(IosTwitch.NEED_KEY);
+                else startTwitchSignIn();
+            }, 300);
             return;
         }
         String q = intent.getStringExtra("search");
@@ -679,7 +695,10 @@ public class IosHome extends Activity {
         if (brand != null) return IosIcons.fromMask(BitmapFactory.decodeResource(getResources(), brand[0]), brand[1]);
         Drawable banner = null;
         try { banner = ri.activityInfo.loadBanner(pm); } catch (RuntimeException ignored) { }
-        return IosIcons.logo(ri.loadIcon(pm), banner);
+        IosIcons.Logo l = IosIcons.logo(ri.loadIcon(pm), banner);
+        Integer accent = ACCENT.get(pkg);
+        // Силуэт — из значка самого приложения, цвет — из палитры.
+        return accent == null ? l : IosIcons.fromMask(l.color, accent);
     }
 
     private void loadApps() {
@@ -743,6 +762,13 @@ public class IosHome extends Activity {
             int at = order.indexOf(HAPP);
             order.add(at < 0 ? order.size() : at + 1, SOTA);
             prefs.edit().putBoolean("sota_placed", true).apply();
+            if (prefs.contains("dock")) store("dock", order);
+        }
+        // Twitch поставили — один раз ставим в док перед Happ (убрал руками — больше не трогаем).
+        if (apps.containsKey(IosFeed.TWITCH) && !order.contains(IosFeed.TWITCH) && !prefs.getBoolean("twitch_placed", false)) {
+            int at = order.indexOf(HAPP);
+            order.add(at < 0 ? order.size() : at, IosFeed.TWITCH);
+            prefs.edit().putBoolean("twitch_placed", true).apply();
             if (prefs.contains("dock")) store("dock", order);
         }
         dock.clear();
@@ -952,7 +978,10 @@ public class IosHome extends Activity {
         appViews.clear();
         appLabels.clear();
         List<App> all = new ArrayList<>(dock);
-        all.addAll(others);
+        // На пульте восемь кнопок: док, потом остальные; менеджер файлов — в самый конец (файлы есть во «Инструментах»).
+        List<App> rest = new ArrayList<>(others);
+        for (App a : others) if (FILES.equals(a.pkg)) { rest.remove(a); rest.add(a); }
+        all.addAll(rest);
         appGrid(all.size() + 1);
         for (int i = 0; i < all.size(); i++) appViews.add(appCard(logoView(all.get(i)), all.get(i).label, i));
         appViews.add(appCard(iconTile(R.drawable.top_clean, CLEAN, this::cleanUp), "Очистить память", appViews.size()));
@@ -961,7 +990,7 @@ public class IosHome extends Activity {
         moveTo(zone, Math.max(0, Math.min(index, views(zone).size() - 1)));
     }
 
-    static final String HAPP = "su.happ.proxyutility", SOTA = "org.interhive.sota.connect";
+    static final String HAPP = "su.happ.proxyutility", SOTA = "org.interhive.sota.connect", FILES = "me.zhanghai.android.files";
     private static final int VPN_H = 280;
 
     boolean vpnOn() {
@@ -977,6 +1006,12 @@ public class IosHome extends Activity {
     private void showFeed(App a) {
         if ("off".equals(feed.mode(a.pkg))) {
             subtitle.setText("Лента выключена: долгое ОК на значке, чтобы включить");
+            addPill("Открыть", a.logo.accent, () -> launch(a));
+            return;
+        }
+        if (IosFeed.TWITCH.equals(a.pkg) && !feed.twitch.signedIn()) {
+            subtitle.setText(feed.twitch.hasKey() ? IosTwitch.NEED_LOGIN : IosTwitch.NEED_KEY);
+            if (feed.twitch.hasKey()) addPill("Войти в Twitch", a.logo.accent, this::startTwitchSignIn);
             addPill("Открыть", a.logo.accent, () -> launch(a));
             return;
         }
@@ -1039,7 +1074,8 @@ public class IosHome extends Activity {
             list.add(e);
         }
         remote.publish(list);
-        remote.state(prefs.getString("vpn_place", ""), IosSleep.at(this), feed.signedIn());
+        remote.state(prefs.getString("vpn_place", ""), IosSleep.at(this), feed.signedIn(),
+                !feed.twitch.hasKey() ? "nokey" : feed.twitch.signedIn() ? "in:" + feed.twitch.login() : "out");
     }
     private IosWeather weather;
 
@@ -1113,6 +1149,17 @@ public class IosHome extends Activity {
     }
 
     void startYouTubeSignIn() {
+        startCodeSignIn("Получаю код от Google", feed::startSignIn, () -> { feed.forget(IosFeed.YOUTUBE); reload(); });
+    }
+
+    void startTwitchSignIn() {
+        startCodeSignIn("Получаю код от Twitch", feed.twitch::startSignIn, () -> { feed.forget(IosFeed.TWITCH); reload(); note("Вошёл в Twitch"); });
+    }
+
+    private interface CodeStart { void start(IosFeed.CodeSink sink); }
+
+    /** Вход кодом (YouTube, Twitch): крупный код по центру и куда его ввести на телефоне. */
+    private void startCodeSignIn(String waiting, CodeStart start, Runnable done) {
         final TextView[] hint = new TextView[1];
         overlay.removeAllViews();
         float w = 820, x = (1920 - w) / 2f, y = 310;
@@ -1128,7 +1175,7 @@ public class IosHome extends Activity {
         code.setText("Подождите");
         code.setSingleLine(true);
         TextView tip = text(IosPalette.BODY, regular, INK_2);
-        tip.setText("Получаю код от Google");
+        tip.setText(waiting);
         tip.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-2, -2);
         lp.topMargin = px(IosPalette.S3);
@@ -1140,15 +1187,14 @@ public class IosHome extends Activity {
         menu.views.clear();
         menu.sides.clear();
         hint[0] = tip;
-        feed.startSignIn(new IosFeed.CodeSink() {
+        start.start(new IosFeed.CodeSink() {
             @Override public void code(String c, String url) {
                 code.setText(c);
-                hint[0].setText("На телефоне открой " + url.replace("https://", "") + ", выбери аккаунт и введи этот код");
+                hint[0].setText("На телефоне открой " + url.replace("https://", "").replace("www.", "") + ", войди и введи этот код");
             }
             @Override public void signedIn() {
                 menu.close();
-                feed.forget(IosFeed.YOUTUBE);
-                reload();
+                done.run();
             }
             @Override public void failed(String error) {
                 code.setText("Не вышло");
