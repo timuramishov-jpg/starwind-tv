@@ -107,8 +107,8 @@ git clone https://github.com/timuramishov-jpg/starwind-tv.git ~/Documents/Claude
 
 ## Шаг 7. Приложения
 
-Док по умолчанию: YouTube (`com.yandex.tv.ytplayer`), ВК, Рутуб, Кинопоиск, Happ (VPN); Telegram встаёт в док сам после
-ввода ключа, Зона — если установлена. Поставить APK с Мака: `tv install файл.apk`, с телефона — пульт → «Инструменты» →
+Док по умолчанию: YouTube (`com.yandex.tv.ytplayer`), ВК, Рутуб, Кинопоиск, Happ (VPN); Зона — если установлена. Telegram — плитка
+в ряду приложений (появляется после ввода ключа). Поставить APK с Мака: `tv install файл.apk`, с телефона — пульт → «Инструменты» →
 «Отправить на телевизор». Магазины: `tv aurora` (Aurora Store) или RuStore.
 
 | Приложение | Зачем | Пакет |

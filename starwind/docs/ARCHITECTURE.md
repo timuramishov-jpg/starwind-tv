@@ -105,7 +105,6 @@
 | `ios_keys` | Ключи сервисов (из `tv keys`) |
 | `tg` (процесс `:tg`) | Ключ Telegram API, позиции просмотра, «недавние» |
 | `files/tg`, `cache/tg` | База и файлы TDLib |
-| `files/tg_feed.json`, `files/tg_channels.json` | Лента Telegram для дока, каналы с видео |
 | `/sdcard/Android/data/com.gathin.tvhome/files/` | Данные для пульта (`remote/`), копия настроек (`backup/`), `crash.txt` |
 
 ## Мак-сторона
