@@ -23,7 +23,6 @@ final class TgSource extends MediaDataSource {
     private final Object lock = new Object();
     private final Runnable wake = () -> { synchronized (lock) { lock.notifyAll(); } };
     private volatile boolean closed;
-    private long requestedFrom = -1;
     /** Кто из потоков плеера сейчас ждёт байты и с какого места: плеер читает в несколько потоков (хвост с
      *  оглавлением и начало одновременно), а TDLib качает файл только с одного места — не дёргаем его туда-сюда. */
     private final java.util.Map<Thread, Long> waiting = new java.util.concurrent.ConcurrentHashMap<>();
@@ -102,19 +101,27 @@ final class TgSource extends MediaDataSource {
         synchronized (knownLock) { knownFrom = knownTo = -1; }
     }
 
-    private long stalledAt = -1, stalledTime;
+    /** TDLib качает кусками по 512 КБ; окно — сколько просим за раз. */
+    private static final long PART = 512L << 10, WINDOW = 24L << 20, EXTEND = 8L << 20;
+    private long winFrom = -1, winTo = -1, stalledAt = -1, stalledTime;
 
-    /** Качать с места, где читает плеер. Если оно далеко от того, откуда уже качаем, — переключаемся.
-     *  Застряли на одном месте дольше 2,5 с — просим именно его: TDLib, докачав диапазон, уходит качать
-     *  начало файла и не возвращается за последний неполный кусок (так ждали хвост с описанием видео минутами). */
+    /** Качать с места, где читает плеер, ограниченным окном. Без предела TDLib раскидывает загрузку по всему файлу
+     *  (в журнале: качает сотни мегабайт середины), а нужные плееру куски — хвост с описанием видео — ждут минутами.
+     *  Застряли на месте дольше 3 с — отменяем и просим заново: зависшие запросы TDLib так сбрасываются. */
     private synchronized void ensureDownloading(long position, long waitedMs) {
         long now = System.currentTimeMillis();
-        boolean stalled = waitedMs > 2500 && (position != stalledAt || now - stalledTime > 8000);
-        if (covered(position) && !stalled) return;
-        if (stalled) { stalledAt = position; stalledTime = now; }
-        // Другой поток ждёт кусок, который сейчас и качается, — пусть докачается (до 4 секунд), потом наша очередь.
-        if (waitedMs < 4000 && !stalled) for (Map.Entry<Thread, Long> w : waiting.entrySet())
-            if (w.getKey() != Thread.currentThread() && covered(w.getValue())) return;
+        boolean inside = position >= winFrom && position < winTo;
+        boolean stalled = inside && waitedMs > 3000 && (position != stalledAt || now - stalledTime > 6000);
+        if (inside && !stalled) return;
+        // Другой поток ждёт кусок из текущего окна — пусть докачается (до 4 секунд), потом наша очередь.
+        if (!stalled && waitedMs < 4000) for (Map.Entry<Thread, Long> w : waiting.entrySet())
+            if (w.getKey() != Thread.currentThread() && w.getValue() >= winFrom && w.getValue() < winTo) return;
+        if (stalled) {
+            stalledAt = position;
+            stalledTime = now;
+            tg.call(new TdApi.CancelDownloadFile(fileId, false), 5_000);
+            Log.i(TAG, "file " + fileId + " stalled at " + position + ", restarting");
+        }
         TdApi.Object f = tg.call(new TdApi.GetFile(fileId), 5_000);
         if (f instanceof TdApi.File && ((TdApi.File) f).local.downloadedSize > KEEP) {
             // Диск не резиновый: накачанное стираем, качаем заново с текущего места.
@@ -123,19 +130,20 @@ final class TgSource extends MediaDataSource {
             closeRaf();
             forgetKnown();
         }
-        // С пределом до конца файла: без него TDLib после конца перескакивает в начало.
-        TdApi.Object d = tg.call(new TdApi.DownloadFile(fileId, 32, position, size - position, false), 10_000);
-        Log.i(TAG, "file " + fileId + " download from " + position + " of " + size + " [" + Thread.currentThread().getName() + "]: " + (d instanceof TdApi.File ? "ok, prefix " + ((TdApi.File) d).local.downloadedPrefixSize + " offset " + ((TdApi.File) d).local.downloadOffset : d));
-        requestedFrom = position;
+        request(position);
     }
 
-    private boolean covered(long position) {
-        return requestedFrom >= 0 && position >= requestedFrom && position - requestedFrom < (8L << 20);
+    private void request(long position) {
+        long off = position - position % PART, lim = Math.min(WINDOW, size - off);
+        TdApi.Object d = tg.call(new TdApi.DownloadFile(fileId, 32, off, lim, false), 10_000);
+        winFrom = off;
+        winTo = off + lim;
+        Log.i(TAG, "file " + fileId + " window " + off + "+" + (lim >> 20) + "MB of " + size + (d instanceof TdApi.File ? "" : ": " + d));
     }
 
-    /** Плеер ушёл дальше — сдвигаем точку, от которой считаем «качаем отсюда». */
+    /** Плеер читает подряд и подходит к концу окна — заранее просим следующее, чтобы не было паузы. */
     private synchronized void ahead(long pos) {
-        if (requestedFrom >= 0 && pos > requestedFrom) requestedFrom = Math.max(requestedFrom, pos - (4L << 20));
+        if (winTo < size && pos >= winFrom && pos < winTo && winTo - pos < EXTEND) request(pos);
     }
 
     private String localPath() {
