@@ -63,6 +63,7 @@ final class IosFeed {
     private static final int POOL = 50, AHEAD = 6, TARGET_W = 880, POSTER_W = 330;
     private static final String TAG = "IosFeed";
     static final String YOUTUBE = "com.yandex.tv.ytplayer", RUTUBE = "ru.rutube.app.tv", VK = "com.vk.tv", KINOPOISK = "ru.kinopoisk.yandex.tv", ZONA = "ru.zonaplayer.app",
+            /** Свой клиент Telegram — плитка в ряду приложений (без ленты и места в доке). */
             TELEGRAM = "com.gathin.tvhome.telegram";
     private final Context context;
     private final SharedPreferences prefs;
@@ -108,7 +109,7 @@ final class IosFeed {
     }
 
     boolean signedIn() { return prefs.contains("refresh"); }
-    static boolean supports(String pkg) { return YOUTUBE.equals(pkg) || RUTUBE.equals(pkg) || VK.equals(pkg) || KINOPOISK.equals(pkg) || ZONA.equals(pkg) || TELEGRAM.equals(pkg); }
+    static boolean supports(String pkg) { return YOUTUBE.equals(pkg) || RUTUBE.equals(pkg) || VK.equals(pkg) || KINOPOISK.equals(pkg) || ZONA.equals(pkg); }
     List<IosHome.FeedItem> cached(String pkg) {
         List<IosHome.FeedItem> l = items.get(pkg);
         return l == null ? new ArrayList<>() : l;
@@ -441,7 +442,7 @@ final class IosFeed {
         SharedPreferences p = c.getSharedPreferences("ios_feed", Context.MODE_PRIVATE);
         String[] best = null;
         long at = 0;
-        for (String pkg : new String[]{YOUTUBE, VK, RUTUBE, KINOPOISK, ZONA, TELEGRAM}) {
+        for (String pkg : new String[]{YOUTUBE, VK, RUTUBE, KINOPOISK, ZONA}) {
             try {
                 JSONArray a = new JSONArray(p.getString("recent_" + pkg, "[]"));
                 if (a.length() == 0) continue;
@@ -449,7 +450,7 @@ final class IosFeed {
                 if (j.optLong("at") <= at) continue;
                 at = j.optLong("at");
                 JSONArray u = j.optJSONArray("urls");
-                String name = pkg.equals(YOUTUBE) ? "YouTube" : pkg.equals(VK) ? "ВК Видео" : pkg.equals(RUTUBE) ? "Рутуб" : pkg.equals(KINOPOISK) ? "Кинопоиск" : pkg.equals(TELEGRAM) ? "Telegram" : "Зона";
+                String name = pkg.equals(YOUTUBE) ? "YouTube" : pkg.equals(VK) ? "ВК Видео" : pkg.equals(RUTUBE) ? "Рутуб" : pkg.equals(KINOPOISK) ? "Кинопоиск" : "Зона";
                 best = new String[]{j.optString("title"), name + " · " + IosText.ago(at, System.currentTimeMillis()), u != null && u.length() > 0 ? u.getString(0) : ""};
             } catch (Exception ignored) { }
         }
@@ -617,7 +618,7 @@ final class IosFeed {
             List<IosHome.FeedItem> out = null;
             String error = null;
             try {
-                out = YOUTUBE.equals(pkg) ? youtube() : RUTUBE.equals(pkg) ? rutubeOwn() : KINOPOISK.equals(pkg) ? kino() : ZONA.equals(pkg) ? zona() : TELEGRAM.equals(pkg) ? telegram() : channel(pkg);
+                out = YOUTUBE.equals(pkg) ? youtube() : RUTUBE.equals(pkg) ? rutubeOwn() : KINOPOISK.equals(pkg) ? kino() : ZONA.equals(pkg) ? zona() : channel(pkg);
             } catch (Exception e) {
                 error = String.valueOf(e.getMessage());
                 Log.w(TAG, pkg + ": " + e);
@@ -639,34 +640,6 @@ final class IosFeed {
                 sink.done(cached(pkg), err);
             });
         });
-    }
-
-    /** Telegram: свежие видео из каналов. Ленту строит процесс :tg (там TDLib) и кладёт файлом; старая — просим обновить. */
-    private List<IosHome.FeedItem> telegram() throws Exception {
-        File f = new File(context.getFilesDir(), TgFeed.FILE);
-        if (!f.exists() || System.currentTimeMillis() - f.lastModified() > 20 * 60_000L)
-            context.sendBroadcast(new Intent().setClassName(context.getPackageName(), TgLocal.class.getName()));
-        List<IosHome.FeedItem> out = new ArrayList<>();
-        if (!f.exists()) return out;
-        JSONArray a;
-        try (FileInputStream in = new FileInputStream(f)) { a = new JSONArray(new String(read(in), StandardCharsets.UTF_8)); }
-        long now = System.currentTimeMillis();
-        for (int i = 0; i < a.length(); i++) {
-            JSONObject j = a.getJSONObject(i);
-            IosHome.FeedItem it = new IosHome.FeedItem();
-            it.title = j.optString("title");
-            it.published = j.optLong("date") * 1000;
-            it.subtitle = j.optString("channel") + " · " + IosText.ago(it.published, now);
-            it.fresh = now - it.published < 24 * 3600_000L;
-            int d = j.optInt("duration");
-            it.duration = d > 0 ? TgActivity.time(d) : null;
-            String img = j.optString("image");
-            it.urls = img.isEmpty() ? null : new String[]{img};
-            it.open = new Intent().setClassName(context.getPackageName(), TgActivity.class.getName())
-                    .putExtra("play_chat", j.optLong("chat")).putExtra("play_msg", j.optLong("msg")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-            out.add(it);
-        }
-        return out;
     }
 
     private List<IosHome.FeedItem> youtube() throws Exception {

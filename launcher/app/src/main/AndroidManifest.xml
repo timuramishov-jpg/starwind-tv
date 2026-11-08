@@ -124,7 +124,6 @@
             android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|uiMode" />
         <receiver android:name=".TgReceiver" android:exported="true" android:permission="android.permission.DUMP" android:process=":tg" />
-        <receiver android:name=".TgLocal" android:exported="false" android:process=":tg" />
         <receiver android:name=".IosSleep" android:exported="false" />
         <!-- Заставки по макетам: выбор в шестерёнке, включает tv deploy (settings screensaver_components). -->
         <service android:name=".IosDream" android:exported="true" android:label="Заставки Starwind"

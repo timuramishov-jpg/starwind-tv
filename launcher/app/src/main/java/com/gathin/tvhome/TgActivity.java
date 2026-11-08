@@ -293,30 +293,13 @@ public final class TgActivity extends Activity {
                     tg.send(new TdApi.GetChat(ids[i]), c -> {
                         if (c instanceof TdApi.Chat) all[at] = (TdApi.Chat) c;
                         if (--left[0] == 0) {
-                            // Только каналы с длинными видео (их находит лента TgFeed); пока не нашла — все каналы.
-                            java.util.Set<Long> video = videoChannels();
                             for (TdApi.Chat ch : all)
-                                if (ch != null && ch.type instanceof TdApi.ChatTypeSupergroup && ((TdApi.ChatTypeSupergroup) ch.type).isChannel
-                                        && (video == null || video.contains(ch.id))) chans.add(ch);
+                                if (ch != null && ch.type instanceof TdApi.ChatTypeSupergroup && ((TdApi.ChatTypeSupergroup) ch.type).isChannel) chans.add(ch);
                             drawHome(cont, chans.subList(0, Math.min(24, chans.size())));
                         }
                     });
                 }
             }));
-    }
-
-    private java.util.Set<Long> videoChannels() {
-        java.io.File f = new java.io.File(getFilesDir(), TgFeed.CHANNELS);
-        if (!f.exists()) return null;
-        try (java.io.FileInputStream in = new java.io.FileInputStream(f)) {
-            byte[] b = new byte[(int) f.length()];
-            int n = 0;
-            while (n < b.length) { int k = in.read(b, n, b.length - n); if (k < 0) break; n += k; }
-            JSONArray a = new JSONArray(new String(b, 0, n, "UTF-8"));
-            java.util.Set<Long> out = new java.util.HashSet<>();
-            for (int i = 0; i < a.length(); i++) out.add(a.getLong(i));
-            return out;
-        } catch (Exception e) { return null; }
     }
 
     private void drawHome(List<Item> cont, List<TdApi.Chat> chans) {
@@ -329,7 +312,7 @@ public final class TgActivity extends Activity {
             y += CARD_H + GAP;
         }
         if (!chans.isEmpty()) {
-            y = section("Каналы с видео", y);
+            y = section("Мои каналы", y);
             for (int i = 0; i < chans.size(); i++) addChannel(chans.get(i), i, y);
             y += ((chans.size() + COLS - 1) / COLS) * (CARD_H + GAP);
         }

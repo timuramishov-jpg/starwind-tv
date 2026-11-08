@@ -57,9 +57,12 @@ public class IosUpdate extends BroadcastReceiver {
                     install(app, download(apk));
                     say = "Скачал версию " + remote + ", подтверди установку на экране";
                 }
+            } catch (java.io.FileNotFoundException e) {
+                // В хранилище ещё нет ни одной сборки (GitHub отвечает 404).
+                say = "На GitHub пока нет сборок — стоит версия " + installed(app);
             } catch (Exception e) {
                 Log.w(TAG, "check: " + e);
-                say = "Не получилось проверить обновление";
+                say = "Не получилось проверить обновление: нет связи с GitHub";
             }
             final String m = say;
             main.post(() -> sink.done(m));

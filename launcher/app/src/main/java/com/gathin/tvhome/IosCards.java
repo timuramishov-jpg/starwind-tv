@@ -52,6 +52,22 @@ final class IosCards {
 
     private static final int NEAR_CARDS = 6;
 
+    /** Лента целиком не строится: рамки, подписи и обложки — только для первых карточек, остальные создаются,
+     *  когда до них долистали. Пересборка ленты со всеми 30–40 карточками и стала полусекундным фризом при листании дока. */
+    private List<IosHome.FeedItem> pending = new ArrayList<>();
+    private int created;
+
+    void start(List<IosHome.FeedItem> items, int upTo) {
+        pending = items;
+        created = 0;
+        ensure(upTo);
+    }
+
+    void ensure(int upTo) {
+        int end = Math.min(upTo, pending.size());
+        while (created < end) { add(pending.get(created), created); created++; }
+    }
+
     void fill(FrameLayout card, IosHome.FeedItem item, boolean breathe) {
         if (card.getChildCount() > 0) return;
         int accent = h.dock.isEmpty() ? h.INK_2 : h.dock.get(h.selected).logo.accent;
@@ -141,6 +157,7 @@ final class IosCards {
 
     /** Обложки и содержимое живут только у карточек рядом с выбранной. */
     void lazy(int at) {
+        ensure(at + NEAR_CARDS + 3);
         List<IosHome.FeedItem> list = new ArrayList<>();
         for (int k = 0; k < h.cardViews.size(); k++) {
             View c = h.cardViews.get(k);

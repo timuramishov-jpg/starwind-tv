@@ -110,8 +110,10 @@ release() {
     -d "Обновления лаунчера Starwind (только APK)" > /dev/null || die "не создалось хранилище tv-home на GitHub"
   CODE=$(( $(git rev-list --count HEAD) + 100 ))
   cp "$APK" "$DIR/tvhome-$CODE.apk"
+  gh release view "v$CODE" -R timuramishov-jpg/tv-home > /dev/null 2>&1 && { rm -f "$DIR/tvhome-$CODE.apk"; say "Сборка v$CODE уже выложена"; return 0; }
   gh release create "v$CODE" "$DIR/tvhome-$CODE.apk" -R timuramishov-jpg/tv-home -t "Лаунчер, сборка $CODE" -n "$(git log -1 --format=%s)" \
     && say "Выложено: v$CODE. На телевизоре: шестерёнка → Обновить лаунчер"
+  rm -f "$DIR/tvhome-$CODE.apk"
 }
 
 # Библиотека Telegram (TDLib из официального репозитория Telegram X, github.com/TGX-Android/tdlib) и libc++ из NDK r23c.
@@ -184,6 +186,8 @@ deploy() {
   # pkill — отдельной командой: иначе он находит своё имя в этой же строке и убивает её оболочку.
   T "pkill -f 'com.gathin.tvhome.IosShel[l]'" > /dev/null; sleep 0.5
   T "A=\$(pm path $PKG | cut -d: -f2); (CLASSPATH=\$A nohup setsid app_process /system/bin com.gathin.tvhome.IosShell </dev/null >/data/local/tmp/iosshell.log 2>&1 &); sleep 1.5" > /dev/null
+  # Та же сборка — в релизы GitHub: «Обновить лаунчер» в меню телевизора видит ровно то, что стоит (RELEASE=0 — не выкладывать).
+  [ "${RELEASE:-1}" = 1 ] && command -v gh > /dev/null && gh auth status > /dev/null 2>&1 && (release > "$DIR/release.log" 2>&1 || true)
   if [ "${QUIET:-0}" = 1 ]; then
     T "cmd package set-home-activity --user 0 $PKG/.IosHome" > /dev/null
     say "РЕЗУЛЬТАТ: готово (тихо, без перехода на главный экран)"

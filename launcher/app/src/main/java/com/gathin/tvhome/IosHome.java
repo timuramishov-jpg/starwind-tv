@@ -692,7 +692,7 @@ public class IosHome extends Activity {
     private void loadApps() {
         apps.clear();
         PackageManager pm = getPackageManager();
-        // Свой клиент Telegram — как отдельный сервис в доке, когда в нём есть ключ (вошли с пульта).
+        // Свой клиент Telegram — плитка в ряду приложений, когда в нём есть ключ (вошли с пульта).
         if (getSharedPreferences("tg", MODE_MULTI_PROCESS).getInt("api_id", 0) != 0) {
             App t = cache.get(IosFeed.TELEGRAM);
             if (t == null) {
@@ -736,15 +736,8 @@ public class IosHome extends Activity {
         else {
             order.addAll(Arrays.asList(DEFAULT_DOCK));
         }
-        // Один раз ставим Telegram в док — между Кинопоиском и Зоной (или в конец).
-        if (apps.containsKey(IosFeed.TELEGRAM) && !prefs.getBoolean("tg_docked", false)) {
-            prefs.edit().putBoolean("tg_docked", true).apply();
-            if (!order.contains(IosFeed.TELEGRAM)) {
-                int at = order.indexOf(IosFeed.KINOPOISK);
-                order.add(at >= 0 ? at + 1 : order.size(), IosFeed.TELEGRAM);
-                if (prefs.contains("dock")) store("dock", order);
-            }
-        }
+        // Telegram — приложение-плеер по ссылкам, в доке его не держим (раньше ставили туда сами).
+        if (order.remove(IosFeed.TELEGRAM) && prefs.contains("dock")) store("dock", order);
         String zona = null;
         if (apps.containsKey("ru.zonaplayer.app")) zona = "ru.zonaplayer.app";
         if (zona != null && !order.contains(zona) && !prefs.getBoolean("zona_placed", false)) {
@@ -996,7 +989,8 @@ public class IosHome extends Activity {
         }
         List<FeedItem> items = feed.cached(a.pkg);
         subtitle.setText("");
-        for (int i = 0; i < items.size(); i++) cards.add(items.get(i), i);
+        Integer was = cardMemory.get(a.pkg);
+        cards.start(items, Math.max(10, (was == null ? 0 : was) + 9));
         if (items.isEmpty()) {
             // Сервис не ответил: говорим об этом, а не показываем пустоту.
             String err = feed.error(a.pkg);
@@ -1228,6 +1222,16 @@ public class IosHome extends Activity {
 
     /** Заголовок и цвет экрана берутся из выбранного в доке сервиса. */
     void showSelected() {
+        long t0 = SystemClock.uptimeMillis();
+        try { showSelectedNow(); }
+        finally {
+            long ms = SystemClock.uptimeMillis() - t0;
+            if (ms > 40) Log.i("IosHome", "showSelected " + ms + " ms, cards " + cardViews.size());
+        }
+    }
+
+    private void showSelectedNow() {
+        cards.start(new ArrayList<>(), 0);
         cardsLayer.removeAllViews();
         cardViews.clear();
         cardLabels.clear();
