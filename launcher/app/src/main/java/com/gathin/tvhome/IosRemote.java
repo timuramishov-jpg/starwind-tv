@@ -111,6 +111,7 @@ final class IosRemote {
 
     /** Состояние для страницы: страна VPN и время таймера сна. */
     void state(String place, long sleepAt, boolean youtube) {
+        prefs(context);
         new Thread(() -> {
             try { write(new File(dir(), "state.json"), new JSONObject().put("place", place).put("sleepAt", sleepAt).put("youtube", youtube).toString()); }
             catch (Exception e) { Log.w(TAG, "state: " + e); }
@@ -153,6 +154,19 @@ final class IosRemote {
                 checking = false;
             }
         }, "remote-shell").start();
+    }
+
+    /** Настройки заставки для пульта: сервер пульта (оболочка) не видит настроек лаунчера, читает этот файл. */
+    static void prefs(android.content.Context c) {
+        new Thread(() -> {
+            try {
+                android.content.SharedPreferences p = c.getSharedPreferences("ios_saver", 0);
+                File d = new File(c.getExternalFilesDir(null), "remote");
+                d.mkdirs();
+                write(new File(d, "prefs.json"), new JSONObject().put("style", p.getInt("style", -1)).put("idle", p.getInt("idle", 5))
+                        .put("styles", new org.json.JSONArray(java.util.Arrays.asList(IosSaver.NAMES))).toString());
+            } catch (Exception e) { Log.w(TAG, "prefs: " + e); }
+        }, "remote-prefs").start();
     }
 
     private static void write(File f, String s) throws Exception {

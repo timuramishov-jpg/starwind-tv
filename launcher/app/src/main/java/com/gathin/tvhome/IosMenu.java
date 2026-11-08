@@ -21,6 +21,10 @@ final class IosMenu {
     /** Пункты и что делает каждый; INFO — строка-сведение, не выбирается. */
     final List<Runnable> acts = new ArrayList<>();
     final List<TextView> views = new ArrayList<>();
+    /** Правая часть строки: переключатель или значение «‹ 30 мин ›»; null — простой пункт. */
+    final List<View> sides = new ArrayList<>();
+    /** Для строк-выборов: что делает стрелка влево (вправо и ОК — это acts). */
+    final List<Runnable> prevs = new ArrayList<>();
     int index;
     /** Что открыто: settings, wifi, search… или пусто. */
     String kind = "";
@@ -57,15 +61,20 @@ final class IosMenu {
         // Высота списка — все строки целиком: иначе окно ужимает список до своей высоты и нижние строки обрезаются.
         window.addView(list, new FrameLayout.LayoutParams(-1, h.px(labels.size() * h.MENU_ROW)));
         panel.addView(window, new LinearLayout.LayoutParams(-1, 0, 1f));
+        sides.clear();
+        prevs.clear();
         for (String l : labels) {
+            FrameLayout row = new FrameLayout(h);
             TextView r = h.text(IosPalette.BODY, h.regular, h.INK);
-            r.setText(l);
             r.setSingleLine(true);
             r.setEllipsize(TextUtils.TruncateAt.END);
             r.setGravity(Gravity.CENTER_VERTICAL);
             r.setPadding(h.px(IosPalette.S3), 0, h.px(IosPalette.S3), 0);
-            list.addView(r, new LinearLayout.LayoutParams(-1, h.px(h.MENU_ROW)));
+            row.addView(r, new FrameLayout.LayoutParams(-1, -1));
+            list.addView(row, new LinearLayout.LayoutParams(-1, h.px(h.MENU_ROW)));
             views.add(r);
+            sides.add(null);
+            setLabel(views.size() - 1, l);
         }
         h.overlay.addView(panel, h.at(1920 - h.MENU_W, 0, h.MENU_W, 1080));
         listView = list;
@@ -95,6 +104,7 @@ final class IosMenu {
             g.setColor(on ? h.ROW_ON : 0x00000000);
             r.setBackground(g);
             r.setTextColor(on ? h.ROW_ON_TEXT : info ? h.INK_2 : h.INK);
+            paintSide(i, on);
         }
     }
 
@@ -105,6 +115,15 @@ final class IosMenu {
             h.search.field.requestFocus();
             return;
         }
+        // Выбор из нескольких значений и переключатели: стрелки ← → меняют значение на месте.
+        if ((key == KeyEvent.KEYCODE_DPAD_LEFT || key == KeyEvent.KEYCODE_DPAD_RIGHT) && index >= 0 && index < sides.size() && sides.get(index) != null) {
+            boolean toggle = sides.get(index) instanceof Switch;
+            Runnable r = key == KeyEvent.KEYCODE_DPAD_RIGHT || toggle ? (index < acts.size() ? acts.get(index) : null)
+                    : (index < prevs.size() ? prevs.get(index) : null);
+            if (toggle && (key == KeyEvent.KEYCODE_DPAD_RIGHT) == ((Switch) sides.get(index)).on) r = null;  // уже в этом положении
+            if (r != null) r.run();
+            return;
+        }
         // Строки-сведения (INFO) не выбираются: курсор их перескакивает.
         int step = key == KeyEvent.KEYCODE_DPAD_UP ? -1 : key == KeyEvent.KEYCODE_DPAD_DOWN ? 1 : 0;
         for (int i = index + step; step != 0 && i >= 0 && i < views.size(); i += step) {
@@ -113,6 +132,92 @@ final class IosMenu {
             break;
         }
         paint();
+    }
+
+    // ---------- Переключатели и выбор значения ----------
+
+    private static final String ON = "\t\u0001", OFF = "\t\u0002";
+
+    /** Пункт «вкл/выкл»: справа рисуется переключатель, как в iOS. */
+    static String toggle(String name, boolean on) { return name + (on ? ON : OFF); }
+
+    /** Пункт с выбором из нескольких значений: справа «‹ значение ›», стрелки ← → листают. */
+    static String choice(String name, String value) { return name + "\t" + value; }
+
+    /** Подпись строки (и её правая часть) — при открытии и когда значение поменялось на месте. */
+    void setLabel(int i, String label) {
+        if (i < 0 || i >= views.size()) return;
+        int tab = label.indexOf('\t');
+        String name = tab < 0 ? label : label.substring(0, tab), value = tab < 0 ? null : label.substring(tab + 1);
+        views.get(i).setText(name);
+        FrameLayout row = (FrameLayout) views.get(i).getParent();
+        View side = sides.get(i);
+        boolean wantSwitch = value != null && (value.equals("\u0001") || value.equals("\u0002"));
+        if (side != null && (value == null || wantSwitch != (side instanceof Switch))) { row.removeView(side); side = null; }
+        if (value != null && side == null) {
+            if (wantSwitch) {
+                side = new Switch(h);
+                row.addView(side, sideParams(Switch.W, Switch.H));
+            } else {
+                TextView v = h.text(IosPalette.BODY, h.regular, h.INK_2);
+                v.setSingleLine(true);
+                v.setGravity(Gravity.CENTER_VERTICAL | Gravity.END);
+                row.addView(v, sideParams(0, 0));
+                side = v;
+            }
+        }
+        sides.set(i, side);
+        if (side instanceof Switch) ((Switch) side).set(value.equals("\u0001"));
+        else if (side instanceof TextView) ((TextView) side).setText("\u2039  " + value + "  \u203A");
+        // Имя не залезает под значение справа.
+        int right = side == null ? h.px(IosPalette.S3) : side instanceof Switch ? h.px(IosPalette.S3 + Switch.W + IosPalette.S3)
+                : h.px(IosPalette.S3 + IosPalette.S3) + Math.round(((TextView) side).getPaint().measureText(((TextView) side).getText().toString()));
+        views.get(i).setPadding(h.px(IosPalette.S3), 0, right, 0);
+        paintSide(i, i == index);
+    }
+
+    private FrameLayout.LayoutParams sideParams(float w, float hh) {
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(w > 0 ? h.px(w) : -2, hh > 0 ? h.px(hh) : -1, Gravity.END | Gravity.CENTER_VERTICAL);
+        lp.rightMargin = h.px(IosPalette.S3);
+        return lp;
+    }
+
+    private void paintSide(int i, boolean on) {
+        View side = i < sides.size() ? sides.get(i) : null;
+        if (side instanceof Switch) ((Switch) side).paint(on);
+        else if (side instanceof TextView) ((TextView) side).setTextColor(on ? h.ROW_ON_TEXT : h.INK_2);
+    }
+
+    /** Переключатель iOS в масштабе телевизора: дорожка-пилюля, белый кружок; включён — зелёный. */
+    private static final class Switch extends View {
+        static final float W = 72, H = 42;
+        boolean on, lit;
+        private final android.graphics.Paint paint = new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        private float knob;  // 0 — слева, 1 — справа
+
+        Switch(android.content.Context c) { super(c); }
+
+        void set(boolean v) {
+            if (on == v && getWidth() > 0) return;
+            boolean first = getWidth() == 0;
+            on = v;
+            if (first) { knob = v ? 1 : 0; invalidate(); return; }
+            android.animation.ValueAnimator a = android.animation.ValueAnimator.ofFloat(knob, v ? 1 : 0);
+            a.setDuration(180);
+            a.addUpdateListener(x -> { knob = (float) x.getAnimatedValue(); invalidate(); });
+            a.start();
+        }
+
+        void paint(boolean focused) { lit = focused; invalidate(); }
+
+        @Override protected void onDraw(android.graphics.Canvas c) {
+            float w = getWidth(), hh = getHeight(), r = hh / 2, pad = hh * 0.08f;
+            paint.setColor(on ? IosPalette.GREEN : lit ? IosPalette.GRAY2 : IosPalette.GRAY4);
+            c.drawRoundRect(0, 0, w, hh, r, r, paint);
+            paint.setColor(IosPalette.INK);
+            float kr = r - pad, cx = r + knob * (w - 2 * r);
+            c.drawCircle(cx, r, kr, paint);
+        }
     }
 
     /** Строка-сведение в меню: показывает значение, но не выбирается. */

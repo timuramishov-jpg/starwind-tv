@@ -27,6 +27,20 @@ public final class IosCommand extends BroadcastReceiver {
                 ClipboardManager cb = (ClipboardManager) c.getSystemService(Context.CLIPBOARD_SERVICE);
                 if (cb != null) cb.setPrimaryClip(ClipData.newPlainText("text", value));
                 break;
+            case "saver":
+                c.startActivity(new Intent(c, IosSaverActivity.class).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK));
+                break;
+            case "saver_style":
+            case "saver_idle":
+                int v = 0;
+                try { v = Integer.parseInt(value); } catch (Exception ignored) { }
+                c.getSharedPreferences("ios_saver", 0).edit().putInt(what.equals("saver_style") ? "style" : "idle", v).apply();
+                IosRemote.prefs(c);
+                break;
+            case "keyboard":
+                // Выбор с пульта: лаунчер после обновления вернёт именно её.
+                c.getSharedPreferences("ios_home_v4", 0).edit().putBoolean("own_keyboard", "1".equals(value)).apply();
+                break;
             default:
                 Log.w("IosCommand", "unknown " + what);
         }

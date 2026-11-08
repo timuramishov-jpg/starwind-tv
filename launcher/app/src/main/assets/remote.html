@@ -88,12 +88,25 @@ svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-l
 .sw::after{content:"";position:absolute;left:2px;top:2px;width:27px;height:27px;border-radius:50%;background:var(--ink);transition:transform .2s}
 .sw:checked{background:var(--green)}.sw:checked::after{transform:translateX(20px)}
 img.shot{display:block;width:100%;border-radius:var(--r-card);margin-top:var(--s3);border:1px solid var(--glass)}
-.file{position:relative;overflow:hidden;flex:1}.file input{position:absolute;inset:0;opacity:0}
+.file{position:relative;overflow:hidden}.file input{position:absolute;inset:0;opacity:0;width:100%}
+/* Выбор из нескольких значений: системный список iPhone (колесо), справа — значение и шеврон. */
+.pick{position:relative;display:flex;align-items:center;flex:none;max-width:55%;color:var(--secondary)}
+.pick select{appearance:none;-webkit-appearance:none;font:inherit;font-size:var(--body);color:inherit;background:var(--gray5);border:0;border-radius:var(--r-row);padding:var(--s2) var(--s6) var(--s2) var(--s3);max-width:100%;text-overflow:ellipsis}
+.pick svg{position:absolute;right:var(--s2);width:16px;height:16px;pointer-events:none}
+.plus{color:var(--blue)}
+.file .name small{white-space:normal}
+#files button{padding:var(--s2) var(--s3);font-size:var(--body)}
+.file progress{position:absolute;left:0;right:0;bottom:0}
+#flist>#files{display:block;padding:0}#flist>#files:empty{display:none}
+.steps{margin:0;padding:0 var(--s4) var(--s3) var(--s6);color:var(--secondary);font-size:var(--body);border-top:0!important;display:none}
+.steps.on{display:block}.steps li{padding:var(--s1) 0}
+/* Над строкой состояния iPhone ничего не проезжает: полоса фона на её высоту. */
+#sb{position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top);background:var(--black);z-index:9}
 progress{width:100%;height:4px;display:none;accent-color:var(--ink)}
 .tgf{display:none!important}.tgf.on{display:flex!important}
 button.wide{width:100%;margin-top:var(--s3);display:flex;align-items:center;justify-content:center;gap:var(--s2);border-radius:var(--r-card);padding:var(--s4)}
-/* Инструменты: три крупные плитки. */
-.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s3)}
+/* Инструменты: четыре крупные плитки, два ряда. */
+.tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s3)}
 .tiles button{background:var(--gray6);color:var(--ink);border-radius:var(--r-card);padding:var(--s4) var(--s2);display:flex;flex-direction:column;align-items:center;gap:var(--s1);font-weight:600}
 .tiles button svg{width:28px;height:28px;margin-bottom:var(--s1)}
 .tiles small{color:var(--secondary);font-weight:400;font-size:var(--footnote)}
@@ -101,26 +114,12 @@ button.wide{width:100%;margin-top:var(--s3);display:flex;align-items:center;just
 svg .fill{fill:currentColor;stroke:none}
 .gap{margin-top:var(--s2)}
 .card .row .file{flex:1}
-/* Экран телевизора на телефоне: всегда «лёжа», на весь экран — даже если телефон держат вертикально.
-   Тапы и свайпы по картинке уходят на телевизор как касания пальцем. */
-.touch{display:none;position:fixed;inset:0;z-index:7;background:var(--black);touch-action:none}
-.touch.on{display:block}
-.stage{position:absolute;left:50%;top:50%;width:100vw;height:100vh;transform:translate(-50%,-50%);display:flex;align-items:center;gap:var(--s3);padding:var(--s3) calc(env(safe-area-inset-right) + var(--s3)) var(--s3) calc(env(safe-area-inset-left) + var(--s3))}
-@media (orientation:portrait){.stage{width:100vh;height:100vw;transform:translate(-50%,-50%) rotate(90deg)}}
-.screen{position:relative;flex:1;height:100%;max-height:calc((100% - 0px));aspect-ratio:16/9;max-width:calc(100% - 64px);border-radius:var(--r-card);overflow:hidden;background:var(--gray6);box-shadow:0 0 0 1px var(--hairline)}
-.screen img{width:100%;height:100%;object-fit:contain;display:block;-webkit-user-drag:none;pointer-events:none}
-.screen i{position:absolute;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;background:var(--glass);box-shadow:0 0 0 2px var(--ink);opacity:0;pointer-events:none;transition:opacity .4s}
-.touch-bar{display:flex;flex-direction:column;gap:var(--s2)}
-.touch-bar button{width:52px;height:52px;padding:0;background:var(--gray6);color:var(--secondary);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600}
-.touch-top{display:flex;align-items:center;justify-content:space-between;color:var(--secondary);font-size:var(--body);gap:var(--s3)}
 /* Снимок и запись: открываются крупно, чтобы сохранить в Фото долгим нажатием или кнопкой «Поделиться». */
+.viewer-top{display:flex;align-items:center;justify-content:space-between;color:var(--secondary);font-size:var(--body);gap:var(--s3)}
 .viewer{display:none;position:fixed;inset:0;z-index:8;background:var(--black);padding:calc(env(safe-area-inset-top) + var(--s3)) var(--s4) calc(env(safe-area-inset-bottom) + var(--s4));flex-direction:column;gap:var(--s4)}
 .viewer.on{display:flex}
 .viewer a.open{color:var(--blue);text-align:center;font-size:var(--headline);text-decoration:none}
 .viewer img,.viewer video{width:100%;border-radius:var(--r-card);-webkit-user-select:auto;user-select:auto;-webkit-touch-callout:default}
-.seg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));background:var(--gray6);border-radius:var(--r-row);padding:3px;margin-top:var(--s1)}
-.seg button{background:none;color:var(--secondary);font-size:var(--body);font-weight:600;padding:var(--s2);border-radius:var(--r-row)}
-.seg button.on{background:var(--gray4);color:var(--ink)}
 
 /* Нижняя панель вкладок, как в приложениях iPhone: стекло поверх GRAY6. */
 nav{position:fixed;left:0;right:0;bottom:0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
@@ -138,6 +137,7 @@ nav button:active{transform:none}
 </style>
 </head>
 <body>
+<div id="sb"></div>
 <div id="glow"></div>
 <h1 id="title">Пульт</h1>
 <!-- На телевизоре открыта клавиатура: печатаем здесь, текст уходит в поле на экране. -->
@@ -172,23 +172,33 @@ nav button:active{transform:none}
 
 <section class="tab" id="tools">
   <div class="tiles">
-    <button onclick="openTouch()"><svg viewBox="0 0 24 24"><path d="M9 11V5a2 2 0 014 0v6"/><path d="M13 9a2 2 0 014 0v4a7 7 0 01-7 7H9a5 5 0 01-4-2l-2-3a2 2 0 013-2l1 1"/></svg><b>Экран</b><small>Нажать пальцем</small></button>
-    <button onclick="shot()"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="3"/><circle cx="12" cy="13" r="3.5"/><path d="M8 6l1.5-2h5L16 6"/></svg><b>Снимок</b><small>В Фото</small></button>
+    <button onclick="shot()"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="3"/><circle cx="12" cy="13" r="3.5"/><path d="M8 6l1.5-2h5L16 6"/></svg><b>Снимок</b><small>Экран телевизора</small></button>
     <button onclick="rec()" id="recb"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5" class="fill"/></svg><b id="recl">Запись</b><small id="recs">Видео экрана</small></button>
+    <button onclick="go('saver',{})"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8"/><path d="M14.5 8.5a3 3 0 11-3 4 2.4 2.4 0 003-4z"/></svg><b>Заставка</b><small>Включить сейчас</small></button>
+    <button onclick="go('free',{})"><svg viewBox="0 0 24 24"><rect x="5" y="5" width="14" height="14" rx="2"/><path d="M9 2v3M15 2v3M9 19v3M15 19v3M2 9h3M2 15h3M19 9h3M19 15h3"/></svg><b>Память</b><small>Освободить</small></button>
   </div>
-  <div id="shotbox"></div>
-  <h2>Отправить на телевизор</h2>
-  <div class="seg" id="fseg"><button class="on" data-d="Download">Загрузки</button><button data-d="Movies">Фильмы</button></div>
-  <div class="card gap"><div class="row"><button class="file s">Файл или фильм<input type="file" onchange="upload(this)"></button><button class="file s">Приложение APK<input type="file" accept=".apk,application/vnd.android.package-archive" onchange="installApk(this)"></button></div><progress id="up" max="1"></progress><progress id="ip" max="1"></progress></div>
-  <div class="card list gap" id="flist"></div>
+  <h2>Файлы на телевизоре</h2>
+  <div class="card list" id="flist">
+    <label class="file"><span class="name">Отправить на телевизор<small>Фильм — в «Фильмы», APK — установлю, остальное — в «Загрузки»</small></span><svg viewBox="0 0 24 24" class="plus"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg><input type="file" onchange="send(this)"><progress id="up" max="1"></progress></label>
+    <div id="files" class="list"></div>
+  </div>
   <h2>Телевизор</h2>
   <div class="card list">
-    <button onclick="sleepNext()"><span class="name">Таймер сна<small id="sleepl">Выключен</small></span><svg viewBox="0 0 24 24" class="muted"><path d="M20 15A8 8 0 019 4a8 8 0 1011 11z"/></svg></button>
+    <label><span class="name">Таймер сна</span><span class="pick"><select id="sleep" onchange="go('sleep',{m:this.value})"><option value="0">Выключен</option><option value="15">15 мин</option><option value="30">30 мин</option><option value="60">1 час</option><option value="90">1,5 часа</option><option value="120">2 часа</option></select><svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg></span></label>
+    <label><span class="name">Заставка</span><span class="pick"><select id="style" onchange="go('saverset',{w:'style',v:this.value})"><option value="-1">По очереди</option></select><svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg></span></label>
+    <label><span class="name">Заставка при простое</span><span class="pick"><select id="idle" onchange="go('saverset',{w:'idle',v:this.value})"><option value="0">Никогда</option><option value="2">Через 2 мин</option><option value="5">Через 5 мин</option><option value="10">Через 10 мин</option><option value="15">Через 15 мин</option><option value="30">Через 30 мин</option></select><svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg></span></label>
+    <label><span class="name">Своя клавиатура<small>Вместо клавиатуры Яндекса</small></span><input type="checkbox" class="sw" id="kbd" onchange="go('keyboard',{on:this.checked?1:0})"></label>
     <label><span class="name">Быстрые анимации<small>Меню и переходы вдвое быстрее</small></span><input type="checkbox" class="sw" id="anim" onchange="tweak('anim',this.checked)"></label>
     <label><span class="name">Блокировка рекламы<small>DNS AdGuard для всех приложений</small></span><input type="checkbox" class="sw" id="dns" onchange="tweak('dns',this.checked)"></label>
     <button onclick="tweak('trim')"><span class="name">Очистить кэш приложений<small>Входы и данные остаются</small></span></button>
     <button onclick="tweak('devsettings')"><span class="name">Доступ к отладке<small>Там же можно отозвать все разрешения</small></span></button>
     <button onclick="if(confirm('Перезагрузить телевизор?'))tweak('reboot')"><span class="name danger">Перезагрузить телевизор</span></button>
+  </div>
+  <h2>Этот телефон</h2>
+  <div class="card list">
+    <label><span class="name">Сразу сохранять в Фото<small>Снимки и записи — без лишних нажатий</small></span><input type="checkbox" class="sw" id="auto" onchange="setAuto(this.checked)"></label>
+    <button onclick="$('how').classList.toggle('on')"><span class="name">Как это работает<small>Один раз создать быструю команду</small></span></button>
+    <ol class="steps" id="how"><li>Открой «Команды» → «+», назови «Starwind в Фото».</li><li>Добавь действие «Получить содержимое URL» — оно возьмёт ссылку из пульта.</li><li>Добавь «Сохранить в фотоальбом». Готово.</li><li>Первый раз iPhone спросит доступ к Фото — разреши.</li></ol>
   </div>
 </section>
 
@@ -226,16 +236,7 @@ nav button:active{transform:none}
   <h2>Встроенные</h2><div class="card list" id="sys"></div>
 </section>
 
-<div class="touch" id="touch">
-  <div class="stage" id="stage">
-    <div class="screen" id="screen"><img id="view" alt="Экран телевизора"><i id="dot"></i></div>
-    <div class="touch-bar"><button data-key="BACK" aria-label="Назад"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg></button>
-      <button data-key="DPAD_CENTER" aria-label="ОК">OK</button>
-      <button onclick="go('home',{})" aria-label="Домой"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg></button>
-      <button onclick="closeTouch()" aria-label="Закрыть"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
-  </div>
-</div>
-<div class="viewer" id="viewer"><div class="touch-top"><span id="viewerHint">Нажми на снимок и удерживай → «Сохранить в Фото»</span><button onclick="$('viewer').classList.remove('on')">Готово</button></div><div id="viewerBody"></div></div>
+<div class="viewer" id="viewer"><div class="viewer-top"><span id="viewerHint">Нажми на снимок и удерживай → «Сохранить в Фото»</span><button onclick="$('viewer').classList.remove('on')">Готово</button></div><div id="viewerBody"></div></div>
 
 <nav id="nav">
   <button class="on" data-t="remote" data-name="Пульт"><svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="4"/><circle cx="12" cy="9" r="2.5"/><path d="M10 15h4M10 18h4"/></svg>Пульт</button>
@@ -286,8 +287,6 @@ fetch(url('apps')).then(r=>r.json()).then(l=>{l.slice(0,8).forEach(x=>{
   b.onclick=()=>{lastAccent=x.accent||lastAccent;glow(lastAccent);document.querySelectorAll('.app').forEach(a=>a.classList.toggle('lit',a===b));go('app',{p:x.pkg})};
   $('dock').appendChild(b)})});
 
-let sleepLeft=0;
-function sleepNext(){const m=sleepLeft===0?30:sleepLeft<=30?60:sleepLeft<=60?90:0;sleepLeft=m;$('sleepl').textContent=m?'Через '+m+' мин':'Выключен';go('sleep',{m})}
 
 async function loadApps(){
   let l;try{l=await call('pkgs')}catch(e){toast('Телевизор не ответил');return}
@@ -312,22 +311,21 @@ function sendFile(path,file,bar,done){
   x.upload.onprogress=e=>{if(e.lengthComputable)bar.value=e.loaded/e.total};
   x.onload=()=>{bar.style.display='none';try{toast(JSON.parse(x.responseText).say||'Готово')}catch(e){toast('Готово')}done&&done()};
   x.onerror=()=>{bar.style.display='none';toast('Телевизор не ответил')};x.send(file)}
-function installApk(i){const f=i.files[0];if(!f)return;toast('Ставлю '+f.name);sendFile(url('install'),f,$('ip'),loadApps);i.value=''}
-
-let dir='Download';
-document.querySelectorAll('#fseg button').forEach(b=>b.onclick=()=>{dir=b.dataset.d;document.querySelectorAll('#fseg button').forEach(x=>x.classList.toggle('on',x===b));loadFiles()});
+// Один способ отправить файл: телевизор сам решает, куда его положить.
+const VIDEO=/\.(mp4|mkv|avi|mov|m4v|webm|ts|mpg|mpeg|wmv|flv)$/i;
+function send(i){const f=i.files[0];i.value='';if(!f)return;
+  if(/\.apk$/i.test(f.name)){toast('Ставлю '+f.name);sendFile(url('install'),f,$('up'),loadFiles);return}
+  const d=VIDEO.test(f.name)?'Movies':'Download';toast((d==='Movies'?'В «Фильмы»: ':'В «Загрузки»: ')+f.name);
+  sendFile(url('upload',{d,n:f.name}),f,$('up'),loadFiles)}
 async function loadFiles(){
-  let l;try{l=await call('files',{d:dir})}catch(e){toast('Телевизор не ответил');return}
-  const box=$('flist');box.innerHTML='';
-  if(l.say){toast(l.say);return}
-  if(!l.length)box.innerHTML='<div><span class="name tag">Пусто</span></div>';
+  let l=[];try{for(const d of ['Movies','Download']){const x=await call('files',{d});if(Array.isArray(x))x.forEach(f=>{f.d=d;l.push(f)})}}catch(e){toast('Телевизор не ответил');return}
+  const box=$('files');box.innerHTML='';
   l.forEach(f=>{const r=document.createElement('div');
-    r.innerHTML='<span class=name>'+esc(f.name)+'<small>'+mb(Math.max(1,Math.round(f.size/1048576)))+'</small></span>';
-    const a=document.createElement('a');a.href=url('get',{d:dir,n:f.name});a.download=f.name;a.textContent='Скачать';
+    r.innerHTML='<span class=name>'+esc(f.name)+'<small>'+(f.d==='Movies'?'Фильмы':'Загрузки')+' · '+mb(Math.max(1,Math.round(f.size/1048576)))+'</small></span>';
+    if(VIDEO.test(f.name)){const p=document.createElement('button');p.className='s';p.textContent='Смотреть';p.onclick=()=>go('play',{d:f.d,n:f.name});r.append(p)}
     const del=document.createElement('button');del.className='r';del.textContent='Удалить';
-    del.onclick=async()=>{if(confirm('Удалить '+f.name+'?')){await go('rm',{d:dir,n:f.name});loadFiles()}};
-    r.append(a,del);box.appendChild(r)})}
-function upload(i){const f=i.files[0];if(!f)return;sendFile(url('upload',{d:dir,n:f.name}),f,$('up'),loadFiles);i.value=''}
+    del.onclick=async()=>{if(confirm('Удалить '+f.name+'?')){await go('rm',{d:f.d,n:f.name});loadFiles()}};
+    r.append(del);box.appendChild(r)})}
 
 async function stats(){
   if(!$('status').classList.contains('on'))return;
@@ -345,7 +343,13 @@ async function topApps(){
     l.forEach(x=>{const r=document.createElement('div');r.innerHTML='<span class=name>'+esc(x.label)+'<small>'+esc(x.pkg)+'</small></span><span class=tag>'+x.mb+' МБ</span>';box.appendChild(r)})}}catch(e){}
   setTimeout(topApps,12000)}
 async function tweak(w,on){await go('tweak',{w,v:on?1:0});state()}
-async function state(){try{const s=await call('state');$('anim').checked=!!s.anim;$('dns').checked=!!s.dns;
+// Значение в списке не трогаем, пока его листают.
+function setPick(i,v){const e=$(i);if(document.activeElement!==e&&v!=null)e.value=String(v)}
+let styles=0;
+async function state(){try{const s=await call('state');$('anim').checked=!!s.anim;$('dns').checked=!!s.dns;$('kbd').checked=!!s.keyboard;
+  if(s.saver&&s.saver.styles&&styles!==s.saver.styles.length){styles=s.saver.styles.length;
+    $('style').innerHTML='<option value="-1">По очереди</option>'+s.saver.styles.map((n,i)=>'<option value="'+i+'">'+esc(n)+'</option>').join('')}
+  if(s.saver){setPick('style',s.saver.style);setPick('idle',s.saver.idle)}
   if(s.vpn!=null){$('vpn').checked=!!s.vpn;$('vpnl').textContent=s.vpn?(s.place||'Включён'):'Выключен'}
   onYouTube=!!s.yt;
   // Поле ввода появляется само, когда на телевизоре открыта клавиатура (любое приложение), и прячется, когда закрыта.
@@ -353,9 +357,16 @@ async function state(){try{const s=await call('state');$('anim').checked=!!s.ani
   else if(s.typing!=='ime'&&fieldMode==='ime')hideField();
   if(s.tg)tgState(s.tg);
   if(s.youtube!=null){$('yts').textContent=s.youtube?'Вошёл — лента подписок':'Не вошёл — показываю популярное';$('ytb').textContent=s.youtube?'Выйти':'Войти'}
-  if(s.sleep!=null){sleepLeft=s.sleep;$('sleepl').textContent=s.sleep?'Через '+s.sleep+' мин':'Выключен'}}catch(e){}}
-// Снимок экрана — крупно, долгое нажатие сохраняет его в Фото.
-function shot(){toast('Снимаю экран');const img=new Image();img.alt='Снимок экрана телевизора';
+  // Таймер идёт: показываем ближайшее значение списка, не меньше оставшегося.
+  if(s.sleep!=null){const o=[...$('sleep').options].map(x=>+x.value);setPick('sleep',s.sleep?o.find(v=>v>=s.sleep)||o[o.length-1]:0)}}catch(e){}}
+// Сохранение в Фото: веб-страница сама писать в Фото не может — это делает быстрая команда «Starwind в Фото»,
+// ей уходит ссылка на снимок или запись. Без команды — снимок открывается крупно, сохранить долгим нажатием.
+let auto=false;try{auto=localStorage.getItem('auto')==='1'}catch(e){}
+$('auto').checked=auto;
+function setAuto(on){auto=on;try{localStorage.setItem('auto',on?'1':'0')}catch(e){}if(on)$('how').classList.add('on')}
+function toPhotos(w){location.href='shortcuts://run-shortcut?name='+encodeURIComponent('Starwind в Фото')+'&input=text&text='+encodeURIComponent(location.origin+url(w,{t:Date.now()}))}
+function shot(){if(auto){toast('Снимаю — сохраню в Фото');toPhotos('shot');return}
+  toast('Снимаю экран');const img=new Image();img.alt='Снимок экрана телевизора';
   img.onload=()=>{$('viewerHint').textContent='Нажми на снимок и удерживай → «Сохранить в Фото»';$('viewerBody').innerHTML='';$('viewerBody').appendChild(img);$('viewer').classList.add('on')};
   img.onerror=()=>toast('Не получилось снять экран');img.src=url('shot',{t:Date.now()})}
 function openLink(){const u=val('u');if(!u){toast('Вставь ссылку');return}go('open',{u});$('u').value=''}
@@ -366,8 +377,9 @@ async function recState(){try{const r=await call('rec',{a:'state'});recOn=!!r.on
 function paintRec(){$('recb').classList.toggle('live',recOn);$('recl').textContent=recOn?'Стоп':'Запись';
   $('recs').textContent=recOn?(recFrom?Math.round((Date.now()-recFrom)/1000)+' с':'Идёт запись'):'Видео экрана'}
 async function rec(){
-  if(!recOn){await go('rec',{a:'start'});recOn=true;recFrom=Date.now();paintRec();clearInterval(recTimer);recTimer=setInterval(()=>{paintRec();if(Date.now()-recFrom>180000){recOn=false;clearInterval(recTimer);paintRec();showRec()}},1000);return}
-  clearInterval(recTimer);recOn=false;paintRec();const r=await go('rec',{a:'stop'});if(r&&r.ready)showRec()}
+  if(!recOn){await go('rec',{a:'start'});recOn=true;recFrom=Date.now();paintRec();clearInterval(recTimer);recTimer=setInterval(()=>{paintRec();if(Date.now()-recFrom>180000){recOn=false;clearInterval(recTimer);paintRec();auto?toPhotos('video'):showRec()}},1000);return}
+  clearInterval(recTimer);recOn=false;paintRec();const r=await go('rec',{a:'stop'});
+  if(r&&r.ready){if(auto)toPhotos('video');else showRec()}else if(r)toast('Запись не получилась')}
 function showRec(){$('viewerHint').textContent='Открой видео отдельно → «Поделиться» → «Сохранить видео»';
   const v=document.createElement('video');v.controls=true;v.playsInline=true;v.src=url('video',{t:Date.now()});
   const a=document.createElement('a');a.href=url('video',{t:Date.now()});a.target='_blank';a.textContent='Открыть видео отдельно';a.className='open';
@@ -405,26 +417,6 @@ function tgState(t){const st=t.state||'closed';
 async function tgKey(){const id=val('tgid').trim(),hash=val('tghash').trim();await go('tg',{a:'key',id,hash});$('tghash').value=''}
 async function tgPass(){const p=$('tgp').value;$('tgp').value='';await go('tg',{a:'password',p})}
 async function tgOut(){if(confirm('Выйти из Telegram на телевизоре?'))await go('tg',{a:'logout'})}
-// Экран телевизора: картинка обновляется сама, пока открыта (следующий кадр — после загрузки предыдущего).
-let touchOn=false,frameUrl='';
-async function frame(){if(!touchOn)return;try{const r=await fetch(url('view',{t:Date.now()}));const b=await r.blob();
-  const u=URL.createObjectURL(b);$('view').src=u;if(frameUrl)URL.revokeObjectURL(frameUrl);frameUrl=u}catch(e){}
-  setTimeout(frame,400)}
-function openTouch(){touchOn=true;$('touch').classList.add('on');frame();try{document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()}catch(e){}}
-function closeTouch(){touchOn=false;$('touch').classList.remove('on');try{document.fullscreenElement&&document.exitFullscreen()}catch(e){}}
-let t0=null;
-// В вертикальном положении телефона экран повёрнут на 90°: пересчитываем касание в координаты картинки.
-function pos(e){const sc=$('screen'),r=sc.getBoundingClientRect(),p=e.changedTouches?e.changedTouches[0]:e;
-  const rot=matchMedia('(orientation:portrait)').matches;
-  const x=rot?(p.clientY-r.top)/r.height:(p.clientX-r.left)/r.width, y=rot?1-(p.clientX-r.left)/r.width:(p.clientY-r.top)/r.height;
-  return {x,y,px:x*sc.offsetWidth,py:y*sc.offsetHeight}}
-function dot(p){const d=$('dot');d.style.left=p.px+'px';d.style.top=p.py+'px';d.style.transition='none';d.style.opacity=1;
-  requestAnimationFrame(()=>{d.style.transition='';d.style.opacity=0})}
-$('screen').addEventListener('pointerdown',e=>{t0=pos(e)});
-$('screen').addEventListener('pointerup',e=>{if(!t0)return;const p=pos(e);dot(p);
-  const moved=Math.hypot(p.px-t0.px,p.py-t0.py)>16;
-  call('tap',moved?{x:t0.x.toFixed(4),y:t0.y.toFixed(4),x2:p.x.toFixed(4),y2:p.y.toFixed(4)}:{x:p.x.toFixed(4),y:p.y.toFixed(4)}).catch(()=>{});
-  if(navigator.vibrate)navigator.vibrate(10);t0=null});
 state();setInterval(state,2000);
 </script>
 </body>

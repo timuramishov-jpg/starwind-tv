@@ -1152,6 +1152,7 @@ public class IosHome extends Activity {
         overlay.setVisibility(View.VISIBLE);
         menu.acts.clear();
         menu.views.clear();
+        menu.sides.clear();
         hint[0] = tip;
         feed.startSignIn(new IosFeed.CodeSink() {
             @Override public void code(String c, String url) {

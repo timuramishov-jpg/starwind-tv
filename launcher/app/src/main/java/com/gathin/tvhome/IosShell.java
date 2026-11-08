@@ -194,6 +194,39 @@ public final class IosShell {
                 json = say(on ? "Включаю VPN" : "Выключаю VPN");
                 break;
             }
+            case "saver": command("saver", ""); json = say("Включаю заставку"); break;
+            case "saverset": {
+                String v = orEmpty(a.get("v"), "0");
+                if (!v.matches("-?\\d{1,3}")) { json = say("Не понял"); break; }
+                command("idle".equals(a.get("w")) ? "saver_idle" : "saver_style", v);
+                json = "{}";
+                break;
+            }
+            case "keyboard": {
+                boolean own = "1".equals(a.get("on"));
+                sh("ime enable " + PKG + "/.IosKeyboard; ime set " + (own ? PKG + "/.IosKeyboard"
+                        : "ru.yandex.androidkeyboard.tv/ru.yandex.androidkeyboard.TvYandexKeyboardService"));
+                command("keyboard", own ? "1" : "0");
+                json = say(own ? "Клавиатура Starwind" : "Клавиатура Яндекса");
+                break;
+            }
+            case "free": {
+                long before = memAvailable();
+                sh("am kill-all");
+                Thread.sleep(1500);
+                long freed = Math.max(0, memAvailable() - before);
+                json = say(freed > 10 ? "Освободил " + freed + " МБ памяти" : "Память уже свободна");
+                break;
+            }
+            case "play": {
+                // Фильм из «Загрузок» или «Фильмов» — сразу на экран, в плеере телевизора.
+                String n = orEmpty(a.get("n"), "");
+                File f = new File(folder(a.get("d")), n);
+                if (n.isEmpty() || n.contains("/") || !f.isFile()) { json = say("Нет такого файла"); break; }
+                sh("am start -a android.intent.action.VIEW -d " + quote("file://" + f.getPath()) + " -t video/*");
+                json = say("Включаю на телевизоре");
+                break;
+            }
             case "sleep": command("sleep", a.get("m")); json = say("0".equals(a.get("m")) ? "Таймер сна выключен" : "Выключу через " + a.get("m") + " мин"); break;
             case "stats": json = stats(); break;
             case "top": json = top(); break;
@@ -234,7 +267,7 @@ public final class IosShell {
                     sh("pkill -INT -f 'screenrec[o]rd'");
                     Thread.sleep(1200);
                     json = new JSONObject().put("say", "Запись готова").put("ready", new File(REC).length() > 0).toString();
-                } else json = new JSONObject().put("on", sh("pgrep -f 'screenrec[o]rd'").trim().length() > 0)
+                } else json = new JSONObject().put("on", recording())
                         .put("ready", new File(REC).length() > 0).toString();
                 break;
             }
@@ -530,6 +563,8 @@ public final class IosShell {
                 .put("typing", typingMode())
                 .put("yt", youTube() != null)
                 .put("tg", new JSONObject(orEmpty(read(DIR + "/tg.json"), "{\"state\":\"closed\"}")).put("tgx", tgxInstalled()))
+                .put("keyboard", sh("settings get secure default_input_method").trim().startsWith(PKG))
+                .put("saver", new JSONObject(orEmpty(read(DIR + "/prefs.json"), "{}")))
                 .put("sleep", sleepAt <= System.currentTimeMillis() ? 0 : (sleepAt - System.currentTimeMillis() + 59_999) / 60000).toString();
     }
 
@@ -574,6 +609,16 @@ public final class IosShell {
     }
 
     // ---------- Файлы ----------
+
+    private static boolean recording() throws Exception {
+        return sh("pgrep -f 'screenrec[o]rd' >/dev/null && echo yes").trim().equals("yes");
+    }
+
+    private static long memAvailable() throws Exception {
+        for (String l : read("/proc/meminfo").split("\n"))
+            if (l.startsWith("MemAvailable:")) return Long.parseLong(l.replaceAll("\\D+", "")) / 1024;
+        return 0;
+    }
 
     private static File folder(String d) { return new File("Movies".equals(d) ? "/sdcard/Movies" : "/sdcard/Download"); }
 

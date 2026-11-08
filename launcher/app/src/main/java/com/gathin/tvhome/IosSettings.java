@@ -17,43 +17,52 @@ final class IosSettings {
 
     private Runnable keep(Runnable r) { return new IosHome.Keep(r); }
 
+    /** Стрелка влево для строк-выборов, по порядку пунктов (null — у строки нет выбора). */
+    private final List<Runnable> prevs = new ArrayList<>();
+
+    /** Значения таймера сна, заставки при простое: по стрелкам ← → в обе стороны. */
+    static final int[] SLEEP = {0, 15, 30, 60, 90, 120}, IDLE = {0, 2, 5, 10, 15, 30};
+
+    static int step(int[] values, int now, int by) {
+        int at = 0;
+        for (int i = 0; i < values.length; i++) if (values[i] <= now) at = i;
+        return values[Math.max(0, Math.min(values.length - 1, at + by))];
+    }
+
+    private void add(List<String> labels, List<Runnable> actions, String label, Runnable act, Runnable prev) {
+        while (prevs.size() < labels.size()) prevs.add(null);
+        labels.add(label);
+        actions.add(act);
+        prevs.add(prev);
+    }
+
     /** Настройки лаунчера. Системные экраны прошивки — только в отдельном пункте «Системные настройки». */
     private void settingsItems(List<String> labels, List<Runnable> actions) {
         labels.add("Wi-Fi и интернет");
         actions.add(this::showWifi);
         long sleepAt = IosSleep.at(h), left = sleepAt == 0 ? 0 : (sleepAt - System.currentTimeMillis() + 59_999) / 60000;
-        labels.add(sleepAt == 0 ? "Таймер сна: выключен" : "Таймер сна: через " + left + " мин");
-        actions.add(keep(() -> {
-            // Каждое нажатие — следующий шаг: 30, 60, 90 минут, выключить.
-            long step = left == 0 ? 30 : left <= 30 ? 60 : left <= 60 ? 90 : 0;
-            IosSleep.schedule(h, step);
-            refreshSettings();
-        }));
+        add(labels, actions, IosMenu.choice("Таймер сна", left == 0 ? "выключен" : "через " + left + " мин"),
+                keep(() -> { IosSleep.schedule(h, step(SLEEP, (int) left, 1)); refreshSettings(); }),
+                keep(() -> { IosSleep.schedule(h, left > 0 && left < SLEEP[1] ? 0 : step(SLEEP, (int) left, -1)); refreshSettings(); }));
         SharedPreferences saverPrefs = h.getSharedPreferences("ios_saver", 0);
         int saverPick = saverPrefs.getInt("style", -1);
-        labels.add("Заставка: " + (saverPick < 0 ? "по очереди" : IosSaver.NAMES[saverPick]));
-        actions.add(keep(() -> {
-            int next = saverPick + 1 >= IosSaver.NAMES.length ? -1 : saverPick + 1;
-            saverPrefs.edit().putInt("style", next).apply();
-            refreshSettings();
-        }));
+        add(labels, actions, IosMenu.choice("Заставка", saverPick < 0 ? "по очереди" : IosSaver.NAMES[saverPick]),
+                keep(() -> { saverPrefs.edit().putInt("style", saverPick + 1 >= IosSaver.NAMES.length ? -1 : saverPick + 1).apply(); refreshSettings(); }),
+                keep(() -> { saverPrefs.edit().putInt("style", saverPick < 0 ? IosSaver.NAMES.length - 1 : saverPick - 1).apply(); refreshSettings(); }));
         int idle = saverPrefs.getInt("idle", 5);
-        labels.add("Заставка при простое: " + (idle == 0 ? "никогда" : "через " + idle + " мин"));
-        actions.add(keep(() -> {
-            int next = idle == 2 ? 5 : idle == 5 ? 10 : idle == 10 ? 15 : idle == 15 ? 0 : 2;
-            saverPrefs.edit().putInt("idle", next).apply();
-            refreshSettings();
-        }));
+        add(labels, actions, IosMenu.choice("Заставка при простое", idle == 0 ? "никогда" : "через " + idle + " мин"),
+                keep(() -> { saverPrefs.edit().putInt("idle", step(IDLE, idle, 1)).apply(); refreshSettings(); }),
+                keep(() -> { saverPrefs.edit().putInt("idle", step(IDLE, idle, -1)).apply(); refreshSettings(); }));
         labels.add("Показать заставку");
         actions.add(() -> h.startActivity(new Intent(h, IosSaverActivity.class)
                 .putExtra("style", saverPick < 0 ? 0 : saverPick)));
         boolean ads = IosTools.adsBlocked(h), fast = IosTools.fastAnim(h);
-        labels.add("Блокировка рекламы: " + (ads ? "включена" : "выключена"));
+        labels.add(IosMenu.toggle("Блокировка рекламы", ads));
         actions.add(keep(() -> tweak("dns", !ads)));
-        labels.add("Быстрые анимации: " + (fast ? "включены" : "выключены"));
+        labels.add(IosMenu.toggle("Быстрые анимации", fast));
         actions.add(keep(() -> tweak("anim", !fast)));
         boolean ownKeys = String.valueOf(Settings.Secure.getString(h.getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD)).startsWith(h.getPackageName());
-        labels.add("Клавиатура: " + (ownKeys ? "Starwind" : "Яндекс"));
+        labels.add(IosMenu.toggle("Своя клавиатура вместо Яндекса", ownKeys));
         actions.add(keep(() -> new Thread(() -> {
             // Выбор запоминаем: обновление лаунчера сбрасывает клавиатуру на Яндекс, лаунчер вернёт выбранную.
             h.prefs.edit().putBoolean("own_keyboard", !ownKeys).apply();
@@ -100,21 +109,27 @@ final class IosSettings {
     void show() {
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
+        prevs.clear();
         settingsItems(labels, actions);
         h.menu.show("Настройки", labels, actions);
+        h.menu.prevs.addAll(prevs);
         h.menu.kind = "settings";
     }
 
     /** Переключатель сработал: подписи меняются на месте, меню не переоткрывается. */
     private void refreshSettings() {
+        IosRemote.prefs(h);
         if (!h.overlayOpen() || !"settings".equals(h.menu.kind)) return;
         List<String> labels = new ArrayList<>();
         List<Runnable> actions = new ArrayList<>();
+        prevs.clear();
         settingsItems(labels, actions);
         if (labels.size() != h.menu.views.size()) { int at = h.menu.index; show(); h.menu.index = Math.min(at, h.menu.views.size() - 1); h.menu.paint(); return; }
-        for (int i = 0; i < labels.size(); i++) h.menu.views.get(i).setText(labels.get(i));
         h.menu.acts.clear();
         h.menu.acts.addAll(actions);
+        h.menu.prevs.clear();
+        h.menu.prevs.addAll(prevs);
+        for (int i = 0; i < labels.size(); i++) h.menu.setLabel(i, labels.get(i));
     }
 
     /** Экраны прошивки собраны в одном месте и так и названы: всё остальное — в стиле лаунчера. */
