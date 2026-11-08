@@ -162,7 +162,6 @@ public class IosHome extends Activity {
     static final int MENU_W = 620, MENU_ROW = 78, POSTER_W = 330;
     private final Map<String, Integer> cardMemory = new HashMap<>();
     private final List<ObjectAnimator> drift = new ArrayList<>();
-    private ImageView glow;
     private ConnectivityManager.NetworkCallback vpnWatch;
     private boolean dirty = true, lastVpn, wasAway;
     private int ticks;
@@ -173,7 +172,8 @@ public class IosHome extends Activity {
     static final float LABEL_REST = 0.66f, LABEL_DIM = 0.55f;
     IosFeed feed;
     final Map<String, String> feedShown = new HashMap<>();
-    private ImageView washA, washB, spot;
+    private ImageView washA, spot;
+    private ValueAnimator washTint;
     private int washNow;
     private float s;
     private int screenW;
@@ -181,7 +181,7 @@ public class IosHome extends Activity {
     IosArt pics;
     int zone = DOCK, index = 0, selected = 0;
     private float scroll = 0;
-    private boolean moving, washOnA, okDown, okLong;
+    private boolean moving, okDown, okLong;
     private long okDownAt;
     View focused;
     /** Что открыто в боковой панели: settings, wifi, search или пусто. */
@@ -236,23 +236,17 @@ public class IosHome extends Activity {
         root.setBackgroundColor(GROUND);
         root.setClipChildren(false);
         setContentView(root);
+        // Свет сервиса — один слой: цвет меняется плавной перекраской, а не сменой двух слоёв. Видеочип телевизора
+        // не тянет несколько полупрозрачных слоёв во весь экран — так кадр рисуется заметно быстрее.
         washA = wash();
-        washB = wash();
         addScrims();
         spot = spotView();
-        glow = wash();
-        glow.setTranslationX(px(120));
-        glow.setTranslationY(px(180));
-        // Без аппаратных слоёв: каждый — полноэкранная текстура на 8–9 МБ видеопамяти, а рисовать 256-точечный
-        // градиент заново дешевле. Четыре слоя стоили лаунчеру треть его памяти.
-        for (ImageView v : new ImageView[]{washA, washB}) {
+        for (ImageView v : new ImageView[]{washA}) {
             swing(v, "translationX", v.getTranslationX(), 110, 23000);
             swing(v, "translationY", v.getTranslationY(), 70, 17000);
             swing(v, "scaleX", 1f, 0.08f, 29000);
             swing(v, "scaleY", 1f, 0.06f, 37000);
         }
-        swing(glow, "translationX", glow.getTranslationX(), 240, 31000);
-        swing(glow, "translationY", glow.getTranslationY(), 130, 26000);
         View grain = new View(this);
         grain.setBackground(grain());
         root.addView(grain, new FrameLayout.LayoutParams(-1, -1));
@@ -501,20 +495,19 @@ public class IosHome extends Activity {
     private void washOff() {
         washNow = 0;
         washA.animate().alpha(0f).setDuration(SLOW).start();
-        washB.animate().alpha(0f).setDuration(SLOW).start();
-        glow.animate().alpha(0f).setDuration(SLOW).start();
     }
 
     void washColor(int color) {
         if (color == washNow) return;
+        int from = washNow == 0 ? color : washNow;
         washNow = color;
-        ImageView on = washOnA ? washB : washA, off = washOnA ? washA : washB;
-        washOnA = !washOnA;
-        on.setImageTintList(ColorStateList.valueOf(color));
-        on.animate().alpha(0.82f).setDuration(SLOW).setInterpolator(ease).start();
-        off.animate().alpha(0f).setDuration(SLOW).start();
-        glow.setImageTintList(ColorStateList.valueOf(color));
-        glow.animate().alpha(0.26f).setDuration(SLOW).start();
+        if (washTint != null) washTint.cancel();
+        washTint = ValueAnimator.ofObject(new android.animation.ArgbEvaluator(), from, color);
+        washTint.setDuration(SLOW);
+        washTint.setInterpolator(ease);
+        washTint.addUpdateListener(an -> washA.setImageTintList(ColorStateList.valueOf((int) an.getAnimatedValue())));
+        washTint.start();
+        if (washA.getAlpha() < 0.82f) washA.animate().alpha(0.82f).setDuration(SLOW).setInterpolator(ease).start();
     }
 
     private void spotAt(int color, float cx, float cy, float size) {

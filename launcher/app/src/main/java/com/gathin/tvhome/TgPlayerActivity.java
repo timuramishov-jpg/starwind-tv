@@ -180,6 +180,9 @@ public final class TgPlayerActivity extends Activity implements SurfaceHolder.Ca
             case KeyEvent.KEYCODE_DPAD_DOWN:
                 show();
                 return true;
+            case KeyEvent.KEYCODE_MENU:
+                tracks();
+                return true;
             default:
                 return super.onKeyDown(code, e);
         }
@@ -198,6 +201,52 @@ public final class TgPlayerActivity extends Activity implements SurfaceHolder.Ca
         paint();
         handler.removeCallbacks(doSeek);
         handler.postDelayed(doSeek, 500);
+        // Байт, где примерно окажется плеер (битрейт ровный): пусть подкачка начнётся до самой перемотки.
+        long size = getIntent().getLongExtra("size", 0);
+        if (source != null && size > 0 && duration > 0) {
+            final long at = (long) (size * (seekTarget / (double) duration));
+            new Thread(() -> source.prefetchAt(at), "tg-seek").start();
+        }
+    }
+
+    /** Меню: звуковая дорожка и субтитры, если в файле их несколько (часто у фильмов в .mkv). Повтор — следующая. */
+    private void tracks() {
+        if (player == null || !prepared) return;
+        MediaPlayer.TrackInfo[] t;
+        try { t = player.getTrackInfo(); } catch (Exception e) { return; }
+        java.util.List<Integer> audio = new java.util.ArrayList<>(), subs = new java.util.ArrayList<>();
+        for (int i = 0; i < t.length; i++) {
+            int type = t[i].getTrackType();
+            if (type == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_AUDIO) audio.add(i);
+            else if (type == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT || type == MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_SUBTITLE) subs.add(i);
+        }
+        String say;
+        if (audio.size() > 1) {
+            int cur = player.getSelectedTrack(MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_AUDIO);
+            int next = audio.get((audio.indexOf(cur) + 1) % audio.size());
+            player.selectTrack(next);
+            say = "Звук: " + language(t[next], audio.indexOf(next) + 1);
+        } else if (!subs.isEmpty()) {
+            int cur = -1;
+            try { cur = player.getSelectedTrack(MediaPlayer.TrackInfo.MEDIA_TRACK_TYPE_TIMEDTEXT); } catch (Exception ignored) { }
+            int at = subs.indexOf(cur);
+            if (at == subs.size() - 1) { player.deselectTrack(cur); say = "Субтитры выключены"; }
+            else { int next = subs.get(at + 1); player.selectTrack(next); say = "Субтитры: " + language(t[next], at + 2); }
+        } else say = "В этом видео одна дорожка, субтитров нет";
+        status.setText(say);
+        handler.removeCallbacks(clearStatus);
+        handler.postDelayed(clearStatus, 2500);
+        show();
+    }
+
+    private final Runnable clearStatus = () -> status.setText("");
+
+    private static String language(MediaPlayer.TrackInfo t, int n) {
+        String l = t.getLanguage();
+        if (l == null || l.isEmpty() || "und".equals(l)) return "дорожка " + n;
+        java.util.Locale loc = new java.util.Locale(l);
+        String name = loc.getDisplayLanguage(new java.util.Locale("ru"));
+        return name.isEmpty() ? l : name;
     }
 
     private void show() {

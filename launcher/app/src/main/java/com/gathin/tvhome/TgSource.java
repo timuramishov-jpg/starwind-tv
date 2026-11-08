@@ -165,6 +165,14 @@ final class TgSource extends MediaDataSource {
         request(position);
     }
 
+    /** Перемотка ещё набирается (кнопку жмут), а место примерно известно: начинаем качать заранее,
+     *  пока плеер не попросил, — первая порция нового места у TDLib приходит небыстро. */
+    synchronized void prefetchAt(long position) {
+        position = Math.max(0, Math.min(size - 1, position));
+        if (position >= winFrom && position < winTo) return;
+        request(Math.max(0, position - (2L << 20)));
+    }
+
     private void request(long position) {
         long off = position - position % PART, lim = Math.min(WINDOW, size - off);
         TdApi.Object d = tg.call(new TdApi.DownloadFile(fileId, 32, off, lim, false), 10_000);
