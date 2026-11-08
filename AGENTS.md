@@ -49,7 +49,7 @@ QUIET=1 ~/Documents/Claude/tv deploy   # то же, не уводя телеви
 - **Работаешь в облаке без доступа к домашней сети** — через агента на Маке (`tv agent`): кладёшь скрипт в
   `~/Documents/Claude/agent/in/<уникальное-имя>.sh`, результат появляется в `agent/out/<имя>.txt`. Код передаётся
   `git bundle` → `~/Documents/Claude/starwind.bundle`. Подробно — DEVELOPMENT.md, «Работа с ИИ-помощником».
-- Сборка без установки: `cd launcher && ./gradlew assembleRelease` (JDK 17, `local.properties` — готовит `tv setup`).
+- Сборка без телевизора: `~/Documents/Claude/tv build` (тесты, шрифты, значки, TDLib, APK).
 
 ## Правила (нарушать нельзя)
 

@@ -25,8 +25,9 @@ RELEASE=0 ~/Documents/Claude/tv deploy # не выкладывать сборк�
 ~/Documents/Claude/tv release         # выложить APK в релизы GitHub — телевизоры обновятся из меню
 ```
 
-Собрать без установки: `cd launcher && ./gradlew assembleRelease` (нужны `JAVA_HOME` на JDK 17 и `local.properties` с
-`sdk.dir`, их готовит `tv setup`).
+Собрать без установки: `tv build` (то же, что первая половина `deploy`, телевизор не нужен). Голый Gradle —
+`cd launcher && ./gradlew assembleRelease` (нужны `JAVA_HOME` на JDK 17 и `local.properties`; шрифты, значки и TDLib
+кладёт `tv build`).
 
 ### `tv deploy` по шагам
 
