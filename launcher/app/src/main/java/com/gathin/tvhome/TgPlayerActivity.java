@@ -37,6 +37,7 @@ public final class TgPlayerActivity extends Activity implements SurfaceHolder.Ca
     private boolean prepared, surfaceReady;
     private int seekTarget = -1, duration;
     private String unique;
+    private long chat, message;
     private SharedPreferences prefs;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable hide = () -> bar.animate().alpha(0f).setDuration(300).start();
@@ -87,6 +88,9 @@ public final class TgPlayerActivity extends Activity implements SurfaceHolder.Ca
         duration = getIntent().getIntExtra("duration", 0);
         unique = getIntent().getStringExtra("unique");
         title.setText(getIntent().getStringExtra("title"));
+        chat = getIntent().getLongExtra("chat", 0);
+        message = getIntent().getLongExtra("message", 0);
+        if (chat != 0) TgActivity.remember(prefs, chat, message);
         status.setText("Загружаю…");
         if (!TgCore.vpn()) { status.setText("Включи VPN — Telegram работает только через него"); return; }
         source = new TgSource(TgCore.get(this), fileId, size);
@@ -119,6 +123,7 @@ public final class TgPlayerActivity extends Activity implements SurfaceHolder.Ca
         });
         player.setOnCompletionListener(mp -> {
             if (unique != null) prefs.edit().remove("pos_" + unique).apply();
+            if (chat != 0) TgActivity.forget(prefs, chat, message);
             finish();
         });
         player.prepareAsync();
