@@ -48,8 +48,13 @@ final class TgSource extends MediaDataSource {
         length = (int) Math.min(length, size - position);
         long waitedSince = System.currentTimeMillis();
         while (!closed) {
-            TdApi.Object r = tg.call(new TdApi.GetFileDownloadedPrefixSize(fileId, position), 10_000);
-            long ready = r instanceof TdApi.FileDownloadedPrefixSize ? ((TdApi.FileDownloadedPrefixSize) r).size : 0;
+            // Уже знаем, что этот кусок на диске, — читаем сразу: плеер делает тысячи мелких чтений, спрашивать TDLib на каждое долго.
+            long ready = known(position);
+            if (ready <= 0) {
+                TdApi.Object r = tg.call(new TdApi.GetFileDownloadedPrefixSize(fileId, position), 10_000);
+                ready = r instanceof TdApi.FileDownloadedPrefixSize ? ((TdApi.FileDownloadedPrefixSize) r).size : 0;
+                if (ready > 0) remember(position, ready);
+            }
             buffered = ready;
             if (ready > 0) {
                 int n = (int) Math.min(length, ready);
@@ -82,11 +87,33 @@ final class TgSource extends MediaDataSource {
         throw new IOException("closed");
     }
 
-    /** Качать с места, где читает плеер. Если оно далеко от того, откуда уже качаем, — переключаемся. */
+    private final Object knownLock = new Object();
+    private long knownFrom = -1, knownTo = -1;
+
+    private long known(long position) {
+        synchronized (knownLock) { return position >= knownFrom && position < knownTo ? knownTo - position : 0; }
+    }
+
+    private void remember(long from, long ready) {
+        synchronized (knownLock) { knownFrom = from; knownTo = from + ready; }
+    }
+
+    private void forgetKnown() {
+        synchronized (knownLock) { knownFrom = knownTo = -1; }
+    }
+
+    private long stalledAt = -1, stalledTime;
+
+    /** Качать с места, где читает плеер. Если оно далеко от того, откуда уже качаем, — переключаемся.
+     *  Застряли на одном месте дольше 2,5 с — просим именно его: TDLib, докачав диапазон, уходит качать
+     *  начало файла и не возвращается за последний неполный кусок (так ждали хвост с описанием видео минутами). */
     private synchronized void ensureDownloading(long position, long waitedMs) {
-        if (covered(position)) return;
+        long now = System.currentTimeMillis();
+        boolean stalled = waitedMs > 2500 && (position != stalledAt || now - stalledTime > 8000);
+        if (covered(position) && !stalled) return;
+        if (stalled) { stalledAt = position; stalledTime = now; }
         // Другой поток ждёт кусок, который сейчас и качается, — пусть докачается (до 4 секунд), потом наша очередь.
-        if (waitedMs < 4000) for (Map.Entry<Thread, Long> w : waiting.entrySet())
+        if (waitedMs < 4000 && !stalled) for (Map.Entry<Thread, Long> w : waiting.entrySet())
             if (w.getKey() != Thread.currentThread() && covered(w.getValue())) return;
         TdApi.Object f = tg.call(new TdApi.GetFile(fileId), 5_000);
         if (f instanceof TdApi.File && ((TdApi.File) f).local.downloadedSize > KEEP) {
@@ -94,8 +121,10 @@ final class TgSource extends MediaDataSource {
             Log.i(TAG, "trim cache at " + position);
             tg.call(new TdApi.DeleteFile(fileId), 10_000);
             closeRaf();
+            forgetKnown();
         }
-        TdApi.Object d = tg.call(new TdApi.DownloadFile(fileId, 32, position, 0, false), 10_000);
+        // С пределом до конца файла: без него TDLib после конца перескакивает в начало.
+        TdApi.Object d = tg.call(new TdApi.DownloadFile(fileId, 32, position, size - position, false), 10_000);
         Log.i(TAG, "download from " + position + " of " + size + " [" + Thread.currentThread().getName() + "]: " + (d instanceof TdApi.File ? "ok, prefix " + ((TdApi.File) d).local.downloadedPrefixSize + " offset " + ((TdApi.File) d).local.downloadOffset : d));
         requestedFrom = position;
     }

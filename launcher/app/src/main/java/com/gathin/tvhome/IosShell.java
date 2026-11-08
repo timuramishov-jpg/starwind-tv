@@ -101,6 +101,14 @@ public final class IosShell {
             Map<String, String> a = parse(query);
             for (String h : lines) if (h.toLowerCase(Locale.ROOT).startsWith("range:")) a.put("_range", h.substring(6).trim());
             OutputStream out = c.getOutputStream();
+            // Быстрая команда iOS «Starwind в Фото» (подписана на Маке): сохраняет снимки и записи экрана в Фото.
+            if (path.equals("/photos.shortcut")) {
+                byte[] b = asset("photos.shortcut");
+                head(out, 200, "application/octet-stream", b.length, "Content-Disposition: attachment; filename*=UTF-8''Starwind%20%D0%B2%20%D0%A4%D0%BE%D1%82%D0%BE.shortcut\r\n");
+                out.write(b);
+                out.flush();
+                return;
+            }
             if (path.equals("/icon.png")) { bytes(out, 200, "image/png", asset("remote-icon.png"), true); return; }
             String key = read(DIR + "/key").trim();
             if (key.isEmpty() || !key.equals(a.get("k"))) { text(out, 403, "text/plain", "Отсканируй QR-код на телевизоре"); return; }

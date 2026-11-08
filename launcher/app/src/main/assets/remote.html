@@ -75,6 +75,7 @@ svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-l
 .list .name small{display:block;color:var(--secondary);font-size:var(--callout);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .list a{color:var(--ink);font-weight:600;text-decoration:none}
 .list .r{padding:0 0 0 var(--s3)}
+.list>button.r{padding:var(--s3) var(--s4)}
 .tag{font-size:var(--callout);color:var(--secondary);white-space:nowrap}
 .acts{display:flex;flex-wrap:wrap;gap:var(--s2);padding:0 var(--s4) var(--s3);border-top:0!important}
 .acts button{padding:var(--s2) var(--s3);font-size:var(--body)}
@@ -99,7 +100,8 @@ img.shot{display:block;width:100%;border-radius:var(--r-card);margin-top:var(--s
 .file progress{position:absolute;left:0;right:0;bottom:0}
 #flist>#files{display:block;padding:0}#flist>#files:empty{display:none}
 .steps{margin:0;padding:0 var(--s4) var(--s3) var(--s6);color:var(--secondary);font-size:var(--body);border-top:0!important;display:none}
-.steps.on{display:block}.steps li{padding:var(--s1) 0}
+.steps.on{display:block}
+a.row-link{text-decoration:none}a.row-link:active{background:var(--gray5)}.steps li{padding:var(--s1) 0}
 /* Над строкой состояния iPhone ничего не проезжает: полоса фона на её высоту. */
 #sb{position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top);background:var(--black);z-index:9}
 progress{width:100%;height:4px;display:none;accent-color:var(--ink)}
@@ -186,7 +188,7 @@ nav button:active{transform:none}
   <div class="card list">
     <label><span class="name">Таймер сна</span><span class="pick"><select id="sleep" onchange="go('sleep',{m:this.value})"><option value="0">Выключен</option><option value="15">15 мин</option><option value="30">30 мин</option><option value="60">1 час</option><option value="90">1,5 часа</option><option value="120">2 часа</option></select><svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg></span></label>
     <label><span class="name">Заставка</span><span class="pick"><select id="style" onchange="go('saverset',{w:'style',v:this.value})"><option value="-1">По очереди</option></select><svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg></span></label>
-    <label><span class="name">Заставка при простое</span><span class="pick"><select id="idle" onchange="go('saverset',{w:'idle',v:this.value})"><option value="0">Никогда</option><option value="2">Через 2 мин</option><option value="5">Через 5 мин</option><option value="10">Через 10 мин</option><option value="15">Через 15 мин</option><option value="30">Через 30 мин</option></select><svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg></span></label>
+    <label><span class="name">Заставка через</span><span class="pick"><select id="idle" onchange="go('saverset',{w:'idle',v:this.value})"><option value="0">Никогда</option><option value="2">2 мин</option><option value="5">5 мин</option><option value="10">10 мин</option><option value="15">15 мин</option><option value="30">30 мин</option></select><svg viewBox="0 0 24 24"><path d="M7 10l5 5 5-5"/></svg></span></label>
     <label><span class="name">Своя клавиатура<small>Вместо клавиатуры Яндекса</small></span><input type="checkbox" class="sw" id="kbd" onchange="go('keyboard',{on:this.checked?1:0})"></label>
     <label><span class="name">Быстрые анимации<small>Меню и переходы вдвое быстрее</small></span><input type="checkbox" class="sw" id="anim" onchange="tweak('anim',this.checked)"></label>
     <label><span class="name">Блокировка рекламы<small>DNS AdGuard для всех приложений</small></span><input type="checkbox" class="sw" id="dns" onchange="tweak('dns',this.checked)"></label>
@@ -197,8 +199,8 @@ nav button:active{transform:none}
   <h2>Этот телефон</h2>
   <div class="card list">
     <label><span class="name">Сразу сохранять в Фото<small>Снимки и записи — без лишних нажатий</small></span><input type="checkbox" class="sw" id="auto" onchange="setAuto(this.checked)"></label>
-    <button onclick="$('how').classList.toggle('on')"><span class="name">Как это работает<small>Один раз создать быструю команду</small></span></button>
-    <ol class="steps" id="how"><li>Открой «Команды» → «+», назови «Starwind в Фото».</li><li>Добавь действие «Получить содержимое URL» — оно возьмёт ссылку из пульта.</li><li>Добавь «Сохранить в фотоальбом». Готово.</li><li>Первый раз iPhone спросит доступ к Фото — разреши.</li></ol>
+    <a class="row-link" href="/photos.shortcut"><span class="name">Установить команду «Starwind в Фото»<small>Один раз: скачать → открыть файл → «Добавить быструю команду»</small></span><svg viewBox="0 0 24 24" class="muted"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg></a>
+    <ol class="steps" id="how"><li>Нажми «Установить команду» и открой скачанный файл — iPhone предложит добавить команду.</li><li>Включи «Сразу сохранять в Фото».</li><li>При первом сохранении iPhone спросит доступ к Фото и к локальной сети — разреши. Дальше всё сохраняется само.</li></ol>
   </div>
 </section>
 
