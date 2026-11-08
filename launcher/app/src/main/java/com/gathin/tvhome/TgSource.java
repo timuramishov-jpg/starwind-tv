@@ -48,15 +48,32 @@ final class TgSource extends MediaDataSource {
      *  первый кусок нового диапазона, а перезапуск не помогает — поэтому следующий диапазон просим заранее,
      *  пока плеер доигрывает запас. */
     private void watchdog() {
+        long lastPos = -1, lastEdge = -1, lastTotal = -1, still = 0;
         while (!closed) {
             try { Thread.sleep(1000); } catch (InterruptedException e) { return; }
             long pos = readPos;
-            if (pos < 0) continue;
+            // Смотрим, только когда плеер читает подряд: после перемотки он ещё дочитывает начало файла,
+            // и если гоняться за каждым чтением, окно прыгает туда-сюда.
+            boolean steady = pos >= 0 && lastPos >= 0 && pos >= lastPos && pos - lastPos < (32L << 20);
+            lastPos = pos;
+            if (!steady) continue;
             TdApi.Object r = tg.call(new TdApi.GetFileDownloadedPrefixSize(fileId, pos), 5_000);
-            if (!(r instanceof TdApi.FileDownloadedPrefixSize)) continue;
-            long edge = pos + ((TdApi.FileDownloadedPrefixSize) r).size;
-            if (edge >= size || edge - pos >= AHEAD) continue;
-            synchronized (this) { if (!(edge >= winFrom && edge < winTo)) request(edge); }
+            TdApi.Object f = tg.call(new TdApi.GetFile(fileId), 5_000);
+            if (!(r instanceof TdApi.FileDownloadedPrefixSize) || !(f instanceof TdApi.File)) continue;
+            long edge = pos + ((TdApi.FileDownloadedPrefixSize) r).size, total = ((TdApi.File) f).local.downloadedSize;
+            if (edge >= size) continue;
+            // Загрузка совсем встала (ни одного нового байта 4 с, а впереди дыра) — перезапускаем: так TDLib оживает.
+            still = edge == lastEdge && total == lastTotal ? still + 1 : 0;
+            lastEdge = edge;
+            lastTotal = total;
+            synchronized (this) {
+                if (still >= 4) {
+                    Log.i(TAG, "file " + fileId + " download stopped at " + edge + ", restarting");
+                    tg.call(new TdApi.CancelDownloadFile(fileId, false), 5_000);
+                    request(edge);
+                    still = 0;
+                } else if (edge - pos < AHEAD && !(edge >= winFrom && edge < winTo) && waiting.isEmpty()) request(edge);
+            }
         }
     }
 
