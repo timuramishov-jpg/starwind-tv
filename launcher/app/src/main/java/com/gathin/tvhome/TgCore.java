@@ -283,7 +283,7 @@ final class TgCore implements Client.ResultHandler {
             long part = 512L << 10, tail = Math.max(0, size - (4L << 20));
             tail -= tail % part;
             if (!waitPrefix(fileId, tail, size - tail)) return;
-            waitPrefix(fileId, 0, Math.min(size, 6L << 20));
+            waitPrefix(fileId, 0, Math.min(size, 16L << 20));
         }, "tg-prefetch").start();
     }
 
