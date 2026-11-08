@@ -47,7 +47,9 @@ public final class IosKeyboard extends InputMethodService {
 
     @Override public void onStartInputView(EditorInfo info, boolean restarting) {
         super.onStartInputView(info, restarting);
-        layout = english ? EN : RU;
+        // Номер телефона, код, число — сразу цифры.
+        int cls = info.inputType & EditorInfo.TYPE_MASK_CLASS;
+        layout = cls == EditorInfo.TYPE_CLASS_PHONE || cls == EditorInfo.TYPE_CLASS_NUMBER ? NUM : english ? EN : RU;
         caps = (info.inputType & EditorInfo.TYPE_TEXT_FLAG_CAP_SENTENCES) != 0;
         if (view != null) view.build();
         typing(true);

@@ -223,6 +223,27 @@ public final class IosShell {
                 out.flush();
                 return;
             }
+            case "view": {
+                // Экран телевизора для пульта: маленький JPEG (960×540, ~60 КБ), чтобы обновлялся раз в секунду.
+                byte[] png = runBytes("screencap -p");
+                android.graphics.Bitmap b = android.graphics.BitmapFactory.decodeByteArray(png, 0, png.length);
+                if (b == null) { json = say("Экран не снялся"); break; }
+                android.graphics.Bitmap small = android.graphics.Bitmap.createScaledBitmap(b, 960, 540, true);
+                ByteArrayOutputStream jpg = new ByteArrayOutputStream();
+                small.compress(android.graphics.Bitmap.CompressFormat.JPEG, 70, jpg);
+                b.recycle();
+                small.recycle();
+                bytes(out, 200, "image/jpeg", jpg.toByteArray(), false);
+                return;
+            }
+            case "tap": {
+                // Касание по экрану: x, y — доли (0…1) от ширины и высоты. Для приложений, сделанных под палец.
+                float x = frac(a.get("x")) * 1920, y = frac(a.get("y")) * 1080;
+                if (a.get("x2") != null) swipe(x, y, frac(a.get("x2")) * 1920, frac(a.get("y2")) * 1080);
+                else touch(x, y);
+                json = "{}";
+                break;
+            }
             case "shot": {
                 byte[] png = runBytes("screencap -p");
                 bytes(out, 200, "image/png", png, false);
@@ -243,6 +264,36 @@ public final class IosShell {
     }
 
     private static void send(KeyEvent e) throws Exception { inject.invoke(input, e, 0); }
+
+    private static float frac(String v) {
+        try { return Math.max(0f, Math.min(1f, Float.parseFloat(v))); } catch (Exception e) { return 0.5f; }
+    }
+
+    private static void motion(int action, long down, float x, float y) throws Exception {
+        android.view.MotionEvent m = android.view.MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, x, y, 0);
+        m.setSource(InputDevice.SOURCE_TOUCHSCREEN);
+        inject.invoke(input, m, 0);
+        m.recycle();
+    }
+
+    /** Касание пальцем прямо в систему ввода — быстрее, чем input tap. */
+    private static void touch(float x, float y) throws Exception {
+        long down = SystemClock.uptimeMillis();
+        motion(android.view.MotionEvent.ACTION_DOWN, down, x, y);
+        Thread.sleep(40);
+        motion(android.view.MotionEvent.ACTION_UP, down, x, y);
+    }
+
+    /** Свайп: лента прокручивается, как пальцем. */
+    private static void swipe(float x1, float y1, float x2, float y2) throws Exception {
+        long down = SystemClock.uptimeMillis();
+        motion(android.view.MotionEvent.ACTION_DOWN, down, x1, y1);
+        for (int i = 1; i <= 10; i++) {
+            Thread.sleep(16);
+            motion(android.view.MotionEvent.ACTION_MOVE, down, x1 + (x2 - x1) * i / 10f, y1 + (y2 - y1) * i / 10f);
+        }
+        motion(android.view.MotionEvent.ACTION_UP, down, x2, y2);
+    }
 
     private static String key(String name) throws Exception {
         if (name == null || !name.matches("[A-Z_0-9]{1,30}")) return say("Нет такой кнопки");

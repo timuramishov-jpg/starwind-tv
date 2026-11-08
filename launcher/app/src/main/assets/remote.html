@@ -92,6 +92,15 @@ img.shot{display:block;width:100%;border-radius:var(--r-card);margin-top:var(--s
 .file{position:relative;overflow:hidden;flex:1}.file input{position:absolute;inset:0;opacity:0}
 progress{width:100%;height:4px;display:none;accent-color:var(--ink)}
 .tgf{display:none!important}.tgf.on{display:flex!important}
+button.wide{width:100%;margin-top:var(--s3);display:flex;align-items:center;justify-content:center;gap:var(--s2);border-radius:var(--r-card);padding:var(--s4)}
+/* Экран телевизора на телефоне: тапы и свайпы по картинке уходят на телевизор как касания пальцем. */
+.touch{display:none;position:fixed;inset:0;z-index:7;background:var(--black);padding:calc(env(safe-area-inset-top) + var(--s3)) var(--s4) calc(env(safe-area-inset-bottom) + var(--s4));flex-direction:column;gap:var(--s4)}
+.touch.on{display:flex}
+.touch-top{display:flex;align-items:center;justify-content:space-between;color:var(--secondary);font-size:var(--body)}
+.screen{position:relative;width:100%;aspect-ratio:16/9;border-radius:var(--r-card);overflow:hidden;background:var(--gray6);box-shadow:0 0 0 1px var(--hairline);touch-action:none}
+.screen img{width:100%;height:100%;display:block;-webkit-user-drag:none}
+.screen i{position:absolute;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;background:var(--glass);box-shadow:0 0 0 2px var(--ink);opacity:0;pointer-events:none;transition:opacity .4s}
+@media (orientation:landscape){.touch .keys{display:none}.screen{height:calc(100vh - 80px);width:auto;margin:0 auto}}
 .seg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));background:var(--gray6);border-radius:var(--r-row);padding:3px;margin-top:var(--s1)}
 .seg button{background:none;color:var(--secondary);font-size:var(--body);font-weight:600;padding:var(--s2);border-radius:var(--r-row)}
 .seg button.on{background:var(--gray4);color:var(--ink)}
@@ -136,6 +145,14 @@ nav button:active{transform:none}
     <button class="danger" onclick="powerOff()" aria-label="Выключить телевизор"><svg viewBox="0 0 24 24"><path d="M12 3v8"/><path d="M6.3 6.3a8 8 0 1011.4 0"/></svg></button>
     <button onclick="go('key',{c:'MENU'})" aria-label="Меню"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     <button onclick="openSearch()" aria-label="Поиск"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button>
+  </div>
+  <button class="s wide" onclick="openTouch()"><svg viewBox="0 0 24 24"><path d="M9 11V5a2 2 0 014 0v6"/><path d="M13 9a2 2 0 014 0v4a7 7 0 01-7 7H9a5 5 0 01-4-2l-2-3a2 2 0 013-2l1 1"/></svg>Экран телевизора: нажать пальцем</button>
+  <div class="touch" id="touch">
+    <div class="touch-top"><span>Нажми или проведи по картинке</span><button onclick="closeTouch()">Готово</button></div>
+    <div class="screen" id="screen"><img id="view" alt="Экран телевизора"><i id="dot"></i></div>
+    <div class="keys"><button data-key="BACK" aria-label="Назад"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg></button>
+      <button data-key="DPAD_CENTER" aria-label="ОК"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg></button>
+      <button onclick="go('home',{})" aria-label="Домой"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg></button></div>
   </div>
   <h2>VPN и сон</h2>
   <div class="card list">
@@ -345,6 +362,23 @@ function tgState(t){const st=t.state||'closed';
 async function tgKey(){const id=val('tgid').trim(),hash=val('tghash').trim();await go('tg',{a:'key',id,hash});$('tghash').value=''}
 async function tgPass(){const p=$('tgp').value;$('tgp').value='';await go('tg',{a:'password',p})}
 async function tgOut(){if(confirm('Выйти из Telegram на телевизоре?'))await go('tg',{a:'logout'})}
+// Экран телевизора: картинка обновляется сама, пока открыта (следующий кадр — после загрузки предыдущего).
+let touchOn=false,frameUrl='';
+async function frame(){if(!touchOn)return;try{const r=await fetch(url('view',{t:Date.now()}));const b=await r.blob();
+  const u=URL.createObjectURL(b);$('view').src=u;if(frameUrl)URL.revokeObjectURL(frameUrl);frameUrl=u}catch(e){}
+  setTimeout(frame,400)}
+function openTouch(){touchOn=true;$('touch').classList.add('on');frame()}
+function closeTouch(){touchOn=false;$('touch').classList.remove('on')}
+let t0=null;
+function pos(e){const r=$('screen').getBoundingClientRect(),p=e.changedTouches?e.changedTouches[0]:e;
+  return {x:(p.clientX-r.left)/r.width,y:(p.clientY-r.top)/r.height,px:p.clientX-r.left,py:p.clientY-r.top}}
+function dot(p){const d=$('dot');d.style.left=p.px+'px';d.style.top=p.py+'px';d.style.transition='none';d.style.opacity=1;
+  requestAnimationFrame(()=>{d.style.transition='';d.style.opacity=0})}
+$('screen').addEventListener('pointerdown',e=>{t0=pos(e)});
+$('screen').addEventListener('pointerup',e=>{if(!t0)return;const p=pos(e);dot(p);
+  const moved=Math.hypot(p.px-t0.px,p.py-t0.py)>16;
+  call('tap',moved?{x:t0.x.toFixed(4),y:t0.y.toFixed(4),x2:p.x.toFixed(4),y2:p.y.toFixed(4)}:{x:p.x.toFixed(4),y:p.y.toFixed(4)}).catch(()=>{});
+  if(navigator.vibrate)navigator.vibrate(10);t0=null});
 state();setInterval(state,2000);
 </script>
 </body>
