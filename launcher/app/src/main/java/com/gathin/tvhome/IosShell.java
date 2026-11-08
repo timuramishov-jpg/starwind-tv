@@ -258,13 +258,13 @@ public final class IosShell {
                 return;
             }
             case "rec": {
-                // Запись экрана: системный screenrecord, до 3 минут, 720p. Остановили — видео можно открыть на телефоне.
+                // Запись экрана: системный screenrecord (ищем по точному имени: у MediaTek есть служба vendor…screenrecord@1.0-service), до 3 минут, 720p. Остановили — видео можно открыть на телефоне.
                 String rec = orEmpty(a.get("a"), "state");
                 if ("start".equals(rec)) {
                     sh("rm -f " + REC + "; (nohup screenrecord --size 1280x720 --bit-rate 6000000 --time-limit 180 " + REC + " </dev/null >/dev/null 2>&1 &)");
                     json = say("Записываю экран — до 3 минут");
                 } else if ("stop".equals(rec)) {
-                    sh("pkill -INT -f 'screenrec[o]rd'");
+                    sh("pkill -INT -x screenrecord");
                     Thread.sleep(1200);
                     json = new JSONObject().put("say", "Запись готова").put("ready", new File(REC).length() > 0).toString();
                 } else json = new JSONObject().put("on", recording())
@@ -611,7 +611,7 @@ public final class IosShell {
     // ---------- Файлы ----------
 
     private static boolean recording() throws Exception {
-        return sh("pgrep -f 'screenrec[o]rd' >/dev/null && echo yes").trim().equals("yes");
+        return sh("pgrep -x screenrecord >/dev/null && echo yes").trim().equals("yes");
     }
 
     private static long memAvailable() throws Exception {
