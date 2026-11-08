@@ -7,6 +7,7 @@ import org.drinkless.tdlib.TdApi;
 
 import java.io.IOException;
 import java.io.RandomAccessFile;
+import java.util.Map;
 
 /**
  * Видео из Telegram для плеера, без скачивания целиком: плеер просит кусок с любого места — просим TDLib качать
@@ -23,6 +24,10 @@ final class TgSource extends MediaDataSource {
     private final Runnable wake = () -> { synchronized (lock) { lock.notifyAll(); } };
     private volatile boolean closed;
     private long requestedFrom = -1;
+    /** Кто из потоков плеера сейчас ждёт байты и с какого места: плеер читает в несколько потоков (хвост с
+     *  оглавлением и начало одновременно), а TDLib качает файл только с одного места — не дёргаем его туда-сюда. */
+    private final java.util.Map<Thread, Long> waiting = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Object fileLock = new Object();
     private RandomAccessFile raf;
     private String rafPath;
     /** Сколько байт докачано подряд от точки, где сейчас читает плеер: для полоски загрузки. */
@@ -48,18 +53,22 @@ final class TgSource extends MediaDataSource {
             buffered = ready;
             if (ready > 0) {
                 int n = (int) Math.min(length, ready);
-                String path = raf != null ? rafPath : localPath();
-                if (path != null) {
-                    if (raf == null) {
-                        raf = new RandomAccessFile(path, "r");
-                        rafPath = path;
+                int got = -1;
+                synchronized (fileLock) {  // один файл на все потоки плеера: seek и read не должны перемешаться
+                    String path = raf != null ? rafPath : localPath();
+                    if (path != null) {
+                        if (raf == null) {
+                            raf = new RandomAccessFile(path, "r");
+                            rafPath = path;
+                        }
+                        raf.seek(position);
+                        got = raf.read(buffer, offset, n);
                     }
-                    raf.seek(position);
-                    int got = raf.read(buffer, offset, n);
-                    if (got > 0) { ahead(position + got); return got; }
                 }
+                if (got > 0) { waiting.remove(Thread.currentThread()); ahead(position + got); return got; }
             }
-            ensureDownloading(position);
+            waiting.put(Thread.currentThread(), position);
+            ensureDownloading(position, System.currentTimeMillis() - waitedSince);
             synchronized (lock) { try { lock.wait(400); } catch (InterruptedException e) { throw new IOException(e); } }
             long waited = System.currentTimeMillis() - waitedSince;
             if (waited > 3000 && waited % 3000 < 450) {
@@ -68,14 +77,17 @@ final class TgSource extends MediaDataSource {
                 Log.i(TAG, "waiting at " + position + ", ready " + ready + (l == null ? "" : ", active " + l.isDownloadingActive
                         + " offset " + l.downloadOffset + " prefix " + l.downloadedPrefixSize + " total " + l.downloadedSize));
             }
-            if (waited > 120_000) throw new IOException("Telegram не отдаёт видео");
+            if (waited > 120_000) { waiting.remove(Thread.currentThread()); throw new IOException("Telegram не отдаёт видео"); }
         }
         throw new IOException("closed");
     }
 
     /** Качать с места, где читает плеер. Если оно далеко от того, откуда уже качаем, — переключаемся. */
-    private void ensureDownloading(long position) {
-        if (requestedFrom >= 0 && position >= requestedFrom && position - requestedFrom < (8L << 20)) return;
+    private synchronized void ensureDownloading(long position, long waitedMs) {
+        if (covered(position)) return;
+        // Другой поток ждёт кусок, который сейчас и качается, — пусть докачается (до 4 секунд), потом наша очередь.
+        if (waitedMs < 4000) for (Map.Entry<Thread, Long> w : waiting.entrySet())
+            if (w.getKey() != Thread.currentThread() && covered(w.getValue())) return;
         TdApi.Object f = tg.call(new TdApi.GetFile(fileId), 5_000);
         if (f instanceof TdApi.File && ((TdApi.File) f).local.downloadedSize > KEEP) {
             // Диск не резиновый: накачанное стираем, качаем заново с текущего места.
@@ -84,12 +96,16 @@ final class TgSource extends MediaDataSource {
             closeRaf();
         }
         TdApi.Object d = tg.call(new TdApi.DownloadFile(fileId, 32, position, 0, false), 10_000);
-        Log.i(TAG, "download from " + position + " of " + size + ": " + (d instanceof TdApi.File ? "ok, prefix " + ((TdApi.File) d).local.downloadedPrefixSize + " offset " + ((TdApi.File) d).local.downloadOffset : d));
+        Log.i(TAG, "download from " + position + " of " + size + " [" + Thread.currentThread().getName() + "]: " + (d instanceof TdApi.File ? "ok, prefix " + ((TdApi.File) d).local.downloadedPrefixSize + " offset " + ((TdApi.File) d).local.downloadOffset : d));
         requestedFrom = position;
     }
 
+    private boolean covered(long position) {
+        return requestedFrom >= 0 && position >= requestedFrom && position - requestedFrom < (8L << 20);
+    }
+
     /** Плеер ушёл дальше — сдвигаем точку, от которой считаем «качаем отсюда». */
-    private void ahead(long pos) {
+    private synchronized void ahead(long pos) {
         if (requestedFrom >= 0 && pos > requestedFrom) requestedFrom = Math.max(requestedFrom, pos - (4L << 20));
     }
 
@@ -101,6 +117,10 @@ final class TgSource extends MediaDataSource {
     }
 
     private void closeRaf() {
+        synchronized (fileLock) { closeRafLocked(); }
+    }
+
+    private void closeRafLocked() {
         try { if (raf != null) raf.close(); } catch (IOException ignored) { }
         raf = null;
         rafPath = null;
@@ -108,6 +128,7 @@ final class TgSource extends MediaDataSource {
 
     @Override public void close() {
         closed = true;
+        waiting.clear();
         tg.unwatchFile(fileId, wake);
         synchronized (lock) { lock.notifyAll(); }
         closeRaf();
