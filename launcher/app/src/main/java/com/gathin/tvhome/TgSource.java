@@ -125,7 +125,7 @@ final class TgSource extends MediaDataSource {
         }
         // С пределом до конца файла: без него TDLib после конца перескакивает в начало.
         TdApi.Object d = tg.call(new TdApi.DownloadFile(fileId, 32, position, size - position, false), 10_000);
-        Log.i(TAG, "download from " + position + " of " + size + " [" + Thread.currentThread().getName() + "]: " + (d instanceof TdApi.File ? "ok, prefix " + ((TdApi.File) d).local.downloadedPrefixSize + " offset " + ((TdApi.File) d).local.downloadOffset : d));
+        Log.i(TAG, "file " + fileId + " download from " + position + " of " + size + " [" + Thread.currentThread().getName() + "]: " + (d instanceof TdApi.File ? "ok, prefix " + ((TdApi.File) d).local.downloadedPrefixSize + " offset " + ((TdApi.File) d).local.downloadOffset : d));
         requestedFrom = position;
     }
 
