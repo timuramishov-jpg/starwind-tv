@@ -1,7 +1,8 @@
 #!/bin/bash
 # VPN только для YouTube и Google: профиль маршрутизации Happ. Вызывается из tv route on.
-R="$HOME/Documents/Claude/cleanyourtv"
-export TV_HOST=192.168.31.237
+R="$(cd "$(dirname "$0")/.." && pwd)"
+DIR="${STARWIND_HOME:-$HOME/Documents/Claude}"
+export TV_HOST="${TV_IP:-$(cat "$DIR/tv-ip" 2>/dev/null || echo 192.168.31.237)}"
 TVPY="$R/tools/venv/bin/python -I $R/tools/tv.py"
 B64=$(python3 - <<'P'
 import base64,json

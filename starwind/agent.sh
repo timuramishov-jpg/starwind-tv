@@ -1,7 +1,7 @@
 #!/bin/bash
 # Агент: Claude кладёт задания в ~/Documents/Claude/agent/in/*.sh, агент выполняет их на Маке
 # и пишет вывод в agent/out/<имя>.txt. Так Claude сам работает с телевизором. Остановить: Ctrl+C.
-DIR="$HOME/Documents/Claude"
+DIR="${STARWIND_HOME:-$HOME/Documents/Claude}"
 Q="$DIR/agent"
 mkdir -p "$Q/in" "$Q/out" "$Q/done"
 # Двое агентов на одну очередь не нужны: второй запуск (например, при входе в систему) тихо выходит.

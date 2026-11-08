@@ -1,9 +1,13 @@
 #!/bin/bash
 # Единый инструмент для телевизора StarWind. Запуск: tv <команда>. Без команды печатает справку.
 set -u
-TV=192.168.31.237
-DIR="$HOME/Documents/Claude"
-R="$DIR/cleanyourtv"
+# Рабочая папка: ключи, снимки, журналы, копии настроек. Можно переопределить: STARWIND_HOME=... tv deploy
+DIR="${STARWIND_HOME:-$HOME/Documents/Claude}"
+# Репозиторий — там, где лежит этот скрипт (tv — ссылка на starwind/tv).
+SELF="$0"; while [ -L "$SELF" ]; do L=$(readlink "$SELF"); case "$L" in /*) SELF="$L" ;; *) SELF="$(dirname "$SELF")/$L" ;; esac; done
+R="$(cd "$(dirname "$SELF")/.." && pwd)"
+# Адрес телевизора: переменная TV_IP, иначе файл $DIR/tv-ip (его пишет tv setup), иначе адрес первого телевизора.
+TV="${TV_IP:-$(cat "$DIR/tv-ip" 2>/dev/null || echo 192.168.31.237)}"
 SECRETS="$DIR/secrets.json"
 PKG=com.gathin.tvhome
 export TV_HOST=$TV
@@ -111,9 +115,9 @@ release() {
 }
 
 # Библиотека Telegram (TDLib из официального репозитория Telegram X, github.com/TGX-Android/tdlib) и libc++ из NDK r23c.
-# В git не кладём (25 МБ): лежат в ~/Documents/Claude/tg/o23, сверяем контрольные суммы и копируем в сборку.
+# Лежат в starwind/vendor/tdlib (откуда — см. README там); сверяем контрольные суммы и копируем в сборку.
 tglibs() {
-  local src="$DIR/tg/o23" dst="$R/launcher/app/src/main/jniLibs/armeabi-v7a" f want got
+  local src="$R/starwind/vendor/tdlib/armeabi-v7a" dst="$R/launcher/app/src/main/jniLibs/armeabi-v7a" f want got
   mkdir -p "$dst"
   while read -r want f; do
     [ -f "$src/$f" ] || die "нет $src/$f — библиотеки Telegram"
@@ -135,8 +139,9 @@ deploy() {
   say "== Версия $(git log -1 --format='%h %s')"
   git status --short | grep -v '^??' | grep . && say "(есть несохранённые правки)"
   fonts; icons; tglibs
-  export JAVA_HOME="$(/opt/homebrew/bin/brew --prefix openjdk@17)/libexec/openjdk.jdk/Contents/Home"
-  export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
+  BREW=$(command -v brew || ls /opt/homebrew/bin/brew /usr/local/bin/brew 2>/dev/null | head -1)
+  export JAVA_HOME="$("$BREW" --prefix openjdk@17)/libexec/openjdk.jdk/Contents/Home"
+  export ANDROID_HOME="$("$BREW" --prefix)/share/android-commandlinetools"
   export PATH="$JAVA_HOME/bin:$PATH"
   signing
   say "== Тесты пульта"; bash "$R/starwind/test/run.sh" > "$DIR/test.log" 2>&1 || { tail -5 "$DIR/test.log"; die "тесты пульта не прошли, ничего не ставлю"; }
@@ -210,7 +215,37 @@ report() {
     say "== Журнал"; T "logcat -d -s IosFeed:* IosHome:* IosConfig:* IosRemote:* IosWeather:* IosUpdate:*" | tail -80; } 2>&1 | tee "$DIR/report.txt" | head -12
 }
 
+# Мак с нуля: инструменты сборки, Android SDK, окружение для связи с телевизором, адрес телевизора, команда tv.
+setup() {
+  say "== Рабочая папка $DIR, репозиторий $R"
+  mkdir -p "$DIR"
+  BREW=$(command -v brew || ls /opt/homebrew/bin/brew /usr/local/bin/brew 2>/dev/null | head -1)
+  [ -n "$BREW" ] || die "нужен Homebrew: https://brew.sh (одна команда в Терминале), потом снова tv setup"
+  for f in openjdk@17 gh; do "$BREW" list "$f" > /dev/null 2>&1 || "$BREW" install "$f" || die "не поставился $f"; done
+  "$BREW" list --cask android-commandlinetools > /dev/null 2>&1 || "$BREW" install --cask android-commandlinetools || die "не поставился Android SDK"
+  export JAVA_HOME="$("$BREW" --prefix openjdk@17)/libexec/openjdk.jdk/Contents/Home"
+  export ANDROID_HOME="$("$BREW" --prefix)/share/android-commandlinetools"
+  export PATH="$JAVA_HOME/bin:$PATH"
+  yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" --licenses > /dev/null 2>&1 || true
+  "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --sdk_root="$ANDROID_HOME" "platforms;android-34" "build-tools;34.0.0" | tail -1
+  printf 'sdk.dir=%s\n' "$ANDROID_HOME" > "$R/launcher/local.properties"
+  [ -x "$R/tools/venv/bin/python" ] || python3 -m venv "$R/tools/venv" || die "python3 -m venv"
+  "$R/tools/venv/bin/pip" install -q -r "$R/tools/requirements.txt" || die "pip install"
+  ln -sf "$R/starwind/tv" "$DIR/tv"; chmod +x "$R/starwind/tv"
+  if [ ! -f "$DIR/tv-ip" ]; then
+    printf "Адрес телевизора в домашней сети (Настройки → Сеть на телевизоре), например 192.168.1.50: "; read -r ip
+    [ -n "$ip" ] && printf '%s' "$ip" > "$DIR/tv-ip"
+  fi
+  [ -f "$SECRETS" ] || say "Нет $SECRETS — ленты YouTube и Кинопоиска будут без ключей (см. starwind/docs/INSTALL.md, шаг «Ключи»)"
+  ls "$DIR"/SF-NF*.zip > /dev/null 2>&1 || say "Нет архива шрифтов SF в $DIR (см. starwind/docs/INSTALL.md, шаг «Шрифты»)"
+  say "РЕЗУЛЬТАТ: Мак готов. Дальше: включи отладку на телевизоре и запусти $DIR/tv deploy"
+}
+
 case "${1:-}" in
+  setup) setup ;;
+  update)
+    # Новая версия с GitHub (основной способ, когда проект ведётся в репозитории).
+    cd "$R" && git pull --ff-only && chmod +x starwind/tv && say "== Версия $(git log -1 --format='%h %s')" ;;
   pull)
     # Новая версия от Claude: пакет starwind.bundle рядом со скриптом.
     cd "$R" || die "нет $R"
@@ -353,7 +388,7 @@ case "${1:-}" in
     if [ "${2:-}" = install ]; then
       # Агент при входе в систему: Терминал открывает agent.command — у Терминала есть доступ к Документам,
       # у фоновой службы macOS его бы не было.
-      printf '#!/bin/bash\n"$HOME/Documents/Claude/tv" agent\n' > "$DIR/agent.command"; chmod +x "$DIR/agent.command"
+      printf '#!/bin/bash\n"%s/tv" agent\n' "$DIR" > "$DIR/agent.command"; chmod +x "$DIR/agent.command"
       PL="$HOME/Library/LaunchAgents/com.starwind.agent.plist"; mkdir -p "$HOME/Library/LaunchAgents"
       cat > "$PL" <<PLEOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -377,8 +412,10 @@ PLEOF
     T 'for p in com.yandex.tv.home com.yandex.tv.input.efir com.yandex.tv.videoplayer com.yandex.devices.farm.companion; do pm enable $p; done; cmd package set-home-activity --user 0 com.yandex.tv.home/.HomeActivity' | tail -1
     say "Вернул оболочку Яндекса домашним экраном. Наш лаунчер остаётся установленным." ;;
   *) cat <<'H'
+tv setup         подготовить Мак с нуля: Java, Android SDK, адрес телевизора (один раз)
 tv deploy        собрать текущую версию, поставить, передать ключи, проверить
 tv check         что сейчас на телевизоре: домашний экран, VPN, память, падения
+tv update        забрать новую версию с GitHub (git pull)
 tv pull          забрать новую версию от Claude (starwind.bundle)
 tv release       выложить собранный лаунчер на GitHub: телек обновится сам
 tv lighten       разгрузить телек: запрет фона лишним приложениям (off — вернуть)

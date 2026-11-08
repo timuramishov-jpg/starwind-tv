@@ -1,5 +1,13 @@
 # AGENTS.md
 
+> **This repository is Starwind** — a custom home screen, phone remote and Telegram video client for a Yandex TV
+> (StarWind SW-LED43SG300), built on top of CleanYourTV. If you were asked to change or extend Starwind, read
+> [starwind/docs/DEVELOPMENT.md](starwind/docs/DEVELOPMENT.md), [ARCHITECTURE.md](starwind/docs/ARCHITECTURE.md) and
+> [DESIGN.md](starwind/docs/DESIGN.md) first (Russian). Key rules: all colours/sizes/spacing come from `IosPalette`
+> (the phone remote mirrors them), run `bash starwind/test/run.sh` before installing, install with
+> `~/Documents/Claude/tv deploy` (`QUIET=1` while someone is watching), never put keys in git, UI texts in Russian.
+> The rest of this file is the original CleanYourTV guide.
+
 Instructions for coding agents (Claude Code, Codex, Gemini CLI, Cursor, Copilot and others) working in
 this repository. People should start with [README.md](README.md) and [CONTRIBUTING.md](CONTRIBUTING.md);
 this file repeats their rules in the form an agent needs, and links to them for the detail.

@@ -111,7 +111,6 @@ public class IosHome extends Activity {
         BRAND.put("me.zhanghai.android.files", new int[]{R.drawable.logo_files, IosPalette.BLUE});
         BRAND.put("ru.vk.store.tv", new int[]{R.drawable.logo_rustore, IosPalette.BLUE});
         BRAND.put("ru.kinopoisk.yandex.tv", new int[]{R.drawable.logo_kino, IosPalette.ORANGE});
-        BRAND.put("org.thunderdog.challegram", new int[]{R.drawable.logo_telegram, IosPalette.BLUE});
         BRAND.put(IosFeed.TELEGRAM, new int[]{R.drawable.logo_telegram, IosPalette.BLUE});
         BRAND.put("com.yandex.browser.tv", new int[]{R.drawable.logo_browser, IosPalette.RED});
         BRAND.put("cm.aptoidetv.pt", new int[]{R.drawable.logo_aptoide, IosPalette.ORANGE});
