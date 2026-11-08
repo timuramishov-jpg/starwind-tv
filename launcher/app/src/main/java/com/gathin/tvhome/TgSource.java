@@ -62,7 +62,12 @@ final class TgSource extends MediaDataSource {
             ensureDownloading(position);
             synchronized (lock) { try { lock.wait(400); } catch (InterruptedException e) { throw new IOException(e); } }
             long waited = System.currentTimeMillis() - waitedSince;
-            if (waited > 5000 && waited % 5000 < 450) Log.i(TAG, "waiting at " + position + " (" + length + " B), ready " + ready);
+            if (waited > 3000 && waited % 3000 < 450) {
+                TdApi.Object f = tg.call(new TdApi.GetFile(fileId), 5_000);
+                TdApi.LocalFile l = f instanceof TdApi.File ? ((TdApi.File) f).local : null;
+                Log.i(TAG, "waiting at " + position + ", ready " + ready + (l == null ? "" : ", active " + l.isDownloadingActive
+                        + " offset " + l.downloadOffset + " prefix " + l.downloadedPrefixSize + " total " + l.downloadedSize));
+            }
             if (waited > 120_000) throw new IOException("Telegram не отдаёт видео");
         }
         throw new IOException("closed");
