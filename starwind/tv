@@ -43,6 +43,7 @@ P
 fonts() {
   Z=$(ls "$DIR"/SF-NF*.zip 2>/dev/null | head -1)
   F="$R/launcher/app/src/main/res/font"
+  mkdir -p "$F"   # в git папка пустая: шрифты Apple туда не кладутся
   if [ -z "$Z" ]; then
     # Нет архива Apple: если шрифтов SF ещё нет (свежая копия проекта) — ставим замену Inter (свободная, с кириллицей).
     ls "$F"/sf_regular.ttf > /dev/null 2>&1 && { say "Нет архива SF, остаются прежние шрифты"; return; }
