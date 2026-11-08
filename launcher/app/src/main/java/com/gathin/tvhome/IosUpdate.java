@@ -114,6 +114,8 @@ public class IosUpdate extends BroadcastReceiver {
 
     /** Ответ установщика: попросил подтверждения — показываем его окно. */
     @Override public void onReceive(Context c, Intent i) {
+        // Обновились: система остановила сервер пульта (его APK больше нет) — поднимаем из нового, не дожидаясь главного экрана.
+        if (Intent.ACTION_MY_PACKAGE_REPLACED.equals(i.getAction())) { new IosRemote(c).ensureShell(); return; }
         int status = i.getIntExtra(PackageInstaller.EXTRA_STATUS, PackageInstaller.STATUS_FAILURE);
         if (status == PackageInstaller.STATUS_PENDING_USER_ACTION) {
             Intent ask = i.getParcelableExtra(Intent.EXTRA_INTENT);

@@ -41,6 +41,7 @@
 | [Разработка](starwind/docs/DEVELOPMENT.md) | Сборка, тесты, установка, правила кода; как продолжать с любым ИИ |
 | [Если что-то не так](starwind/docs/TROUBLESHOOTING.md) | Частые проблемы и решения |
 | [История и решения](starwind/docs/HISTORY.md) | Почему сделано именно так, известные ограничения, идеи |
+| [**Учебник PDF «с нуля»**](starwind/docs/Starwind-tutorial.pdf) | Всё по шагам со снимками экрана — для повторения на своём телевизоре |
 
 ## Быстрый старт (Мак + телевизор в одной сети)
 
@@ -57,4 +58,4 @@ git clone https://github.com/timuramishov-jpg/starwind-tv.git ~/Documents/Claude
 Проект вырос из открытого [CleanYourTV](https://github.com/Gathin23/cleanyourtv) (очистка Android TV от лишнего и свой
 лаунчер). Исходный README того проекта — в [README.cleanyourtv.md](README.cleanyourtv.md); его инструменты (`tools/`)
 используются для связи с телевизором по adb. Вся работа Starwind — в ветке `starwind` (здесь она основная):
-папка [`starwind/`](starwind) и классы `Ios*`/`Tg*` в [`launcher/app/src/main/java/com/gathin/tvhome`](launcher/app/src/main/java/com/gathin/tvhome).
+папка [`starwind/`](starwind) и классы `Ios*`/`Tg*` (классы старого лаунчера CleanYourTV удалены) в [`launcher/app/src/main/java/com/gathin/tvhome`](launcher/app/src/main/java/com/gathin/tvhome).

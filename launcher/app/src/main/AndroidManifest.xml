@@ -134,7 +134,9 @@
         </service>
         <activity android:name=".IosSaverActivity" android:exported="false"
             android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" android:excludeFromRecents="true" />
-        <receiver android:name=".IosUpdate" android:exported="false" />
+        <receiver android:name=".IosUpdate" android:exported="false">
+            <intent-filter><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /></intent-filter>
+        </receiver>
         <!-- Таймер сна: право только гасить экран. Включается из adb: dpm set-active-admin. -->
         <receiver android:name=".IosAdmin" android:exported="true" android:permission="android.permission.BIND_DEVICE_ADMIN">
             <meta-data android:name="android.app.device_admin" android:resource="@xml/ios_admin" />
