@@ -37,6 +37,38 @@ final class TgSource extends MediaDataSource {
         this.fileId = fileId;
         this.size = size;
         tg.watchFile(fileId, wake);
+        Thread w = new Thread(this::watchdog, "tg-watchdog");
+        w.setDaemon(true);
+        w.start();
+    }
+
+    private volatile long readPos = -1;
+
+    /** Сторож подкачки: TDLib иногда «зависает» на одном куске (в журнале — до 30 с), пока остальные качаются.
+     *  Смотрим, докуда файл готов подряд от места просмотра; не растёт 3 с, а окно ещё не докачано — перезапускаем
+     *  загрузку именно с дыры, пока плеер доигрывает уже скачанное. */
+    private void watchdog() {
+        long lastEdge = -1, since = System.currentTimeMillis();
+        while (!closed) {
+            try { Thread.sleep(1000); } catch (InterruptedException e) { return; }
+            long pos = readPos;
+            if (pos < 0) continue;
+            TdApi.Object r = tg.call(new TdApi.GetFileDownloadedPrefixSize(fileId, pos), 5_000);
+            if (!(r instanceof TdApi.FileDownloadedPrefixSize)) continue;
+            long edge = pos + ((TdApi.FileDownloadedPrefixSize) r).size;
+            long now = System.currentTimeMillis();
+            if (edge != lastEdge) { lastEdge = edge; since = now; continue; }
+            boolean wanted;
+            synchronized (this) { wanted = edge >= winFrom && edge < winTo && edge < size; }
+            if (wanted && now - since > 3000) {
+                synchronized (this) {
+                    Log.i(TAG, "file " + fileId + " hole at " + edge + " (reading " + pos + "), restarting");
+                    tg.call(new TdApi.CancelDownloadFile(fileId, false), 5_000);
+                    request(edge);
+                }
+                since = now;
+            }
+        }
     }
 
     @Override public long getSize() { return size; }
@@ -69,7 +101,7 @@ final class TgSource extends MediaDataSource {
                         got = raf.read(buffer, offset, n);
                     }
                 }
-                if (got > 0) { waiting.remove(Thread.currentThread()); ahead(position + got); return got; }
+                if (got > 0) { waiting.remove(Thread.currentThread()); readPos = position + got; ahead(position + got); return got; }
             }
             waiting.put(Thread.currentThread(), position);
             ensureDownloading(position, System.currentTimeMillis() - waitedSince);
