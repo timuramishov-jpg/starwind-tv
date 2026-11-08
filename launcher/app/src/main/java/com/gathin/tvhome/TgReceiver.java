@@ -26,6 +26,7 @@ public final class TgReceiver extends BroadcastReceiver {
                 break;
             case "password": tg.password(String.valueOf(i.getStringExtra("p"))); break;
             case "logout": tg.logOut(); break;
+            case "feed": tg.feed(); break;
             default: tg.start();
         }
     }

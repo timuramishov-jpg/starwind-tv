@@ -112,6 +112,7 @@ public class IosHome extends Activity {
         BRAND.put("ru.vk.store.tv", new int[]{R.drawable.logo_rustore, IosPalette.BLUE});
         BRAND.put("ru.kinopoisk.yandex.tv", new int[]{R.drawable.logo_kino, IosPalette.ORANGE});
         BRAND.put("org.thunderdog.challegram", new int[]{R.drawable.logo_telegram, IosPalette.BLUE});
+        BRAND.put(IosFeed.TELEGRAM, new int[]{R.drawable.logo_telegram, IosPalette.BLUE});
         BRAND.put("com.yandex.browser.tv", new int[]{R.drawable.logo_browser, IosPalette.RED});
         BRAND.put("cm.aptoidetv.pt", new int[]{R.drawable.logo_aptoide, IosPalette.ORANGE});
         BRAND.put("com.moovi.tv.moovitv", new int[]{R.drawable.logo_moovi, IosPalette.RED});
@@ -403,6 +404,12 @@ public class IosHome extends Activity {
             handler.postDelayed(() -> { if (!overlayOpen() || !"settings".equals(menu.kind)) settings.show(); }, 250);
             return;
         }
+        // Пульт: «Аккаунты → YouTube» — вход или выход здесь, на телевизоре.
+        if (intent.getBooleanExtra("youtube_account", false)) {
+            intent.removeExtra("youtube_account");
+            handler.postDelayed(() -> { if (feed.signedIn()) { feed.signOut(); reload(); note("Вышел из YouTube"); } else startYouTubeSignIn(); }, 300);
+            return;
+        }
         String q = intent.getStringExtra("search");
         if (q != null && !q.trim().isEmpty()) { handler.postDelayed(() -> search.run(q.trim()), 300); return; }
         menu.close();
@@ -686,6 +693,21 @@ public class IosHome extends Activity {
     private void loadApps() {
         apps.clear();
         PackageManager pm = getPackageManager();
+        // Свой клиент Telegram — как отдельный сервис в доке, когда в нём есть ключ (вошли с пульта).
+        if (getSharedPreferences("tg", MODE_MULTI_PROCESS).getInt("api_id", 0) != 0) {
+            App t = cache.get(IosFeed.TELEGRAM);
+            if (t == null) {
+                t = new App();
+                t.pkg = IosFeed.TELEGRAM;
+                t.label = "Telegram";
+                t.component = new ComponentName(getPackageName(), TgActivity.class.getName());
+                t.system = true;
+                int[] brand = BRAND.get(IosFeed.TELEGRAM);
+                t.logo = IosIcons.fromMask(BitmapFactory.decodeResource(getResources(), brand[0]), brand[1]);
+                cache.put(t.pkg, t);
+            }
+            apps.put(t.pkg, t);
+        }
         for (String category : new String[]{Intent.CATEGORY_LEANBACK_LAUNCHER, Intent.CATEGORY_LAUNCHER}) {
             Intent i = new Intent(Intent.ACTION_MAIN).addCategory(category);
             for (ResolveInfo ri : pm.queryIntentActivities(i, 0)) {
@@ -714,6 +736,15 @@ public class IosHome extends Activity {
         if (prefs.contains("dock")) order.addAll(stored("dock"));
         else {
             order.addAll(Arrays.asList(DEFAULT_DOCK));
+        }
+        // Один раз ставим Telegram в док — между Кинопоиском и Зоной (или в конец).
+        if (apps.containsKey(IosFeed.TELEGRAM) && !prefs.getBoolean("tg_docked", false)) {
+            prefs.edit().putBoolean("tg_docked", true).apply();
+            if (!order.contains(IosFeed.TELEGRAM)) {
+                int at = order.indexOf(IosFeed.KINOPOISK);
+                order.add(at >= 0 ? at + 1 : order.size(), IosFeed.TELEGRAM);
+                if (prefs.contains("dock")) store("dock", order);
+            }
         }
         String zona = null;
         if (apps.containsKey("ru.zonaplayer.app")) zona = "ru.zonaplayer.app";
@@ -1022,7 +1053,7 @@ public class IosHome extends Activity {
             list.add(e);
         }
         remote.publish(list);
-        remote.state(prefs.getString("vpn_place", ""), IosSleep.at(this));
+        remote.state(prefs.getString("vpn_place", ""), IosSleep.at(this), feed.signedIn());
     }
     private IosWeather weather;
 

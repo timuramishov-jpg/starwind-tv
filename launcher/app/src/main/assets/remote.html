@@ -54,14 +54,13 @@ svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-l
 .app img{width:46%;aspect-ratio:1;object-fit:contain}
 .app.lit{box-shadow:inset 0 0 0 1px var(--hairline)}
 
-/* Кликпад как у пульта Apple TV: тёмное кольцо, точки направлений, центральная кнопка без надписи. */
-.pad{position:relative;width:min(78vw,300px);aspect-ratio:1;margin:var(--s5) auto var(--s4);border-radius:50%;background:var(--gray6);box-shadow:inset 0 0 0 1px var(--glass)}
-.pad button{position:absolute;background:none;width:32%;height:32%;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center}
-.pad button:not(.ok)::after{content:"";width:7px;height:7px;border-radius:50%;background:var(--gray1);transition:background .15s}
-.pad button:not(.ok):active{background:radial-gradient(closest-side,color-mix(in srgb,var(--glow) 40%,transparent),transparent);transform:none}
-.pad button:not(.ok):active::after{background:var(--ink)}
-.pad .u{left:34%;top:2%}.pad .d{left:34%;bottom:2%}.pad .l{left:2%;top:34%}.pad .rt{right:2%;top:34%}
-.pad .ok{left:30%;top:30%;width:40%;height:40%;background:var(--gray5);box-shadow:inset 0 0 0 1px var(--glass)}
+/* Кликпад как у пульта Apple TV, компактный: стрелки — шевроны, в центре OK. */
+.pad{position:relative;width:min(60vw,232px);aspect-ratio:1;margin:var(--s5) auto var(--s4);border-radius:50%;background:var(--gray6);box-shadow:inset 0 0 0 1px var(--glass)}
+.pad button{position:absolute;background:none;width:32%;height:32%;border-radius:50%;padding:0;display:flex;align-items:center;justify-content:center;color:var(--gray1)}
+.pad button svg{width:22px;height:22px}
+.pad button:not(.ok):active{background:radial-gradient(closest-side,color-mix(in srgb,var(--glow) 40%,transparent),transparent);transform:none;color:var(--ink)}
+.pad .u{left:34%;top:1%}.pad .d{left:34%;bottom:1%}.pad .l{left:1%;top:34%}.pad .rt{right:1%;top:34%}
+.pad .ok{left:31%;top:31%;width:38%;height:38%;background:var(--gray5);box-shadow:inset 0 0 0 1px var(--glass);color:var(--ink);font-size:var(--headline);font-weight:600}
 .pad .ok:active{background:var(--gray4);transform:scale(.97)}
 .keys{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s3)}
 .keys button{background:var(--gray6);color:var(--secondary);padding:0;height:64px;display:flex;align-items:center;justify-content:center;border-radius:var(--r-card)}
@@ -93,14 +92,32 @@ img.shot{display:block;width:100%;border-radius:var(--r-card);margin-top:var(--s
 progress{width:100%;height:4px;display:none;accent-color:var(--ink)}
 .tgf{display:none!important}.tgf.on{display:flex!important}
 button.wide{width:100%;margin-top:var(--s3);display:flex;align-items:center;justify-content:center;gap:var(--s2);border-radius:var(--r-card);padding:var(--s4)}
-/* Экран телевизора на телефоне: тапы и свайпы по картинке уходят на телевизор как касания пальцем. */
-.touch{display:none;position:fixed;inset:0;z-index:7;background:var(--black);padding:calc(env(safe-area-inset-top) + var(--s3)) var(--s4) calc(env(safe-area-inset-bottom) + var(--s4));flex-direction:column;gap:var(--s4)}
-.touch.on{display:flex}
-.touch-top{display:flex;align-items:center;justify-content:space-between;color:var(--secondary);font-size:var(--body)}
-.screen{position:relative;width:100%;aspect-ratio:16/9;border-radius:var(--r-card);overflow:hidden;background:var(--gray6);box-shadow:0 0 0 1px var(--hairline);touch-action:none}
-.screen img{width:100%;height:100%;display:block;-webkit-user-drag:none}
+/* Инструменты: три крупные плитки. */
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s3)}
+.tiles button{background:var(--gray6);color:var(--ink);border-radius:var(--r-card);padding:var(--s4) var(--s2);display:flex;flex-direction:column;align-items:center;gap:var(--s1);font-weight:600}
+.tiles button svg{width:28px;height:28px;margin-bottom:var(--s1)}
+.tiles small{color:var(--secondary);font-weight:400;font-size:var(--footnote)}
+.tiles button.live{color:var(--red)}
+svg .fill{fill:currentColor;stroke:none}
+.gap{margin-top:var(--s2)}
+.card .row .file{flex:1}
+/* Экран телевизора на телефоне: всегда «лёжа», на весь экран — даже если телефон держат вертикально.
+   Тапы и свайпы по картинке уходят на телевизор как касания пальцем. */
+.touch{display:none;position:fixed;inset:0;z-index:7;background:var(--black);touch-action:none}
+.touch.on{display:block}
+.stage{position:absolute;left:50%;top:50%;width:100vw;height:100vh;transform:translate(-50%,-50%);display:flex;align-items:center;gap:var(--s3);padding:var(--s3) calc(env(safe-area-inset-right) + var(--s3)) var(--s3) calc(env(safe-area-inset-left) + var(--s3))}
+@media (orientation:portrait){.stage{width:100vh;height:100vw;transform:translate(-50%,-50%) rotate(90deg)}}
+.screen{position:relative;flex:1;height:100%;max-height:calc((100% - 0px));aspect-ratio:16/9;max-width:calc(100% - 64px);border-radius:var(--r-card);overflow:hidden;background:var(--gray6);box-shadow:0 0 0 1px var(--hairline)}
+.screen img{width:100%;height:100%;object-fit:contain;display:block;-webkit-user-drag:none;pointer-events:none}
 .screen i{position:absolute;width:24px;height:24px;margin:-12px 0 0 -12px;border-radius:50%;background:var(--glass);box-shadow:0 0 0 2px var(--ink);opacity:0;pointer-events:none;transition:opacity .4s}
-@media (orientation:landscape){.touch .keys{display:none}.screen{height:calc(100vh - 80px);width:auto;margin:0 auto}}
+.touch-bar{display:flex;flex-direction:column;gap:var(--s2)}
+.touch-bar button{width:52px;height:52px;padding:0;background:var(--gray6);color:var(--secondary);border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:600}
+.touch-top{display:flex;align-items:center;justify-content:space-between;color:var(--secondary);font-size:var(--body);gap:var(--s3)}
+/* Снимок и запись: открываются крупно, чтобы сохранить в Фото долгим нажатием или кнопкой «Поделиться». */
+.viewer{display:none;position:fixed;inset:0;z-index:8;background:var(--black);padding:calc(env(safe-area-inset-top) + var(--s3)) var(--s4) calc(env(safe-area-inset-bottom) + var(--s4));flex-direction:column;gap:var(--s4)}
+.viewer.on{display:flex}
+.viewer a.open{color:var(--blue);text-align:center;font-size:var(--headline);text-decoration:none}
+.viewer img,.viewer video{width:100%;border-radius:var(--r-card);-webkit-user-select:auto;user-select:auto;-webkit-touch-callout:default}
 .seg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));background:var(--gray6);border-radius:var(--r-row);padding:3px;margin-top:var(--s1)}
 .seg button{background:none;color:var(--secondary);font-size:var(--body);font-weight:600;padding:var(--s2);border-radius:var(--r-row)}
 .seg button.on{background:var(--gray4);color:var(--ink)}
@@ -129,11 +146,11 @@ nav button:active{transform:none}
 <section class="tab on" id="remote">
   <div class="dock" id="dock"></div>
   <div class="pad">
-    <button class="u" data-key="DPAD_UP" aria-label="Вверх"></button>
-    <button class="l" data-key="DPAD_LEFT" aria-label="Влево"></button>
-    <button class="ok" data-key="DPAD_CENTER" aria-label="ОК"></button>
-    <button class="rt" data-key="DPAD_RIGHT" aria-label="Вправо"></button>
-    <button class="d" data-key="DPAD_DOWN" aria-label="Вниз"></button>
+    <button class="u" data-key="DPAD_UP" aria-label="Вверх"><svg viewBox="0 0 24 24"><path d="M6 15l6-6 6 6"/></svg></button>
+    <button class="l" data-key="DPAD_LEFT" aria-label="Влево"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
+    <button class="ok" data-key="DPAD_CENTER" aria-label="ОК">OK</button>
+    <button class="rt" data-key="DPAD_RIGHT" aria-label="Вправо"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
+    <button class="d" data-key="DPAD_DOWN" aria-label="Вниз"><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>
   </div>
   <div class="keys">
     <button data-key="BACK" aria-label="Назад"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg></button>
@@ -146,29 +163,56 @@ nav button:active{transform:none}
     <button onclick="go('key',{c:'MENU'})" aria-label="Меню"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
     <button onclick="openSearch()" aria-label="Поиск"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button>
   </div>
-  <button class="s wide" onclick="openTouch()"><svg viewBox="0 0 24 24"><path d="M9 11V5a2 2 0 014 0v6"/><path d="M13 9a2 2 0 014 0v4a7 7 0 01-7 7H9a5 5 0 01-4-2l-2-3a2 2 0 013-2l1 1"/></svg>Экран телевизора: нажать пальцем</button>
-  <div class="touch" id="touch">
-    <div class="touch-top"><span>Нажми или проведи по картинке</span><button onclick="closeTouch()">Готово</button></div>
-    <div class="screen" id="screen"><img id="view" alt="Экран телевизора"><i id="dot"></i></div>
-    <div class="keys"><button data-key="BACK" aria-label="Назад"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg></button>
-      <button data-key="DPAD_CENTER" aria-label="ОК"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7"/></svg></button>
-      <button onclick="go('home',{})" aria-label="Домой"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg></button></div>
-  </div>
-  <h2>VPN и сон</h2>
-  <div class="card list">
+  <h2>Открыть на телевизоре</h2>
+  <div class="card"><div class="row"><input type="url" id="u" placeholder="Ссылка: YouTube, ВК, Telegram…" enterkeyhint="go"><button onclick="openLink()">Открыть</button></div></div>
+  <div class="card list gap">
     <label><span class="name">VPN<small id="vpnl">Happ</small></span><input type="checkbox" class="sw" id="vpn" onchange="go('vpn',{on:this.checked?1:0})"></label>
-    <button onclick="sleepNext()"><span class="name">Таймер сна<small id="sleepl">Выключен</small></span><svg viewBox="0 0 24 24" class="muted"><path d="M20 15A8 8 0 019 4a8 8 0 1011 11z"/></svg></button>
   </div>
 </section>
 
-<section class="tab" id="apps">
-  <div class="card"><div class="row"><button class="file s">Установить APK с телефона<input type="file" accept=".apk,application/vnd.android.package-archive" onchange="installApk(this)"></button></div><progress id="ip" max="1"></progress></div>
-  <h2>Можно смело отключить</h2><div class="card list" id="bloat"></div>
-  <h2>Установленные</h2><div class="card list" id="user"></div>
-  <h2>Встроенные</h2><div class="card list" id="sys"></div>
+<section class="tab" id="tools">
+  <div class="tiles">
+    <button onclick="openTouch()"><svg viewBox="0 0 24 24"><path d="M9 11V5a2 2 0 014 0v6"/><path d="M13 9a2 2 0 014 0v4a7 7 0 01-7 7H9a5 5 0 01-4-2l-2-3a2 2 0 013-2l1 1"/></svg><b>Экран</b><small>Нажать пальцем</small></button>
+    <button onclick="shot()"><svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="14" rx="3"/><circle cx="12" cy="13" r="3.5"/><path d="M8 6l1.5-2h5L16 6"/></svg><b>Снимок</b><small>В Фото</small></button>
+    <button onclick="rec()" id="recb"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3.5" class="fill"/></svg><b id="recl">Запись</b><small id="recs">Видео экрана</small></button>
+  </div>
+  <div id="shotbox"></div>
+  <h2>Отправить на телевизор</h2>
+  <div class="seg" id="fseg"><button class="on" data-d="Download">Загрузки</button><button data-d="Movies">Фильмы</button></div>
+  <div class="card gap"><div class="row"><button class="file s">Файл или фильм<input type="file" onchange="upload(this)"></button><button class="file s">Приложение APK<input type="file" accept=".apk,application/vnd.android.package-archive" onchange="installApk(this)"></button></div><progress id="up" max="1"></progress><progress id="ip" max="1"></progress></div>
+  <div class="card list gap" id="flist"></div>
+  <h2>Телевизор</h2>
+  <div class="card list">
+    <button onclick="sleepNext()"><span class="name">Таймер сна<small id="sleepl">Выключен</small></span><svg viewBox="0 0 24 24" class="muted"><path d="M20 15A8 8 0 019 4a8 8 0 1011 11z"/></svg></button>
+    <label><span class="name">Быстрые анимации<small>Меню и переходы вдвое быстрее</small></span><input type="checkbox" class="sw" id="anim" onchange="tweak('anim',this.checked)"></label>
+    <label><span class="name">Блокировка рекламы<small>DNS AdGuard для всех приложений</small></span><input type="checkbox" class="sw" id="dns" onchange="tweak('dns',this.checked)"></label>
+    <button onclick="tweak('trim')"><span class="name">Очистить кэш приложений<small>Входы и данные остаются</small></span></button>
+    <button onclick="tweak('devsettings')"><span class="name">Доступ к отладке<small>Там же можно отозвать все разрешения</small></span></button>
+    <button onclick="if(confirm('Перезагрузить телевизор?'))tweak('reboot')"><span class="name danger">Перезагрузить телевизор</span></button>
+  </div>
 </section>
 
-<section class="tab" id="tv">
+<section class="tab" id="accounts">
+  <h2>Telegram</h2>
+  <div class="card list" id="tg">
+    <div><span class="name">Telegram<small id="tgs">—</small></span><button class="s" onclick="go('tg',{a:'open'})">На экран</button></div>
+    <div class="tgf" id="tgkey"><span class="name">Ключ приложения<small>my.telegram.org → API development tools</small></span></div>
+    <div class="tgf" id="tgkey2"><input type="text" id="tgid" inputmode="numeric" placeholder="api_id" autocomplete="off"></div>
+    <div class="tgf" id="tgkey3"><input type="text" id="tghash" placeholder="api_hash" autocomplete="off" autocapitalize="off" spellcheck="false"><button onclick="tgKey()">Сохранить</button></div>
+    <div class="tgf" id="tgpass"><input type="password" id="tgp" placeholder="Облачный пароль" autocomplete="current-password"><button onclick="tgPass()">Войти</button></div>
+    <button class="r" id="tgout" onclick="tgOut()">Выйти из Telegram на телевизоре</button>
+  </div>
+  <h2>YouTube</h2>
+  <div class="card list">
+    <div><span class="name">YouTube<small id="yts">—</small></span><button class="s" id="ytb" onclick="go('account',{a:'youtube'})">Войти</button></div>
+  </div>
+  <h2>Яндекс</h2>
+  <div class="card list">
+    <div><span class="name">Аккаунт Яндекса<small>Кинопоиск, Алиса и сервисы Яндекса</small></span><button class="s" onclick="go('account',{a:'yandex'})">На экран</button></div>
+  </div>
+</section>
+
+<section class="tab" id="status">
   <div class="stats">
     <div class="stat"><span>Процессор</span><b id="cpu">—</b><div class="bar"><i id="cpub"></i></div></div>
     <div class="stat"><span id="raml">Память</span><b id="ram">—</b><div class="bar"><i id="ramb"></i></div></div>
@@ -176,45 +220,28 @@ nav button:active{transform:none}
     <div class="stat"><span id="netl">Сеть, Мбит/с</span><b id="net">—</b></div>
     <div class="stat wide"><span>Свободно на диске</span><b id="disk">—</b></div>
   </div>
-  <h2>Открыть ссылку на телевизоре</h2>
-  <div class="card"><div class="row"><input type="url" id="u" placeholder="YouTube, ВК, Telegram…"><button onclick="go('open',{u:val('u')})">Открыть</button></div></div>
-  <h2>Telegram</h2>
-  <div class="card list" id="tg">
-    <div><span class="name">Состояние<small id="tgs">—</small></span><button class="s" onclick="go('tg',{a:'open'})">На экран</button></div>
-    <div class="tgf" id="tgkey"><span class="name">Ключ приложения<small>my.telegram.org → API development tools</small></span></div>
-    <div class="tgf" id="tgkey2"><input type="text" id="tgid" inputmode="numeric" placeholder="api_id" autocomplete="off"></div>
-    <div class="tgf" id="tgkey3"><input type="text" id="tghash" placeholder="api_hash" autocomplete="off" autocapitalize="off" spellcheck="false"><button onclick="tgKey()">Сохранить</button></div>
-    <div class="tgf" id="tgpass"><input type="password" id="tgp" placeholder="Облачный пароль" autocomplete="current-password"><button onclick="tgPass()">Войти</button></div>
-    <button class="r" id="tgout" onclick="tgOut()">Выйти из Telegram на телевизоре</button>
-  </div>
   <h2>Больше всего памяти</h2><div class="card list" id="top"></div>
-  <h2>Настройки</h2>
-  <div class="card list">
-    <label><span class="name">Быстрые анимации<small>Меню и переходы вдвое быстрее</small></span><input type="checkbox" class="sw" id="anim" onchange="tweak('anim',this.checked)"></label>
-    <label><span class="name">Блокировка рекламы<small>Через DNS AdGuard, для всех приложений</small></span><input type="checkbox" class="sw" id="dns" onchange="tweak('dns',this.checked)"></label>
-  </div>
-  <h2>Действия</h2>
-  <div class="card list">
-    <button onclick="shot()"><span class="name">Снимок экрана</span></button>
-    <button onclick="tweak('trim')"><span class="name">Очистить кэш приложений<small>Входы и данные остаются</small></span></button>
-    <button onclick="tweak('devsettings')"><span class="name">Доступ к отладке<small>Там же можно отозвать все разрешения</small></span></button>
-    <button onclick="if(confirm('Перезагрузить телевизор?'))tweak('reboot')"><span class="name danger">Перезагрузить телевизор</span></button>
-  </div>
-  <div id="shotbox"></div>
+  <h2>Можно смело отключить</h2><div class="card list" id="bloat"></div>
+  <h2>Установленные</h2><div class="card list" id="user"></div>
+  <h2>Встроенные</h2><div class="card list" id="sys"></div>
 </section>
 
-<section class="tab" id="files">
-  <div class="seg" id="fseg"><button class="on" data-d="Download">Загрузки</button><button data-d="Movies">Фильмы</button></div>
-  <h2>Отправить на телевизор</h2>
-  <div class="card"><div class="row"><button class="file s">Выбрать файл<input type="file" onchange="upload(this)"></button></div><progress id="up" max="1"></progress></div>
-  <h2>На телевизоре</h2><div class="card list" id="flist"></div>
-</section>
+<div class="touch" id="touch">
+  <div class="stage" id="stage">
+    <div class="screen" id="screen"><img id="view" alt="Экран телевизора"><i id="dot"></i></div>
+    <div class="touch-bar"><button data-key="BACK" aria-label="Назад"><svg viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 010 12h-3"/></svg></button>
+      <button data-key="DPAD_CENTER" aria-label="ОК">OK</button>
+      <button onclick="go('home',{})" aria-label="Домой"><svg viewBox="0 0 24 24"><path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/></svg></button>
+      <button onclick="closeTouch()" aria-label="Закрыть"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+  </div>
+</div>
+<div class="viewer" id="viewer"><div class="touch-top"><span id="viewerHint">Нажми на снимок и удерживай → «Сохранить в Фото»</span><button onclick="$('viewer').classList.remove('on')">Готово</button></div><div id="viewerBody"></div></div>
 
 <nav id="nav">
   <button class="on" data-t="remote" data-name="Пульт"><svg viewBox="0 0 24 24"><rect x="7" y="2" width="10" height="20" rx="4"/><circle cx="12" cy="9" r="2.5"/><path d="M10 15h4M10 18h4"/></svg>Пульт</button>
-  <button data-t="apps" data-name="Приложения"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="2"/></svg>Приложения</button>
-  <button data-t="tv" data-name="Телевизор"><svg viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="13" rx="2.5"/><path d="M8 21h8"/></svg>Телевизор</button>
-  <button data-t="files" data-name="Файлы"><svg viewBox="0 0 24 24"><path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>Файлы</button>
+  <button data-t="tools" data-name="Инструменты"><svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 00-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 005.4-5.4l-2.5 2.5-2.5-.5-.5-2.5z"/></svg>Инструменты</button>
+  <button data-t="accounts" data-name="Аккаунты"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0116 0"/></svg>Аккаунты</button>
+  <button data-t="status" data-name="Состояние"><svg viewBox="0 0 24 24"><path d="M3 12h4l3-7 4 14 3-7h4"/></svg>Состояние</button>
 </nav>
 <div id="t" role="status"></div>
 
@@ -233,13 +260,13 @@ function mb(n){return n>=1024?(n/1024).toFixed(1).replace('.',',')+' ГБ':n+' �
 function glow(c){document.documentElement.style.setProperty('--glow',c)}
 
 
-const tabGlow={remote:null,apps:'var(--blue)',tv:'var(--green)',files:'var(--orange)'};
+const tabGlow={remote:null,tools:'var(--orange)',accounts:'var(--blue)',status:'var(--green)'};
 let lastAccent='var(--orange)';
 document.querySelectorAll('#nav button').forEach(b=>b.onclick=()=>{
   document.querySelectorAll('#nav button').forEach(x=>x.classList.toggle('on',x===b));
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.id===b.dataset.t));
   $('title').textContent=b.dataset.name;glow(tabGlow[b.dataset.t]||lastAccent);scrollTo(0,0);
-  if(b.dataset.t==='apps')loadApps();if(b.dataset.t==='files')loadFiles();if(b.dataset.t==='tv'){stats();topApps()}
+  if(b.dataset.t==='tools'){loadFiles();recState()}if(b.dataset.t==='status'){stats();topApps();loadApps()}
 });
 
 // Кнопки пульта: зажатая повторяет нажатие.
@@ -303,7 +330,7 @@ async function loadFiles(){
 function upload(i){const f=i.files[0];if(!f)return;sendFile(url('upload',{d:dir,n:f.name}),f,$('up'),loadFiles);i.value=''}
 
 async function stats(){
-  if(!$('tv').classList.contains('on'))return;
+  if(!$('status').classList.contains('on'))return;
   try{const s=await call('stats');
     if(s.cpu!=null){$('cpu').textContent=s.cpu+'%';$('cpub').style.width=s.cpu+'%'}
     const used=s.ramTotal-s.ramFree;$('ram').textContent=Math.round(100*used/s.ramTotal)+'%';$('raml').textContent='Память · '+used+'/'+s.ramTotal+' МБ';$('ramb').style.width=Math.round(100*used/s.ramTotal)+'%';
@@ -313,7 +340,7 @@ async function stats(){
   }catch(e){}
   setTimeout(stats,2500)}
 async function topApps(){
-  if(!$('tv').classList.contains('on'))return;
+  if(!$('status').classList.contains('on'))return;
   try{const l=await call('top');if(Array.isArray(l)){const box=$('top');box.innerHTML='';
     l.forEach(x=>{const r=document.createElement('div');r.innerHTML='<span class=name>'+esc(x.label)+'<small>'+esc(x.pkg)+'</small></span><span class=tag>'+x.mb+' МБ</span>';box.appendChild(r)})}}catch(e){}
   setTimeout(topApps,12000)}
@@ -325,10 +352,26 @@ async function state(){try{const s=await call('state');$('anim').checked=!!s.ani
   if(s.typing==='ime'&&fieldMode!=='ime')showField('ime');
   else if(s.typing!=='ime'&&fieldMode==='ime')hideField();
   if(s.tg)tgState(s.tg);
+  if(s.youtube!=null){$('yts').textContent=s.youtube?'Вошёл — лента подписок':'Не вошёл — показываю популярное';$('ytb').textContent=s.youtube?'Выйти':'Войти'}
   if(s.sleep!=null){sleepLeft=s.sleep;$('sleepl').textContent=s.sleep?'Через '+s.sleep+' мин':'Выключен'}}catch(e){}}
-function shot(){toast('Снимаю экран');const img=new Image();img.className='shot';img.alt='Снимок экрана телевизора';
-  img.onload=()=>{$('shotbox').innerHTML='';const a=document.createElement('a');a.href=img.src;a.download='tv.png';a.appendChild(img);$('shotbox').appendChild(a)};
+// Снимок экрана — крупно, долгое нажатие сохраняет его в Фото.
+function shot(){toast('Снимаю экран');const img=new Image();img.alt='Снимок экрана телевизора';
+  img.onload=()=>{$('viewerHint').textContent='Нажми на снимок и удерживай → «Сохранить в Фото»';$('viewerBody').innerHTML='';$('viewerBody').appendChild(img);$('viewer').classList.add('on')};
   img.onerror=()=>toast('Не получилось снять экран');img.src=url('shot',{t:Date.now()})}
+function openLink(){const u=val('u');if(!u){toast('Вставь ссылку');return}go('open',{u});$('u').value=''}
+$('u').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();openLink()}});
+// Запись экрана: старт, стоп — и видео сразу открывается для сохранения в Фото.
+let recOn=false,recFrom=0,recTimer=null;
+async function recState(){try{const r=await call('rec',{a:'state'});recOn=!!r.on;paintRec()}catch(e){}}
+function paintRec(){$('recb').classList.toggle('live',recOn);$('recl').textContent=recOn?'Стоп':'Запись';
+  $('recs').textContent=recOn?(recFrom?Math.round((Date.now()-recFrom)/1000)+' с':'Идёт запись'):'Видео экрана'}
+async function rec(){
+  if(!recOn){await go('rec',{a:'start'});recOn=true;recFrom=Date.now();paintRec();clearInterval(recTimer);recTimer=setInterval(()=>{paintRec();if(Date.now()-recFrom>180000){recOn=false;clearInterval(recTimer);paintRec();showRec()}},1000);return}
+  clearInterval(recTimer);recOn=false;paintRec();const r=await go('rec',{a:'stop'});if(r&&r.ready)showRec()}
+function showRec(){$('viewerHint').textContent='Открой видео отдельно → «Поделиться» → «Сохранить видео»';
+  const v=document.createElement('video');v.controls=true;v.playsInline=true;v.src=url('video',{t:Date.now()});
+  const a=document.createElement('a');a.href=url('video',{t:Date.now()});a.target='_blank';a.textContent='Открыть видео отдельно';a.className='open';
+  $('viewerBody').innerHTML='';$('viewerBody').append(v,a);$('viewer').classList.add('on')}
 // Одно поле на весь пульт. ime — на телевизоре открыта клавиатура: текст уходит прямо в поле, с кириллицей.
 // yt — поиск в YouTube (у него своя клавиатура): запрос открывается готовыми результатами.
 // tv — поиск лаунчера по всем приложениям.
@@ -348,7 +391,7 @@ $('tv-in').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault()
 $('tv-in').addEventListener('input',e=>{if(fieldMode==='ime'&&$('tv-in').value.endsWith(' '))sendType(false)});
 // Telegram: что показывает телевизор и какие поля нужны сейчас. Ключ и пароль уходят прямо на телевизор, здесь не хранятся.
 const tgText={closed:'Не запущен — нажми «На экран»',api:'Нужен ключ приложения',novpn:'Включи VPN — без него Telegram на паузе',
-  wait:'Подключаюсь…',qr:'Отсканируй QR-код на телевизоре в Telegram: Настройки → Устройства',password:'Нужен облачный пароль',ready:'Вошёл, можно открывать ссылки',error:'Ошибка'};
+  wait:'Подключаюсь…',qr:'Отсканируй QR-код на телевизоре в Telegram: Настройки → Устройства',password:'Нужен облачный пароль',ready:'Вошёл · каналы и видео — на телевизоре',error:'Ошибка'};
 let tgLast='';
 function tgState(t){const st=t.state||'closed';
   // Пока своего ключа нет, ссылки открывает Telegram X — так и пишем, без тревожного «нужен ключ».
@@ -367,11 +410,14 @@ let touchOn=false,frameUrl='';
 async function frame(){if(!touchOn)return;try{const r=await fetch(url('view',{t:Date.now()}));const b=await r.blob();
   const u=URL.createObjectURL(b);$('view').src=u;if(frameUrl)URL.revokeObjectURL(frameUrl);frameUrl=u}catch(e){}
   setTimeout(frame,400)}
-function openTouch(){touchOn=true;$('touch').classList.add('on');frame()}
-function closeTouch(){touchOn=false;$('touch').classList.remove('on')}
+function openTouch(){touchOn=true;$('touch').classList.add('on');frame();try{document.documentElement.requestFullscreen&&document.documentElement.requestFullscreen()}catch(e){}}
+function closeTouch(){touchOn=false;$('touch').classList.remove('on');try{document.fullscreenElement&&document.exitFullscreen()}catch(e){}}
 let t0=null;
-function pos(e){const r=$('screen').getBoundingClientRect(),p=e.changedTouches?e.changedTouches[0]:e;
-  return {x:(p.clientX-r.left)/r.width,y:(p.clientY-r.top)/r.height,px:p.clientX-r.left,py:p.clientY-r.top}}
+// В вертикальном положении телефона экран повёрнут на 90°: пересчитываем касание в координаты картинки.
+function pos(e){const sc=$('screen'),r=sc.getBoundingClientRect(),p=e.changedTouches?e.changedTouches[0]:e;
+  const rot=matchMedia('(orientation:portrait)').matches;
+  const x=rot?(p.clientY-r.top)/r.height:(p.clientX-r.left)/r.width, y=rot?1-(p.clientX-r.left)/r.width:(p.clientY-r.top)/r.height;
+  return {x,y,px:x*sc.offsetWidth,py:y*sc.offsetHeight}}
 function dot(p){const d=$('dot');d.style.left=p.px+'px';d.style.top=p.py+'px';d.style.transition='none';d.style.opacity=1;
   requestAnimationFrame(()=>{d.style.transition='';d.style.opacity=0})}
 $('screen').addEventListener('pointerdown',e=>{t0=pos(e)});

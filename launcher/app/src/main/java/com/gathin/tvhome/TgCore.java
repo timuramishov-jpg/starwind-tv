@@ -43,7 +43,7 @@ final class TgCore implements Client.ResultHandler {
     private final List<Runnable> listeners = new ArrayList<>();
     private final Map<Integer, List<Runnable>> fileWaiters = new ConcurrentHashMap<>();
     private Client client;
-    private boolean libs, vpnUp, closing;
+    private boolean libs, vpnUp, closing, feedWanted;
 
     static synchronized TgCore get(Context c) {
         if (instance == null) instance = new TgCore(c.getApplicationContext());
@@ -115,6 +115,12 @@ final class TgCore implements Client.ResultHandler {
             closing = true;
             client.send(new TdApi.Close(), r -> { });
         } else start();
+    }
+
+    /** Обновить ленту для дока: сейчас, если вошли, или как только войдём. */
+    void feed() {
+        if ("ready".equals(state)) TgFeed.build(context, this);
+        else { feedWanted = true; start(); }
     }
 
     void logOut() {
@@ -230,6 +236,7 @@ final class TgCore implements Client.ResultHandler {
             changed("password");
         } else if (a instanceof TdApi.AuthorizationStateReady) {
             hint = "";
+            if (feedWanted) { feedWanted = false; TgFeed.build(context, this); }
             changed(vpnUp ? "ready" : "novpn");
             // Кэш видео не копим: больше 300 МБ — старое удаляется.
             c.send(new TdApi.OptimizeStorage(300L << 20, 3 * 24 * 3600, 0, 60, new TdApi.FileType[0], new long[0], new long[0], false, 0), r -> { });

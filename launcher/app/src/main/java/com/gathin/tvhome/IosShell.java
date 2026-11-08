@@ -99,6 +99,7 @@ public final class IosShell {
             int q = path.indexOf('?');
             if (q >= 0) { query = path.substring(q + 1); path = path.substring(0, q); }
             Map<String, String> a = parse(query);
+            for (String h : lines) if (h.toLowerCase(Locale.ROOT).startsWith("range:")) a.put("_range", h.substring(6).trim());
             OutputStream out = c.getOutputStream();
             if (path.equals("/icon.png")) { bytes(out, 200, "image/png", asset("remote-icon.png"), true); return; }
             String key = read(DIR + "/key").trim();
@@ -222,6 +223,57 @@ public final class IosShell {
                 try (InputStream i = new FileInputStream(f)) { copy(i, out, Long.MAX_VALUE); }
                 out.flush();
                 return;
+            }
+            case "rec": {
+                // Запись экрана: системный screenrecord, до 3 минут, 720p. Остановили — видео можно открыть на телефоне.
+                String rec = orEmpty(a.get("a"), "state");
+                if ("start".equals(rec)) {
+                    sh("rm -f " + REC + "; (nohup screenrecord --size 1280x720 --bit-rate 6000000 --time-limit 180 " + REC + " </dev/null >/dev/null 2>&1 &)");
+                    json = say("Записываю экран — до 3 минут");
+                } else if ("stop".equals(rec)) {
+                    sh("pkill -INT -f 'screenrec[o]rd'");
+                    Thread.sleep(1200);
+                    json = new JSONObject().put("say", "Запись готова").put("ready", new File(REC).length() > 0).toString();
+                } else json = new JSONObject().put("on", sh("pgrep -f 'screenrec[o]rd'").trim().length() > 0)
+                        .put("ready", new File(REC).length() > 0).toString();
+                break;
+            }
+            case "video": {
+                // Запись экрана для телефона: с поддержкой Range — без неё Safari на iPhone не показывает видео.
+                File f = new File(REC);
+                if (!f.isFile()) { text(out, 404, "text/plain", ""); return; }
+                long len = f.length(), from = 0, to = len - 1;
+                String r = a.get("_range");
+                Matcher m = r == null ? null : Pattern.compile("bytes=(\\d*)-(\\d*)").matcher(r);
+                boolean part = m != null && m.find();
+                if (part) {
+                    if (!m.group(1).isEmpty()) from = Long.parseLong(m.group(1));
+                    if (!m.group(2).isEmpty()) to = Math.min(len - 1, Long.parseLong(m.group(2)));
+                    if (m.group(1).isEmpty() && !m.group(2).isEmpty()) { from = Math.max(0, len - Long.parseLong(m.group(2))); to = len - 1; }
+                }
+                head(out, part ? 206 : 200, "video/mp4", to - from + 1, "Accept-Ranges: bytes\r\n"
+                        + (part ? "Content-Range: bytes " + from + "-" + to + "/" + len + "\r\n" : ""));
+                try (java.io.RandomAccessFile raf = new java.io.RandomAccessFile(f, "r")) {
+                    raf.seek(from);
+                    byte[] buf = new byte[65536];
+                    long left = to - from + 1;
+                    while (left > 0) {
+                        int n = raf.read(buf, 0, (int) Math.min(buf.length, left));
+                        if (n <= 0) break;
+                        out.write(buf, 0, n);
+                        left -= n;
+                    }
+                }
+                out.flush();
+                return;
+            }
+            case "account": {
+                // Аккаунты на телевизоре: экран управления открывается на самом телевизоре.
+                String which = orEmpty(a.get("a"), "");
+                if ("yandex".equals(which)) sh("am start -a com.yandex.tv.passport.MANAGE_ACCOUNTS -p com.yandex.tv.services");
+                else if ("youtube".equals(which)) sh("am start -n " + PKG + "/.IosHome --ez youtube_account true");
+                json = say("Открываю на телевизоре");
+                break;
             }
             case "view": {
                 // Экран телевизора для пульта: маленький JPEG (960×540, ~60 КБ), чтобы обновлялся раз в секунду.
@@ -380,6 +432,7 @@ public final class IosShell {
     }
 
     static final String TGX = "org.thunderdog.challegram";
+    private static final String REC = "/sdcard/Movies/tv-rec.mp4";
     private static boolean tgx;
     private static long tgxAt;
 
@@ -473,7 +526,7 @@ public final class IosShell {
         String mode = sh("settings get global private_dns_mode").trim(), host = sh("settings get global private_dns_specifier").trim();
         long sleepAt = s.optLong("sleepAt");
         return new JSONObject().put("anim", "0.5".equals(anim)).put("dns", "hostname".equals(mode) && IosTools.DNS_HOST.equals(host))
-                .put("vpn", new File("/sys/class/net/tun0").exists()).put("place", s.optString("place"))
+                .put("vpn", new File("/sys/class/net/tun0").exists()).put("place", s.optString("place")).put("youtube", s.optBoolean("youtube"))
                 .put("typing", typingMode())
                 .put("yt", youTube() != null)
                 .put("tg", new JSONObject(orEmpty(read(DIR + "/tg.json"), "{\"state\":\"closed\"}")).put("tgx", tgxInstalled()))
@@ -645,7 +698,7 @@ public final class IosShell {
     }
 
     private static void head(OutputStream out, int code, String type, long length, String extra) throws Exception {
-        String h = "HTTP/1.1 " + code + (code == 200 ? " OK" : code == 404 ? " Not Found" : " Forbidden") + "\r\nContent-Type: " + type
+        String h = "HTTP/1.1 " + code + (code == 200 ? " OK" : code == 206 ? " Partial Content" : code == 404 ? " Not Found" : " Forbidden") + "\r\nContent-Type: " + type
                 + "\r\nContent-Length: " + length + "\r\n" + (extra == null ? "" : extra) + "Connection: close\r\n\r\n";
         out.write(h.getBytes(StandardCharsets.UTF_8));
     }
