@@ -115,11 +115,12 @@
             <meta-data android:name="android.view.im" android:resource="@xml/ios_ime" />
         </service>
         <receiver android:name=".IosCommand" android:exported="true" android:permission="android.permission.DUMP" />
-        <!-- Telegram: свой процесс, чтобы библиотека и плеер не утяжеляли главный экран. -->
-        <activity android:name=".TgActivity" android:exported="true" android:permission="android.permission.DUMP" android:process=":tg"
+        <!-- Telegram: свой процесс (библиотека и плеер не утяжеляют главный экран) и своя задача — иначе он попадает
+             в задачу главного экрана и система закрывает его при возврате домой. -->
+        <activity android:name=".TgActivity" android:exported="true" android:permission="android.permission.DUMP" android:process=":tg" android:taskAffinity="com.gathin.tvhome.tg"
             android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen" android:launchMode="singleTask"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|uiMode" />
-        <activity android:name=".TgPlayerActivity" android:exported="false" android:process=":tg"
+        <activity android:name=".TgPlayerActivity" android:exported="false" android:process=":tg" android:taskAffinity="com.gathin.tvhome.tg"
             android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenSize|uiMode" />
         <receiver android:name=".TgReceiver" android:exported="true" android:permission="android.permission.DUMP" android:process=":tg" />
