@@ -91,6 +91,7 @@ svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:2;stroke-l
 img.shot{display:block;width:100%;border-radius:var(--r-card);margin-top:var(--s3);border:1px solid var(--glass)}
 .file{position:relative;overflow:hidden;flex:1}.file input{position:absolute;inset:0;opacity:0}
 progress{width:100%;height:4px;display:none;accent-color:var(--ink)}
+.tgf{display:none!important}.tgf.on{display:flex!important}
 .seg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));background:var(--gray6);border-radius:var(--r-row);padding:3px;margin-top:var(--s1)}
 .seg button{background:none;color:var(--secondary);font-size:var(--body);font-weight:600;padding:var(--s2);border-radius:var(--r-row)}
 .seg button.on{background:var(--gray4);color:var(--ink)}
@@ -159,7 +160,16 @@ nav button:active{transform:none}
     <div class="stat wide"><span>Свободно на диске</span><b id="disk">—</b></div>
   </div>
   <h2>Открыть ссылку на телевизоре</h2>
-  <div class="card"><div class="row"><input type="url" id="u" placeholder="YouTube, ВК, Рутуб"><button onclick="go('open',{u:val('u')})">Открыть</button></div></div>
+  <div class="card"><div class="row"><input type="url" id="u" placeholder="YouTube, ВК, Telegram…"><button onclick="go('open',{u:val('u')})">Открыть</button></div></div>
+  <h2>Telegram</h2>
+  <div class="card list" id="tg">
+    <div><span class="name">Состояние<small id="tgs">—</small></span><button class="s" onclick="go('tg',{a:'open'})">На экран</button></div>
+    <div class="tgf" id="tgkey"><span class="name">Ключ приложения<small>my.telegram.org → API development tools</small></span></div>
+    <div class="tgf" id="tgkey2"><input type="text" id="tgid" inputmode="numeric" placeholder="api_id" autocomplete="off"></div>
+    <div class="tgf" id="tgkey3"><input type="text" id="tghash" placeholder="api_hash" autocomplete="off" autocapitalize="off" spellcheck="false"><button onclick="tgKey()">Сохранить</button></div>
+    <div class="tgf" id="tgpass"><input type="password" id="tgp" placeholder="Облачный пароль" autocomplete="current-password"><button onclick="tgPass()">Войти</button></div>
+    <button class="r" id="tgout" onclick="tgOut()">Выйти из Telegram на телевизоре</button>
+  </div>
   <h2>Больше всего памяти</h2><div class="card list" id="top"></div>
   <h2>Настройки</h2>
   <div class="card list">
@@ -297,6 +307,7 @@ async function state(){try{const s=await call('state');$('anim').checked=!!s.ani
   // Поле ввода появляется само, когда на телевизоре открыта клавиатура (любое приложение), и прячется, когда закрыта.
   if(s.typing==='ime'&&fieldMode!=='ime')showField('ime');
   else if(s.typing!=='ime'&&fieldMode==='ime')hideField();
+  if(s.tg)tgState(s.tg);
   if(s.sleep!=null){sleepLeft=s.sleep;$('sleepl').textContent=s.sleep?'Через '+s.sleep+' мин':'Выключен'}}catch(e){}}
 function shot(){toast('Снимаю экран');const img=new Image();img.className='shot';img.alt='Снимок экрана телевизора';
   img.onload=()=>{$('shotbox').innerHTML='';const a=document.createElement('a');a.href=img.src;a.download='tv.png';a.appendChild(img);$('shotbox').appendChild(a)};
@@ -318,6 +329,19 @@ async function sendType(done){const t=$('tv-in').value;
 $('tv-in').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();sendType(true)}});
 // На клавиатуре телевизора каждое слово уходит сразу: после пробела отправляем набранное.
 $('tv-in').addEventListener('input',e=>{if(fieldMode==='ime'&&$('tv-in').value.endsWith(' '))sendType(false)});
+// Telegram: что показывает телевизор и какие поля нужны сейчас. Ключ и пароль уходят прямо на телевизор, здесь не хранятся.
+const tgText={closed:'Не запущен — нажми «На экран»',api:'Нужен ключ приложения',novpn:'Включи VPN — без него Telegram на паузе',
+  wait:'Подключаюсь…',qr:'Отсканируй QR-код на телевизоре в Telegram: Настройки → Устройства',password:'Нужен облачный пароль',ready:'Вошёл, можно открывать ссылки',error:'Ошибка'};
+let tgLast='';
+function tgState(t){const st=t.state||'closed';const line=(tgText[st]||st)+(t.hint?' · '+t.hint:'');
+  if(line!==tgLast){tgLast=line;$('tgs').textContent=line}
+  const needKey=st==='api'||(st==='closed'&&!t.hasKey);
+  ['tgkey','tgkey2','tgkey3'].forEach(i=>$(i).classList.toggle('on',needKey));
+  $('tgpass').classList.toggle('on',st==='password');
+  $('tgout').style.display=st==='ready'||st==='novpn'?'':'none'}
+async function tgKey(){const id=val('tgid').trim(),hash=val('tghash').trim();await go('tg',{a:'key',id,hash});$('tghash').value=''}
+async function tgPass(){const p=$('tgp').value;$('tgp').value='';await go('tg',{a:'password',p})}
+async function tgOut(){if(confirm('Выйти из Telegram на телевизоре?'))await go('tg',{a:'logout'})}
 state();setInterval(state,2000);
 </script>
 </body>

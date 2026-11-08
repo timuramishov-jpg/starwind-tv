@@ -164,6 +164,27 @@ public final class IosShell {
                 json = say("Ищу на YouTube");
                 break;
             }
+            case "tg": {
+                // Telegram: ключ приложения, облачный пароль, выход, открыть экран. Всё — поручением процессу :tg.
+                String tgWhat = String.valueOf(a.get("a"));
+                StringBuilder cmd = new StringBuilder("am broadcast -n " + PKG + "/.TgReceiver --es k " + quote(read(DIR + "/key").trim()) + " --es what " + quote(tgWhat));
+                if ("key".equals(tgWhat)) {
+                    String id = orEmpty(a.get("id"), "").trim(), hash = orEmpty(a.get("hash"), "").trim();
+                    if (!id.matches("\\d{3,12}") || !hash.matches("[0-9a-fA-F]{32}")) { json = say("api_id — число, api_hash — 32 знака из букв a–f и цифр"); break; }
+                    cmd.append(" --es id ").append(id).append(" --es hash ").append(hash);
+                } else if ("password".equals(tgWhat)) {
+                    String p = a.get("p");
+                    if (p == null || p.isEmpty()) { json = say("Введи пароль"); break; }
+                    cmd.append(" --es p ").append(quote(p));
+                } else if ("open".equals(tgWhat)) {
+                    sh("am start -n " + PKG + "/.TgActivity");
+                    json = say("Открываю Telegram");
+                    break;
+                }
+                sh(cmd.toString());
+                json = say("key".equals(tgWhat) ? "Ключ на телевизоре" : "password".equals(tgWhat) ? "Проверяю пароль" : "logout".equals(tgWhat) ? "Выхожу из Telegram" : "Готово");
+                break;
+            }
             case "vpn": {
                 boolean on = "1".equals(a.get("on"));
                 command("vpn", on ? "1" : "0");
@@ -290,8 +311,13 @@ public final class IosShell {
 
     private static String openLink(String u) throws Exception {
         if (u == null || u.isEmpty()) return say("Вставь ссылку");
-        if (!u.startsWith("http")) u = "https://" + u;
+        if (!u.startsWith("http") && !u.startsWith("tg:")) u = "https://" + u;
         String host = u.replaceFirst("^https?://", "").split("/")[0];
+        // Пост в Telegram — в свой просмотрщик видео (TDLib, через VPN), а не в браузер.
+        if (host.equals("t.me") || host.equals("telegram.me") || host.endsWith(".t.me") || u.startsWith("tg:")) {
+            String r = sh("am start -n " + PKG + "/.TgActivity -a android.intent.action.VIEW -d " + quote(u));
+            return say(r.contains("Error") ? "Telegram на телевизоре не открылся" : "Открываю пост в Telegram");
+        }
         String pkg = host.contains("youtu") ? "com.google.android.youtube.tv" : host.contains("rutube") ? "ru.rutube.app.tv"
                 : host.contains("vk.com") || host.contains("vkvideo") ? "com.vk.tv" : "";
         String r = sh("am start -a android.intent.action.VIEW -d " + quote(u) + (pkg.isEmpty() ? "" : " -p " + pkg));
@@ -373,6 +399,7 @@ public final class IosShell {
                 .put("vpn", new File("/sys/class/net/tun0").exists()).put("place", s.optString("place"))
                 .put("typing", typingMode())
                 .put("yt", youTube() != null)
+                .put("tg", new JSONObject(orEmpty(read(DIR + "/tg.json"), "{\"state\":\"closed\"}")))
                 .put("sleep", sleepAt <= System.currentTimeMillis() ? 0 : (sleepAt - System.currentTimeMillis() + 59_999) / 60000).toString();
     }
 

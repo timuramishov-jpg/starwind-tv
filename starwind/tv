@@ -110,13 +110,31 @@ release() {
     && say "Выложено: v$CODE. На телевизоре: шестерёнка → Обновить лаунчер"
 }
 
+# Библиотека Telegram (TDLib из официального репозитория Telegram X, github.com/TGX-Android/tdlib) и libc++ из NDK r23c.
+# В git не кладём (25 МБ): лежат в ~/Documents/Claude/tg/o23, сверяем контрольные суммы и копируем в сборку.
+tglibs() {
+  local src="$DIR/tg/o23" dst="$R/launcher/app/src/main/jniLibs/armeabi-v7a" f want got
+  mkdir -p "$dst"
+  while read -r want f; do
+    [ -f "$src/$f" ] || die "нет $src/$f — библиотеки Telegram"
+    got=$(shasum -a 256 "$src/$f" | cut -c1-64)
+    [ "$got" = "$want" ] || die "контрольная сумма $f не сходится"
+    cmp -s "$src/$f" "$dst/$f" || cp "$src/$f" "$dst/$f"
+  done <<SUMS
+e7b32254498528eb811c5dbc23acf644872bf3d845ace7c7fd6e5921a5707c59 libtdjni.so
+14d3752f5c3af78a8162fa55399cb113bb7b46a8841dfeacf387b91e5148ede7 libcryptox.so
+717723362c7a997422e2a9a3334818b9f2301ee641af40696b6dabe1efd80fd9 libsslx.so
+52df819dc40888fb2e736f4cb1e51329afcd9aec6dbcab4fa6a1885a3b84e844 libc++_shared.so
+SUMS
+}
+
 deploy() {
   online
   cd "$R" || die "нет $R"
   [ "$(git branch --show-current)" = starwind ] || die "в $R не та ветка, нужна starwind"
   say "== Версия $(git log -1 --format='%h %s')"
   git status --short | grep -v '^??' | grep . && say "(есть несохранённые правки)"
-  fonts; icons
+  fonts; icons; tglibs
   export JAVA_HOME="$(/opt/homebrew/bin/brew --prefix openjdk@17)/libexec/openjdk.jdk/Contents/Home"
   export ANDROID_HOME=/opt/homebrew/share/android-commandlinetools
   export PATH="$JAVA_HOME/bin:$PATH"
