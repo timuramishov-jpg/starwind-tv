@@ -692,7 +692,19 @@ public final class TgActivity extends Activity {
 
     // ---------- Фокус и прокрутка ----------
 
+    // ---------- Подготовка выбранного видео ----------
+
+    private final android.os.Handler prepHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable prepare = () -> {
+        if (index < 0 || index >= tiles.size() || tiles.get(index).video == null) return;
+        Item it = tiles.get(index).video;
+        if (it.size > (50L << 20)) TgCore.get(this).prefetch(it.fileId, it.size);
+    };
+
     private void focus() {
+        // Задержался на видео — заранее качаем его начало и хвост с описанием: ОК — и сразу играет.
+        prepHandler.removeCallbacks(prepare);
+        prepHandler.postDelayed(prepare, 900);
         for (int i = 0; i < tiles.size(); i++) {
             View c = tiles.get(i).view;
             boolean on = i == index;
@@ -768,6 +780,8 @@ public final class TgActivity extends Activity {
     }
 
     private void play(Item it) {
+        prepHandler.removeCallbacks(prepare);
+        tg.stopPrefetch();
         startActivity(new Intent(this, TgPlayerActivity.class)
                 .putExtra("file", it.fileId).putExtra("size", it.size).putExtra("title", it.title)
                 .putExtra("unique", it.unique).putExtra("duration", it.duration)

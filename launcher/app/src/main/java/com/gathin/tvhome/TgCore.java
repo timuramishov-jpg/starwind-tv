@@ -273,6 +273,35 @@ final class TgCore implements Client.ResultHandler {
         return out[0];
     }
 
+    private volatile int prefetching;
+
+    /** Заранее скачать хвост (там у больших видео описание, без него плеер не стартует) и начало файла.
+     *  Последняя просьба главнее: перевели фокус — прежняя подготовка бросается. */
+    void prefetch(int fileId, long size) {
+        prefetching = fileId;
+        new Thread(() -> {
+            long part = 512L << 10, tail = Math.max(0, size - (4L << 20));
+            tail -= tail % part;
+            if (!waitPrefix(fileId, tail, size - tail)) return;
+            waitPrefix(fileId, 0, Math.min(size, 6L << 20));
+        }, "tg-prefetch").start();
+    }
+
+    /** Плеер забирает загрузку себе. */
+    void stopPrefetch() { prefetching = 0; }
+
+    /** Качать кусок и ждать, пока он ляжет на диск (до 40 с); false — если фокус ушёл на другое видео. */
+    private boolean waitPrefix(int fileId, long off, long lim) {
+        call(new TdApi.DownloadFile(fileId, 8, off, lim, false), 10_000);
+        for (int k = 0; k < 80; k++) {
+            if (prefetching != fileId) return false;
+            TdApi.Object r = call(new TdApi.GetFileDownloadedPrefixSize(fileId, off), 5_000);
+            if (r instanceof TdApi.FileDownloadedPrefixSize && ((TdApi.FileDownloadedPrefixSize) r).size >= lim) return true;
+            try { Thread.sleep(500); } catch (InterruptedException e) { return false; }
+        }
+        return true;
+    }
+
     /** Будить ожидающего, когда по файлу пришло обновление (докачался ещё кусок). */
     void watchFile(int id, Runnable r) {
         fileWaiters.computeIfAbsent(id, k -> new ArrayList<>());

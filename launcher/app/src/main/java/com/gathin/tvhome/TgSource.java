@@ -111,7 +111,7 @@ final class TgSource extends MediaDataSource {
     private synchronized void ensureDownloading(long position, long waitedMs) {
         long now = System.currentTimeMillis();
         boolean inside = position >= winFrom && position < winTo;
-        boolean stalled = inside && waitedMs > 3000 && (position != stalledAt || now - stalledTime > 6000);
+        boolean stalled = inside && waitedMs > 5000 && (position != stalledAt || now - stalledTime > 6000);
         if (inside && !stalled) return;
         // Другой поток ждёт кусок из текущего окна — пусть докачается (до 4 секунд), потом наша очередь.
         if (!stalled && waitedMs < 4000) for (Map.Entry<Thread, Long> w : waiting.entrySet())
