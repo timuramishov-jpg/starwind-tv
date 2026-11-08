@@ -350,7 +350,7 @@ case "${1:-}" in
     [ "${2:-}" = off ] || { say "tv adb off: выключить отладку. Включить обратно: Настройки лаунчера, Отладка по сети"; exit 0; }
     T 'settings put global adb_enabled 0' ; say "Отладка выключена. Включить: Настройки лаунчера, Отладка по сети" ;;
   agent)
-    if [ "$2" = install ]; then
+    if [ "${2:-}" = install ]; then
       # Агент при входе в систему: Терминал открывает agent.command — у Терминала есть доступ к Документам,
       # у фоновой службы macOS его бы не было.
       printf '#!/bin/bash\n"$HOME/Documents/Claude/tv" agent\n' > "$DIR/agent.command"; chmod +x "$DIR/agent.command"
