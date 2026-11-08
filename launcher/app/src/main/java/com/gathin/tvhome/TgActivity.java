@@ -162,6 +162,10 @@ public final class TgActivity extends Activity {
                 sub.setText("Подключаюсь…");
         }
         if (!"ready".equals(s)) shownState = s;
+        // Без QR-кода текст — по центру экрана, с кодом — под ним.
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) center.getLayoutParams();
+        lp.topMargin = px(qr.getVisibility() == View.VISIBLE ? 790 : 470);
+        center.setLayoutParams(lp);
     }
 
     // ---------- Пост ----------

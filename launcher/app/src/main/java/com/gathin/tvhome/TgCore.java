@@ -167,7 +167,7 @@ final class TgCore implements Client.ResultHandler {
                     vpnUp = up;
                     applyNetwork();
                     if (!up && client != null) { hint = "VPN выключен — Telegram на паузе"; changed("novpn"); }
-                    else if (up && "novpn".equals(state)) { hint = ""; changed(client == null ? "wait" : "ready"); start(); refreshAuth(); }
+                    else if (up && "novpn".equals(state)) { hint = ""; changed("wait"); start(); refreshAuth(); }
                 }
                 try { Thread.sleep(1500); } catch (InterruptedException e) { return; }
             }
