@@ -333,7 +333,10 @@ $('tv-in').addEventListener('input',e=>{if(fieldMode==='ime'&&$('tv-in').value.e
 const tgText={closed:'Не запущен — нажми «На экран»',api:'Нужен ключ приложения',novpn:'Включи VPN — без него Telegram на паузе',
   wait:'Подключаюсь…',qr:'Отсканируй QR-код на телевизоре в Telegram: Настройки → Устройства',password:'Нужен облачный пароль',ready:'Вошёл, можно открывать ссылки',error:'Ошибка'};
 let tgLast='';
-function tgState(t){const st=t.state||'closed';const line=(tgText[st]||st)+(t.hint?' · '+t.hint:'');
+function tgState(t){const st=t.state||'closed';
+  // Пока своего ключа нет, ссылки открывает Telegram X — так и пишем, без тревожного «нужен ключ».
+  const line=!t.hasKey&&t.tgx&&(st==='closed'||st==='api')?'Ссылки открываются в Telegram X. Свой просмотрщик заработает, когда появится ключ'
+    :(tgText[st]||st)+(t.hint?' · '+t.hint:'');
   if(line!==tgLast){tgLast=line;$('tgs').textContent=line}
   const needKey=st==='api'||(st==='closed'&&!t.hasKey);
   ['tgkey','tgkey2','tgkey3'].forEach(i=>$(i).classList.toggle('on',needKey));

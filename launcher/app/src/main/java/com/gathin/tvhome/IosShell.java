@@ -313,15 +313,41 @@ public final class IosShell {
         if (u == null || u.isEmpty()) return say("Вставь ссылку");
         if (!u.startsWith("http") && !u.startsWith("tg:")) u = "https://" + u;
         String host = u.replaceFirst("^https?://", "").split("/")[0];
-        // Пост в Telegram — в свой просмотрщик видео (TDLib, через VPN), а не в браузер.
+        // Пост в Telegram: есть ключ API — в свой просмотрщик (карточки и плеер), нет — в Telegram X
+        // (официальный клиент со своим ключом). И тот и другой ходят через VPN: Happ заворачивает все приложения.
         if (host.equals("t.me") || host.equals("telegram.me") || host.endsWith(".t.me") || u.startsWith("tg:")) {
-            String r = sh("am start -n " + PKG + "/.TgActivity -a android.intent.action.VIEW -d " + quote(u));
+            boolean ownKey = new JSONObject(orEmpty(read(DIR + "/tg.json"), "{}")).optBoolean("hasKey");
+            String r = !ownKey && tgxInstalled()
+                    ? sh("am start -a android.intent.action.VIEW -d " + quote(tgLink(u)) + " -p " + TGX)
+                    : sh("am start -n " + PKG + "/.TgActivity -a android.intent.action.VIEW -d " + quote(u));
             return say(r.contains("Error") ? "Telegram на телевизоре не открылся" : "Открываю пост в Telegram");
         }
         String pkg = host.contains("youtu") ? "com.google.android.youtube.tv" : host.contains("rutube") ? "ru.rutube.app.tv"
                 : host.contains("vk.com") || host.contains("vkvideo") ? "com.vk.tv" : "";
         String r = sh("am start -a android.intent.action.VIEW -d " + quote(u) + (pkg.isEmpty() ? "" : " -p " + pkg));
         return say(r.contains("Error") ? "Телевизор не знает, чем открыть эту ссылку" : "Открываю на телевизоре");
+    }
+
+    static final String TGX = "org.thunderdog.challegram";
+    private static boolean tgx;
+    private static long tgxAt;
+
+    /** Стоит ли Telegram X: проверяем раз в полминуты, страница спрашивает состояние каждые 2 секунды. */
+    private static synchronized boolean tgxInstalled() {
+        if (SystemClock.uptimeMillis() - tgxAt > 30_000) {
+            tgxAt = SystemClock.uptimeMillis();
+            try { tgx = sh("pm path " + TGX).contains("package:"); } catch (Exception e) { tgx = false; }
+        }
+        return tgx;
+    }
+
+    /** t.me/канал/123 → tg://resolve?domain=канал&post=123, t.me/c/456/123 → tg://privatepost: Telegram X открывает сразу пост. */
+    static String tgLink(String u) {
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^https?://(?:t|telegram)\\.me/(?:s/)?([A-Za-z0-9_]{4,})/(\\d+)").matcher(u);
+        if (m.find()) return "tg://resolve?domain=" + m.group(1) + "&post=" + m.group(2);
+        m = java.util.regex.Pattern.compile("^https?://(?:t|telegram)\\.me/c/(\\d+)/(\\d+)").matcher(u);
+        if (m.find()) return "tg://privatepost?channel=" + m.group(1) + "&post=" + m.group(2);
+        return u;
     }
 
     /** Поручение лаунчеру: он проснётся ради него, даже если был выгружен. */
@@ -399,7 +425,7 @@ public final class IosShell {
                 .put("vpn", new File("/sys/class/net/tun0").exists()).put("place", s.optString("place"))
                 .put("typing", typingMode())
                 .put("yt", youTube() != null)
-                .put("tg", new JSONObject(orEmpty(read(DIR + "/tg.json"), "{\"state\":\"closed\"}")))
+                .put("tg", new JSONObject(orEmpty(read(DIR + "/tg.json"), "{\"state\":\"closed\"}")).put("tgx", tgxInstalled()))
                 .put("sleep", sleepAt <= System.currentTimeMillis() ? 0 : (sleepAt - System.currentTimeMillis() + 59_999) / 60000).toString();
     }
 
