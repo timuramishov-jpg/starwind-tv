@@ -50,7 +50,7 @@ final class IosSettings {
                 keep(() -> { saverPrefs.edit().putInt("style", saverPick + 1 >= IosSaver.NAMES.length ? -1 : saverPick + 1).apply(); refreshSettings(); }),
                 keep(() -> { saverPrefs.edit().putInt("style", saverPick < 0 ? IosSaver.NAMES.length - 1 : saverPick - 1).apply(); refreshSettings(); }));
         int idle = saverPrefs.getInt("idle", 5);
-        add(labels, actions, IosMenu.choice("Заставка при простое", idle == 0 ? "никогда" : "через " + idle + " мин"),
+        add(labels, actions, IosMenu.choice("Заставка через", idle == 0 ? "никогда" : idle + " мин"),
                 keep(() -> { saverPrefs.edit().putInt("idle", step(IDLE, idle, 1)).apply(); refreshSettings(); }),
                 keep(() -> { saverPrefs.edit().putInt("idle", step(IDLE, idle, -1)).apply(); refreshSettings(); }));
         labels.add("Показать заставку");
@@ -62,7 +62,7 @@ final class IosSettings {
         labels.add(IosMenu.toggle("Быстрые анимации", fast));
         actions.add(keep(() -> tweak("anim", !fast)));
         boolean ownKeys = String.valueOf(Settings.Secure.getString(h.getContentResolver(), Settings.Secure.DEFAULT_INPUT_METHOD)).startsWith(h.getPackageName());
-        labels.add(IosMenu.toggle("Своя клавиатура вместо Яндекса", ownKeys));
+        labels.add(IosMenu.toggle("Своя клавиатура", ownKeys));
         actions.add(keep(() -> new Thread(() -> {
             // Выбор запоминаем: обновление лаунчера сбрасывает клавиатуру на Яндекс, лаунчер вернёт выбранную.
             h.prefs.edit().putBoolean("own_keyboard", !ownKeys).apply();

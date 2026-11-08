@@ -226,16 +226,31 @@ public final class TgActivity extends Activity {
 
     // ---------- Главная: продолжить просмотр и мои каналы ----------
 
+    private int homeGen;
+
+    /** Главная: «Продолжить просмотр» и каналы грузятся параллельно; рисуем, когда готово и то и другое,
+     *  а через 8 секунд — в любом случае тем, что успело прийти (TDLib после перезапуска иногда долго молчит). */
     private void showHome() {
         page = Page.HOME;
         title.setText("Telegram");
         sub.setText("Ссылку на пост можно прислать с пульта");
         clear();
+        final int gen = ++homeGen;
         List<long[]> recent = recent();
         final List<Item> cont = new ArrayList<>();
+        final List<List<TdApi.Chat>> chans = new ArrayList<>();
+        final boolean[] contDone = {recent.isEmpty()};
+        final Runnable draw = () -> {
+            if (gen != homeGen || page != Page.HOME) return;
+            if (contDone[0] && !chans.isEmpty()) drawHome(cont, chans.get(0));
+        };
+        loadChannels(list -> { chans.add(list); draw.run(); });
+        prepHandler.postDelayed(() -> {
+            if (gen != homeGen || page != Page.HOME || !tiles.isEmpty()) return;
+            android.util.Log.w("TgActivity", "home timeout: recents " + contDone[0] + ", channels " + !chans.isEmpty());
+            drawHome(cont, chans.isEmpty() ? new ArrayList<>() : chans.get(0));
+        }, 8000);
         final int[] left = {recent.size()};
-        Runnable channels = () -> loadChannels(cont);
-        if (recent.isEmpty()) { channels.run(); return; }
         for (long[] r : recent) {
             tg.send(new TdApi.GetChat(r[0]), ig -> tg.send(new TdApi.GetMessage(r[0], r[1]), m -> {
                 if (m instanceof TdApi.Message) {
@@ -248,20 +263,27 @@ public final class TgActivity extends Activity {
                     for (long[] rr : recent) for (Item it : cont) if (it.messageId == rr[1] && it.chatId == rr[0]) sorted.add(it);
                     cont.clear();
                     cont.addAll(sorted);
-                    channels.run();
+                    contDone[0] = true;
+                    draw.run();
                 }
             }));
         }
     }
 
-    private void loadChannels(List<Item> cont) {
-        tg.send(new TdApi.LoadChats(new TdApi.ChatListMain(), 200), ignored ->
+    interface ChannelsSink { void on(List<TdApi.Chat> chans); }
+
+    private void loadChannels(ChannelsSink sink) {
+        tg.send(new TdApi.LoadChats(new TdApi.ChatListMain(), 200), loaded ->
             tg.send(new TdApi.GetChats(new TdApi.ChatListMain(), 200), r -> {
-                if (!(r instanceof TdApi.Chats)) { drawHome(cont, new ArrayList<>()); return; }
+                if (!(r instanceof TdApi.Chats)) {
+                    android.util.Log.w("TgActivity", "chats: " + r);
+                    sink.on(new ArrayList<>());
+                    return;
+                }
                 long[] ids = ((TdApi.Chats) r).chatIds;
                 List<TdApi.Chat> chans = new ArrayList<>();
                 final int[] left = {ids.length};
-                if (left[0] == 0) { drawHome(cont, chans); return; }
+                if (left[0] == 0) { sink.on(chans); return; }
                 final TdApi.Chat[] all = new TdApi.Chat[ids.length];
                 for (int i = 0; i < ids.length; i++) {
                     final int at = i;
@@ -270,7 +292,7 @@ public final class TgActivity extends Activity {
                         if (--left[0] == 0) {
                             for (TdApi.Chat ch : all)
                                 if (ch != null && ch.type instanceof TdApi.ChatTypeSupergroup && ((TdApi.ChatTypeSupergroup) ch.type).isChannel) chans.add(ch);
-                            drawHome(cont, chans.subList(0, Math.min(24, chans.size())));
+                            sink.on(chans.subList(0, Math.min(24, chans.size())));
                         }
                     });
                 }
