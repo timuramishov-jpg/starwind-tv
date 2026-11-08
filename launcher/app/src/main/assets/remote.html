@@ -109,7 +109,6 @@ a.row-link{text-decoration:none}a.row-link:active{background:var(--gray5)}.steps
   -webkit-mask-image:linear-gradient(var(--black) 55%,transparent);mask-image:linear-gradient(var(--black) 55%,transparent)}
 progress{width:100%;height:4px;display:none;accent-color:var(--ink)}
 .tgf{display:none!important}.tgf.on{display:flex!important}
-button.wide{width:100%;margin-top:var(--s3);display:flex;align-items:center;justify-content:center;gap:var(--s2);border-radius:var(--r-card);padding:var(--s4)}
 /* Инструменты: четыре крупные плитки, два ряда. */
 .tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s3)}
 .tiles button{background:var(--gray6);color:var(--ink);border-radius:var(--r-card);padding:var(--s4) var(--s2);display:flex;flex-direction:column;align-items:center;gap:var(--s1);font-weight:600}
@@ -408,12 +407,11 @@ $('tv-in').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault()
 $('tv-in').addEventListener('input',e=>{if(fieldMode==='ime'&&$('tv-in').value.endsWith(' '))sendType(false)});
 // Telegram: что показывает телевизор и какие поля нужны сейчас. Ключ и пароль уходят прямо на телевизор, здесь не хранятся.
 const tgText={closed:'Не запущен — нажми «На экран»',api:'Нужен ключ приложения',novpn:'Включи VPN — без него Telegram на паузе',
-  wait:'Подключаюсь…',qr:'Отсканируй QR-код на телевизоре в Telegram: Настройки → Устройства',password:'Нужен облачный пароль',ready:'Вошёл · каналы и видео — на телевизоре',error:'Ошибка'};
+  wait:'Подключаюсь…',qr:'Отсканируй QR-код на телевизоре в Telegram: Настройки → Устройства',password:'Нужен облачный пароль',ready:'Вошёл · ссылки на посты открываются на телевизоре',error:'Ошибка'};
 let tgLast='';
 function tgState(t){const st=t.state||'closed';
   // Пока своего ключа нет, ссылки открывает Telegram X — так и пишем, без тревожного «нужен ключ».
-  const line=!t.hasKey&&t.tgx&&(st==='closed'||st==='api')?'Ссылки открываются в Telegram X. Свой просмотрщик заработает, когда появится ключ'
-    :(tgText[st]||st)+(t.hint?' · '+t.hint:'');
+  const line=(tgText[st]||st)+(t.hint?' · '+t.hint:'');
   if(line!==tgLast){tgLast=line;$('tgs').textContent=line}
   const needKey=st==='api'||(st==='closed'&&!t.hasKey);
   ['tgkey','tgkey2','tgkey3'].forEach(i=>$(i).classList.toggle('on',needKey));

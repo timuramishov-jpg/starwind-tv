@@ -329,14 +329,6 @@ public final class IosShell {
                 bytes(out, 200, "image/jpeg", jpg.toByteArray(), false);
                 return;
             }
-            case "tap": {
-                // Касание по экрану: x, y — доли (0…1) от ширины и высоты. Для приложений, сделанных под палец.
-                float x = frac(a.get("x")) * 1920, y = frac(a.get("y")) * 1080;
-                if (a.get("x2") != null) swipe(x, y, frac(a.get("x2")) * 1920, frac(a.get("y2")) * 1080);
-                else touch(x, y);
-                json = "{}";
-                break;
-            }
             case "shot": {
                 byte[] png = runBytes("screencap -p");
                 bytes(out, 200, "image/png", png, false);
@@ -358,35 +350,9 @@ public final class IosShell {
 
     private static void send(KeyEvent e) throws Exception { inject.invoke(input, e, 0); }
 
-    private static float frac(String v) {
-        try { return Math.max(0f, Math.min(1f, Float.parseFloat(v))); } catch (Exception e) { return 0.5f; }
-    }
 
-    private static void motion(int action, long down, float x, float y) throws Exception {
-        android.view.MotionEvent m = android.view.MotionEvent.obtain(down, SystemClock.uptimeMillis(), action, x, y, 0);
-        m.setSource(InputDevice.SOURCE_TOUCHSCREEN);
-        inject.invoke(input, m, 0);
-        m.recycle();
-    }
 
-    /** Касание пальцем прямо в систему ввода — быстрее, чем input tap. */
-    private static void touch(float x, float y) throws Exception {
-        long down = SystemClock.uptimeMillis();
-        motion(android.view.MotionEvent.ACTION_DOWN, down, x, y);
-        Thread.sleep(40);
-        motion(android.view.MotionEvent.ACTION_UP, down, x, y);
-    }
 
-    /** Свайп: лента прокручивается, как пальцем. */
-    private static void swipe(float x1, float y1, float x2, float y2) throws Exception {
-        long down = SystemClock.uptimeMillis();
-        motion(android.view.MotionEvent.ACTION_DOWN, down, x1, y1);
-        for (int i = 1; i <= 10; i++) {
-            Thread.sleep(16);
-            motion(android.view.MotionEvent.ACTION_MOVE, down, x1 + (x2 - x1) * i / 10f, y1 + (y2 - y1) * i / 10f);
-        }
-        motion(android.view.MotionEvent.ACTION_UP, down, x2, y2);
-    }
 
     private static String key(String name) throws Exception {
         if (name == null || !name.matches("[A-Z_0-9]{1,30}")) return say("Нет такой кнопки");
@@ -457,43 +423,24 @@ public final class IosShell {
         if (u == null || u.isEmpty()) return say("Вставь ссылку");
         if (!u.startsWith("http") && !u.startsWith("tg:")) u = "https://" + u;
         String host = u.replaceFirst("^https?://", "").split("/")[0];
-        // Пост в Telegram: есть ключ API — в свой просмотрщик (карточки и плеер), нет — в Telegram X
-        // (официальный клиент со своим ключом). И тот и другой ходят через VPN: Happ заворачивает все приложения.
+        // Пост в Telegram — в свой клиент (TDLib, только через VPN), а не в браузер.
         if (host.equals("t.me") || host.equals("telegram.me") || host.endsWith(".t.me") || u.startsWith("tg:")) {
-            boolean ownKey = new JSONObject(orEmpty(read(DIR + "/tg.json"), "{}")).optBoolean("hasKey");
-            String r = !ownKey && tgxInstalled()
-                    ? sh("am start -a android.intent.action.VIEW -d " + quote(tgLink(u)) + " -p " + TGX)
-                    : sh("am start -n " + PKG + "/.TgActivity -a android.intent.action.VIEW -d " + quote(u));
+            String r = sh("am start -n " + PKG + "/.TgActivity -a android.intent.action.VIEW -d " + quote(u));
             return say(r.contains("Error") ? "Telegram на телевизоре не открылся" : "Открываю пост в Telegram");
         }
-        String pkg = host.contains("youtu") ? "com.google.android.youtube.tv" : host.contains("rutube") ? "ru.rutube.app.tv"
-                : host.contains("vk.com") || host.contains("vkvideo") ? "com.vk.tv" : "";
-        String r = sh("am start -a android.intent.action.VIEW -d " + quote(u) + (pkg.isEmpty() ? "" : " -p " + pkg));
+        // Ссылка — в приложение сервиса, если оно стоит (YouTube на Яндекс ТВ — своя сборка Cobalt), иначе куда решит система.
+        String target = "";
+        if (host.contains("youtu")) {
+            for (String[] y : YOUTUBE) if (sh("pm path " + y[0]).contains("package:")) { target = " -n " + y[1]; break; }
+        } else {
+            String pkg = host.contains("rutube") ? "ru.rutube.app.tv" : host.contains("vk.com") || host.contains("vkvideo") ? "com.vk.tv" : "";
+            if (!pkg.isEmpty() && sh("pm path " + pkg).contains("package:")) target = " -p " + pkg;
+        }
+        String r = sh("am start -a android.intent.action.VIEW -d " + quote(u) + target);
         return say(r.contains("Error") ? "Телевизор не знает, чем открыть эту ссылку" : "Открываю на телевизоре");
     }
 
-    static final String TGX = "org.thunderdog.challegram";
     private static final String REC = "/sdcard/Movies/tv-rec.mp4";
-    private static boolean tgx;
-    private static long tgxAt;
-
-    /** Стоит ли Telegram X: проверяем раз в полминуты, страница спрашивает состояние каждые 2 секунды. */
-    private static synchronized boolean tgxInstalled() {
-        if (SystemClock.uptimeMillis() - tgxAt > 30_000) {
-            tgxAt = SystemClock.uptimeMillis();
-            try { tgx = sh("pm path " + TGX).contains("package:"); } catch (Exception e) { tgx = false; }
-        }
-        return tgx;
-    }
-
-    /** t.me/канал/123 → tg://resolve?domain=канал&post=123, t.me/c/456/123 → tg://privatepost: Telegram X открывает сразу пост. */
-    static String tgLink(String u) {
-        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^https?://(?:t|telegram)\\.me/(?:s/)?([A-Za-z0-9_]{4,})/(\\d+)").matcher(u);
-        if (m.find()) return "tg://resolve?domain=" + m.group(1) + "&post=" + m.group(2);
-        m = java.util.regex.Pattern.compile("^https?://(?:t|telegram)\\.me/c/(\\d+)/(\\d+)").matcher(u);
-        if (m.find()) return "tg://privatepost?channel=" + m.group(1) + "&post=" + m.group(2);
-        return u;
-    }
 
     /** Поручение лаунчеру: он проснётся ради него, даже если был выгружен. */
     private static void command(String what, String value) throws Exception {
@@ -570,7 +517,7 @@ public final class IosShell {
                 .put("vpn", new File("/sys/class/net/tun0").exists()).put("place", s.optString("place")).put("youtube", s.optBoolean("youtube"))
                 .put("typing", typingMode())
                 .put("yt", youTube() != null)
-                .put("tg", new JSONObject(orEmpty(read(DIR + "/tg.json"), "{\"state\":\"closed\"}")).put("tgx", tgxInstalled()))
+                .put("tg", new JSONObject(orEmpty(read(DIR + "/tg.json"), "{\"state\":\"closed\"}")))
                 .put("keyboard", sh("settings get secure default_input_method").trim().startsWith(PKG))
                 .put("saver", new JSONObject(orEmpty(read(DIR + "/prefs.json"), "{}")))
                 .put("sleep", sleepAt <= System.currentTimeMillis() ? 0 : (sleepAt - System.currentTimeMillis() + 59_999) / 60000).toString();

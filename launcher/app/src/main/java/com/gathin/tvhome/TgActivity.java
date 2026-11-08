@@ -80,7 +80,6 @@ public final class TgActivity extends Activity {
     private Typeface regular, semibold;
     private final Runnable onState = this::render;
     private List<Item> panelItems;
-    private long playChat, playMsg;
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
@@ -152,12 +151,6 @@ public final class TgActivity extends Activity {
     }
 
     private void take(Intent i) {
-        // Карточка из ленты лаунчера: сразу плеер, а «Назад» — обратно на главный экран телевизора.
-        if (i != null && i.getLongExtra("play_chat", 0) != 0) {
-            playChat = i.getLongExtra("play_chat", 0);
-            playMsg = i.getLongExtra("play_msg", 0);
-            i.removeExtra("play_chat");
-        }
         Uri u = i == null ? null : i.getData();
         if (u != null) { link = u.toString(); page = Page.POST; shown = ""; }
     }
@@ -189,24 +182,6 @@ public final class TgActivity extends Activity {
                 say((tg.hint.isEmpty() ? "" : tg.hint + "\n\n") + "На аккаунте стоит облачный пароль.\nВведи его в пульте: вкладка «Телевизор» → Telegram.");
                 break;
             case "ready": {
-                if (playChat != 0) {
-                    long c = playChat, m = playMsg;
-                    playChat = 0;
-                    sub.setText("Открываю видео…");
-                    // Сначала канал: после перезапуска процесса TDLib не знает чат и на GetMessage отвечает «Chat not found».
-                    tg.send(new TdApi.GetChat(c), ignored -> tg.send(new TdApi.GetMessage(c, m), r -> {
-                        Item it = r instanceof TdApi.Message ? itemOf((TdApi.Message) r) : null;
-                        if (it == null) {
-                            sub.setText("Видео не открылось" + (r instanceof TdApi.Error ? ": " + ((TdApi.Error) r).message : ""));
-                            android.util.Log.w("TgActivity", "play " + c + "/" + m + ": " + r);
-                            showHome();
-                            return;
-                        }
-                        play(it);
-                        finish();
-                    }));
-                    break;
-                }
                 String want = page + ":" + link + ":" + channelId;
                 if (!want.equals(shown)) {
                     shown = want;
