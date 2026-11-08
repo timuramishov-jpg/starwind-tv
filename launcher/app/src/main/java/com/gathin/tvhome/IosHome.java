@@ -91,12 +91,10 @@ public class IosHome extends Activity {
             "com.yandex.devices.", "org.chromium", "com.yandex.tv.live", "com.yandex.tv.input"};
     private static final Map<String, int[]> BRAND = new HashMap<>();
     private static final Map<String, Integer> WORD = new HashMap<>();
-    /** Свой цвет сервиса при значке из самого приложения (рисованного логотипа нет): Twitch — фиолетовый. */
-    private static final Map<String, Integer> ACCENT = new HashMap<>();
     private static final int ZONA_PINK = IosPalette.PINK;
     static {
-        ACCENT.put(IosFeed.TWITCH, IosPalette.PURPLE);
         WORD.put("com.yandex.tv.ytplayer", R.drawable.word_youtube);
+        WORD.put(IosFeed.TWITCH, R.drawable.word_twitch);
         WORD.put("com.vk.tv", R.drawable.word_vk);
         WORD.put("su.happ.proxyutility", R.drawable.word_happ);
         WORD.put("ru.zonaplayer.app", R.drawable.word_zona);
@@ -114,6 +112,7 @@ public class IosHome extends Activity {
         BRAND.put("me.zhanghai.android.files", new int[]{R.drawable.logo_files, IosPalette.BLUE});
         BRAND.put("ru.vk.store.tv", new int[]{R.drawable.logo_rustore, IosPalette.BLUE});
         BRAND.put("ru.kinopoisk.yandex.tv", new int[]{R.drawable.logo_kino, IosPalette.ORANGE});
+        BRAND.put(IosFeed.TWITCH, new int[]{R.drawable.logo_twitch, IosPalette.PURPLE});
         BRAND.put(IosFeed.TELEGRAM, new int[]{R.drawable.logo_telegram, IosPalette.BLUE});
         BRAND.put("com.yandex.browser.tv", new int[]{R.drawable.logo_browser, IosPalette.RED});
         BRAND.put("cm.aptoidetv.pt", new int[]{R.drawable.logo_aptoide, IosPalette.ORANGE});
@@ -695,10 +694,7 @@ public class IosHome extends Activity {
         if (brand != null) return IosIcons.fromMask(BitmapFactory.decodeResource(getResources(), brand[0]), brand[1]);
         Drawable banner = null;
         try { banner = ri.activityInfo.loadBanner(pm); } catch (RuntimeException ignored) { }
-        IosIcons.Logo l = IosIcons.logo(ri.loadIcon(pm), banner);
-        Integer accent = ACCENT.get(pkg);
-        // Силуэт — из значка самого приложения, цвет — из палитры.
-        return accent == null ? l : IosIcons.fromMask(l.color, accent);
+        return IosIcons.logo(ri.loadIcon(pm), banner);
     }
 
     private void loadApps() {
@@ -1237,7 +1233,9 @@ public class IosHome extends Activity {
             wordmark.setPivotY(px(38));
             wordmark.setScaleX(k);
             wordmark.setScaleY(k);
-            wordmark.setImageTintList(mark == R.drawable.word_vk ? null : ColorStateList.valueOf(a.logo.accent));
+            // ВК и Twitch — двухцветные надписи (белое + цвет), их не перекрашиваем.
+            boolean twoTone = mark == R.drawable.word_vk || mark == R.drawable.word_twitch;
+            wordmark.setImageTintList(twoTone ? null : ColorStateList.valueOf(a.logo.accent));
             wordmark.setVisibility(View.VISIBLE);
             title.setText("");
         } else {
