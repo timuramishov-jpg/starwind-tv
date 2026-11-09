@@ -4,6 +4,8 @@
 Apple TV / iOS, тёмная тема. Правило проекта: **новых цветов, размеров шрифта, скруглений и отступов в коде не пишут —
 только токены.** Нарушение ловят тесты, и `tv deploy` не соберёт сборку.
 
+Переносимая версия для других проектов и ИИ — [DESIGN-SYSTEM.md](DESIGN-SYSTEM.md) (один файл: токены, CSS, JSON, правила).
+
 Единственный источник — [`IosPalette.java`](../../launcher/app/src/main/java/com/gathin/tvhome/IosPalette.java).
 Пульт повторяет те же значения в `:root` файла [`remote.html`](../../launcher/app/src/main/assets/remote.html).
 
